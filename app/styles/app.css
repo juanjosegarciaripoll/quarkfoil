@@ -23,6 +23,19 @@ button.active { background: #146c7e; border-color: #56cfe1; }
 }
 .toolbar__group { display: flex; align-items: center; gap: 0.38rem; }
 .toolbar label { display: flex; align-items: center; gap: 0.35rem; font-size: 0.86rem; }
+.toolbar .toolbar-icon-button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 30px;
+  padding: 0;
+  font-size: 1.05rem;
+  line-height: 1;
+}
+.toolbar-icon-button .text-glyph { display: grid; place-items: center; width: 22px; height: 22px; line-height: 1; transform: translateY(-0.5px); }
+.toolbar-icon-button .roman-t { font-family: Georgia, "Times New Roman", serif; font-weight: 700; }
+.action-svg { display: block; width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.toolbar-icon-button.destructive-icon:hover:not(:disabled) { color: #fff; background: #a61e4d; }
 .save-state { min-width: 5rem; color: #aab4bd; font-size: 0.82rem; }
 
 .workspace {
