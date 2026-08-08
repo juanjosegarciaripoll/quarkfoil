@@ -109,7 +109,7 @@ H_{\mathrm{eff}}
 
 ---
 
-## Annotated figure {.layout-free}
+## Annotated figure {.layout-0}
 
 ::: overlay {#full-figure type="image" x="8" y="17" w="84" h="65" z="1" locked="true"}
 ![](figures/hardware-model.svg){fit=contain focus="50 50"}
