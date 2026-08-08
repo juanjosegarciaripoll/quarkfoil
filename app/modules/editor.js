@@ -404,5 +404,18 @@ export class DesignEditor {
     return candidate;
   }
 
-  commit(source) { this.options.commitSource(source); }
+  commit(source) {
+    const overlayId = this.selected?.dataset.objectId || null;
+    const cellId = this.selectedCell?.dataset.cellId || null;
+    this.options.commitSource(source);
+    if (overlayId) {
+      const overlay = [...(this.section()?.querySelectorAll(".slide-overlay") || [])]
+        .find(item => item.dataset.objectId === overlayId);
+      if (overlay) this.selectOverlay(overlay);
+    } else if (cellId) {
+      const cell = [...(this.section()?.querySelectorAll(".slide-cell") || [])]
+        .find(item => item.dataset.cellId === cellId);
+      if (cell) this.selectCell(cell);
+    }
+  }
 }
