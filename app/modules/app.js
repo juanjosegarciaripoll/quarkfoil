@@ -123,7 +123,7 @@ function parseAndRender(source, { preserveSlide = true } = {}) {
 }
 
 function commitSource(source, record = true) {
-  if (source === state.source) return;
+  if (source === state.source) return true;
   const previous = state.source;
   try {
     parseAndRender(source);
@@ -133,9 +133,11 @@ function commitSource(source, record = true) {
       state.redo.length = 0;
       updateHistoryButtons();
     }
+    return true;
   } catch (error) {
     showStatus(error.message, true);
     elements.source.value = source;
+    return false;
   }
 }
 
@@ -168,13 +170,12 @@ function rebuildSlideList() {
     button.textContent = `${index + 1}. ${slide.title || "Untitled"}`;
     button.title = "Click to select; double-click to rename";
     button.classList.toggle("current", index === state.currentSlide);
-    button.addEventListener("click", () => { reveal.slide(index); setMode(state.mode === "source" ? "design" : state.mode); });
+    button.addEventListener("click", () => { reveal.slide(index); requestMode(state.mode === "source" ? "design" : state.mode); });
     button.addEventListener("dblclick", event => {
       event.preventDefault();
       state.currentSlide = index;
       reveal.slide(index);
-      setMode("design");
-      setTimeout(() => editor?.openTitleDialog(), 0);
+      if (requestMode("design")) setTimeout(() => editor?.openTitleDialog(), 0);
     });
     li.append(button);
     return li;
@@ -243,6 +244,14 @@ function setMode(mode) {
   if (mode === "source") requestAnimationFrame(focusSourceOnCurrentSlide);
 }
 
+function requestMode(mode) {
+  if (state.mode === "source" && mode !== "source" && elements.source.value !== state.source) {
+    if (!commitSource(elements.source.value)) return false;
+  }
+  setMode(mode);
+  return true;
+}
+
 function focusSourceOnCurrentSlide() {
   const slide = state.deck?.slides[state.currentSlide];
   if (!slide) return;
@@ -256,10 +265,11 @@ function focusSourceOnCurrentSlide() {
 }
 
 function updateDirtyState() {
-  const dirty = state.source !== state.savedSource;
+  const sourceDraft = state.mode === "source" && elements.source.value !== state.source;
+  const dirty = state.source !== state.savedSource || sourceDraft;
   elements.save.disabled = !state.deck || !dirty;
   elements.download.disabled = !state.deck;
-  elements.saveState.textContent = dirty ? "Unsaved" : "Saved";
+  elements.saveState.textContent = sourceDraft ? "Source edited" : dirty ? "Unsaved" : "Saved";
   elements.saveState.classList.toggle("dirty", dirty);
 }
 
@@ -360,6 +370,7 @@ async function preloadPortableAssets(source) {
 
 async function saveDeck() {
   try {
+    if (elements.source.value !== state.source && !commitSource(elements.source.value)) return;
     if (state.local) {
       const response = await fetch("/api/deck", {
         method: "PUT",
@@ -423,12 +434,16 @@ async function importAsset(file) {
 }
 
 function bindUi() {
-  document.querySelectorAll("[data-mode]").forEach(button => button.addEventListener("click", () => setMode(button.dataset.mode)));
+  document.querySelectorAll("[data-mode]").forEach(button => button.addEventListener("click", () => requestMode(button.dataset.mode)));
   document.querySelector("#open-button").addEventListener("click", () => openPortable().catch(error => showStatus(error.message, true)));
   elements.save.addEventListener("click", saveDeck);
   elements.download.addEventListener("click", downloadSource);
-  document.querySelector("#apply-source").addEventListener("click", () => commitSource(elements.source.value));
-  document.querySelector("#revert-source").addEventListener("click", () => { elements.source.value = state.source; });
+  elements.source.addEventListener("input", () => {
+    if (elements.source.value === state.source) { updateDirtyState(); return; }
+    elements.save.disabled = false;
+    elements.saveState.textContent = "Source edited";
+    elements.saveState.classList.add("dirty");
+  });
   document.querySelector("#file-input").addEventListener("change", async event => {
     const file = event.target.files?.[0];
     if (!file) return;
