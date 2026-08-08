@@ -1,9 +1,20 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><title>Scientific Slides self-test</title></head>
+<head>
+  <meta charset="utf-8">
+  <title>Scientific Slides self-test</title>
+  <link rel="stylesheet" href="vendor/katex/katex.min.css">
+  <link rel="stylesheet" href="styles/theme.css">
+  <style>
+    #layout-fixture { position: fixed; left: -2000px; top: 0; width: 1000px; height: 700px; }
+    #layout-fixture .scientific-slide { width: 100%; height: 100%; }
+  </style>
+</head>
 <body>
   <pre id="results">Running…</pre>
   <script src="vendor/yaml/js-yaml.min.js"></script>
+  <script src="vendor/marked/marked.min.js"></script>
+  <script src="vendor/katex/katex.min.js"></script>
   <script type="module" src="modules/selftest.js"></script>
 </body>
 </html>

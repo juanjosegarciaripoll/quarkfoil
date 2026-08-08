@@ -8,6 +8,7 @@ import {
   updateOverlay,
   updateSlideTitle,
 } from "./parser.js";
+import { renderDeck } from "./render.js";
 
 const source = `---
 title: Test deck
@@ -42,6 +43,32 @@ function assert(condition, message) {
   checks.push(`PASS ${message}`);
 }
 
+function assertCompoundLayout(layout, cellIds, spanningCellId) {
+  const layoutSource = `## Geometry {.layout-${layout} columns="40 60" rows="55 45"}\n\n`
+    + cellIds.map(id => `::: ${id}\n${id}\n:::\n`).join("\n");
+  const fixture = document.createElement("div");
+  fixture.id = "layout-fixture";
+  document.body.append(fixture);
+  const parsed = parseDeck(layoutSource);
+  renderDeck(parsed, fixture, source => source);
+  const grid = fixture.querySelector(".slide-grid");
+  const gridRect = grid.getBoundingClientRect();
+  const rectangles = Object.fromEntries(cellIds.map(id => [id, fixture.querySelector(`.cell-${id}`).getBoundingClientRect()]));
+  const epsilon = 1;
+  for (const [id, rect] of Object.entries(rectangles)) {
+    assert(rect.left >= gridRect.left - epsilon && rect.right <= gridRect.right + epsilon
+      && rect.top >= gridRect.top - epsilon && rect.bottom <= gridRect.bottom + epsilon,
+    `${layout} ${id} stays inside the grid`);
+  }
+  const nonSpanning = cellIds.filter(id => id !== spanningCellId).map(id => rectangles[id]);
+  assert(nonSpanning[0].bottom <= nonSpanning[1].top + epsilon, `${layout} stacked cells do not overlap`);
+  const spanning = rectangles[spanningCellId];
+  assert(Math.abs(spanning.top - nonSpanning[0].top) <= epsilon
+    && Math.abs(spanning.bottom - nonSpanning[1].bottom) <= epsilon,
+  `${layout} spanning cell covers both rows`);
+  fixture.remove();
+}
+
 try {
   let deck = parseDeck(source);
   assert(deck.metadata.title === "Test deck", "front matter parses");
@@ -51,6 +78,9 @@ try {
   assert(deck.slides[0].cells.find(cell => cell.id === "top-right").image.attrs.values.fit === "cover", "image attributes parse");
   assert(deck.slides[0].overlays[0].id === "eq", "overlay ID parses");
   assert(deck.slides[1].cells[0]?.range !== null, "ordinary core Markdown retains an editable range");
+
+  assertCompoundLayout("1-2", ["left", "top-right", "bottom-right"], "left");
+  assertCompoundLayout("2-1", ["top-left", "bottom-left", "right"], "right");
 
   let next = updateOverlay(deck, 0, "eq", { x: 51.5, y: 22, locked: "true" });
   assert(next.includes('x="51.5"'), "overlay geometry patches source");

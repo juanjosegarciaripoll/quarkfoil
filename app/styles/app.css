@@ -105,14 +105,6 @@ body.presenting .toolbar { display: none; }
 .resize-handle.se { right: -7px; bottom: -7px; cursor: nwse-resize; }
 .resize-handle.sw { left: -7px; bottom: -7px; cursor: nesw-resize; }
 
-.grid-splitter { position: absolute; z-index: 500; background: transparent; }
-.grid-splitter::after { content: ""; position: absolute; background: #22b8cf; opacity: 0.58; }
-.grid-splitter.vertical { top: 0; bottom: 0; left: var(--column-a-pct); width: 14px; margin-left: -7px; cursor: col-resize; }
-.grid-splitter.vertical::after { top: 0; bottom: 0; left: 6px; width: 2px; }
-.grid-splitter.horizontal { left: var(--split-side-left, var(--column-a-pct)); right: 0; top: var(--row-a-pct); height: 14px; margin-top: -7px; cursor: row-resize; }
-.grid-splitter.horizontal::after { top: 6px; left: 0; right: 0; height: 2px; }
-.layout-2-1 .grid-splitter.horizontal { --split-side-left: 0%; right: var(--column-b-pct); }
-
 .mode-design .fragment { visibility: visible !important; opacity: 1 !important; transform: none !important; }
 
 dialog { width: min(900px, 88vw); padding: 0; color: #edf2f4; background: #20252b; border: 1px solid #697681; border-radius: 8px; }

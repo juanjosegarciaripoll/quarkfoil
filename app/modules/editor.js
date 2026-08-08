@@ -88,28 +88,6 @@ export class DesignEditor {
     const slide = this.slide();
     if (!slide) return;
     document.querySelector("#layout-select").value = slide.layout;
-    this.installSplitters();
-  }
-
-  installSplitters() {
-    document.querySelectorAll(".grid-splitter").forEach(item => item.remove());
-    if (!this.active()) return;
-    const section = this.section();
-    const core = section?.querySelector(".slide-core");
-    if (!core) return;
-    const layout = this.slide().layout;
-    if (["1-1", "1-2", "2-1"].includes(layout)) {
-      const vertical = document.createElement("div");
-      vertical.className = "grid-splitter vertical";
-      vertical.dataset.axis = "columns";
-      core.append(vertical);
-    }
-    if (["1-2", "2-1"].includes(layout)) {
-      const horizontal = document.createElement("div");
-      horizontal.className = "grid-splitter horizontal";
-      horizontal.dataset.axis = "rows";
-      core.append(horizontal);
-    }
   }
 
   onClick(event) {
@@ -199,8 +177,6 @@ export class DesignEditor {
 
   onPointerDown(event) {
     if (!this.active() || event.button !== 0) return;
-    const splitter = event.target.closest(".grid-splitter");
-    if (splitter) { this.beginSplitter(event, splitter); return; }
     const handle = event.target.closest(".resize-handle");
     const overlay = event.target.closest(".slide-overlay");
     if (!overlay) return;
@@ -272,40 +248,6 @@ export class DesignEditor {
     element.style.top = `${geometry.y}%`;
     element.style.width = `${geometry.w}%`;
     element.style.height = `${geometry.h}%`;
-  }
-
-  beginSplitter(event, splitter) {
-    event.preventDefault();
-    const core = splitter.closest(".slide-core");
-    const rect = core.getBoundingClientRect();
-    const axis = splitter.dataset.axis;
-    splitter.setPointerCapture(event.pointerId);
-    const move = moveEvent => {
-      const value = axis === "columns"
-        ? clamp(100 * (moveEvent.clientX - rect.left) / rect.width, 12, 88)
-        : clamp(100 * (moveEvent.clientY - rect.top) / rect.height, 12, 88);
-      if (axis === "columns") {
-        this.section().style.setProperty("--columns", `${round(value)}fr ${round(100 - value)}fr`);
-        this.section().style.setProperty("--column-a-pct", `${round(value)}%`);
-        this.section().style.setProperty("--column-b-pct", `${round(100 - value)}%`);
-      } else {
-        this.section().style.setProperty("--rows", `${round(value)}fr ${round(100 - value)}fr`);
-        this.section().style.setProperty("--row-a-pct", `${round(value)}%`);
-        this.section().style.setProperty("--row-b-pct", `${round(100 - value)}%`);
-      }
-    };
-    const finish = finishEvent => {
-      splitter.releasePointerCapture(finishEvent.pointerId);
-      splitter.removeEventListener("pointermove", move);
-      splitter.removeEventListener("pointerup", finish);
-      const style = getComputedStyle(this.section());
-      const columns = [parseFloat(style.getPropertyValue("--column-a-pct")), parseFloat(style.getPropertyValue("--column-b-pct"))];
-      const rows = [parseFloat(style.getPropertyValue("--row-a-pct")), parseFloat(style.getPropertyValue("--row-b-pct"))];
-      const slide = this.slide();
-      this.commit(updateHeadingLayout(this.options.getDeck(), this.slideIndex(), slide.layout, columns, rows));
-    };
-    splitter.addEventListener("pointermove", move);
-    splitter.addEventListener("pointerup", finish);
   }
 
   changeLayout(layout) {

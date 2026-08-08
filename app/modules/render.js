@@ -75,12 +75,10 @@ function renderSlide(slide, metadata, assetResolver) {
   section.className = `scientific-slide layout-${slide.layout}`;
   section.dataset.slideIndex = String(slide.index);
   section.dataset.slideId = slide.id;
-  section.style.setProperty("--columns", `${slide.columns[0]}fr ${slide.columns[1]}fr`);
-  section.style.setProperty("--rows", `${slide.rows[0]}fr ${slide.rows[1]}fr`);
-  section.style.setProperty("--column-a-pct", `${slide.columns[0]}%`);
-  section.style.setProperty("--column-b-pct", `${slide.columns[1]}%`);
-  section.style.setProperty("--row-a-pct", `${slide.rows[0]}%`);
-  section.style.setProperty("--row-b-pct", `${slide.rows[1]}%`);
+  section.style.setProperty("--column-a", `${slide.columns[0]}fr`);
+  section.style.setProperty("--column-b", `${slide.columns[1]}fr`);
+  section.style.setProperty("--row-a", `${slide.rows[0]}fr`);
+  section.style.setProperty("--row-b", `${slide.rows[1]}fr`);
 
   if (slide.title) {
     const title = document.createElement(slide.headingAttrs.classes.includes("title-slide") ? "h1" : "h2");

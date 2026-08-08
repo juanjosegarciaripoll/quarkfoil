@@ -58,19 +58,29 @@
   gap: var(--grid-gap);
 }
 
-.layout-1 .slide-grid { grid-template: "core" 1fr / 1fr; }
-.layout-1-1 .slide-grid { grid-template: "left right" 1fr / var(--columns); }
+.layout-1 .slide-grid {
+  grid-template-areas: "core";
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+}
+.layout-1-1 .slide-grid {
+  grid-template-areas: "left right";
+  grid-template-columns: minmax(0, var(--column-a)) minmax(0, var(--column-b));
+  grid-template-rows: minmax(0, 1fr);
+}
 .layout-1-2 .slide-grid {
-  grid-template:
-    "left top-right" var(--row-a)
-    "left bottom-right" var(--row-b)
-    / var(--columns);
+  grid-template-areas:
+    "left top-right"
+    "left bottom-right";
+  grid-template-columns: minmax(0, var(--column-a)) minmax(0, var(--column-b));
+  grid-template-rows: minmax(0, var(--row-a)) minmax(0, var(--row-b));
 }
 .layout-2-1 .slide-grid {
-  grid-template:
-    "top-left right" var(--row-a)
-    "bottom-left right" var(--row-b)
-    / var(--columns);
+  grid-template-areas:
+    "top-left right"
+    "bottom-left right";
+  grid-template-columns: minmax(0, var(--column-a)) minmax(0, var(--column-b));
+  grid-template-rows: minmax(0, var(--row-a)) minmax(0, var(--row-b));
 }
 .layout-free .slide-grid { display: none; }
 
