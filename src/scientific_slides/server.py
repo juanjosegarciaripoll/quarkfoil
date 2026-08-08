@@ -6,6 +6,7 @@ import json
 import mimetypes
 import os
 import shutil
+import sys
 import tempfile
 import threading
 import urllib.parse
@@ -202,6 +203,25 @@ def create_server(deck: Path, host: str, port: int) -> ThreadingHTTPServer:
 
 
 def main(argv: list[str] | None = None) -> int:
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    if arguments[:1] == ["export"]:
+        from .exporter import export_presentation
+
+        export_parser = argparse.ArgumentParser(
+            prog="quarkfoil export",
+            description="Export a Quarkfoil presentation as a static website",
+        )
+        export_parser.add_argument("deck", type=Path, help="Markdown presentation to export")
+        export_parser.add_argument("--output", "-o", type=Path, required=True, help="New directory to create")
+        assets = export_parser.add_mutually_exclusive_group()
+        assets.add_argument("--assets", choices=("local", "cdn"), default="local", help="Dependency source (default: local)")
+        assets.add_argument("--cdn", dest="assets", action="store_const", const="cdn", help="Use pinned jsDelivr dependencies")
+        export_args = export_parser.parse_args(arguments[1:])
+        destination = export_presentation(export_args.deck, export_args.output, assets=export_args.assets)
+        print(f"Exported Quarkfoil presentation to {destination}")
+        print(f"Serve {destination / 'index.html'} from any static web server")
+        return 0
+
     parser = argparse.ArgumentParser(description="Open a scientific Markdown presentation in Quarkfoil")
     parser.add_argument("deck", type=Path, help="Markdown presentation to open")
     parser.add_argument("--host", default="127.0.0.1", help="Address to bind (default: 127.0.0.1)")
@@ -209,7 +229,7 @@ def main(argv: list[str] | None = None) -> int:
     browser = parser.add_mutually_exclusive_group()
     browser.add_argument("--open", dest="open_browser", action="store_true", default=True, help="Open the editor in a browser (default)")
     browser.add_argument("--no-open", dest="open_browser", action="store_false", help="Start the server without opening a browser")
-    args = parser.parse_args(argv)
+    args = parser.parse_args(arguments)
     server = create_server(args.deck, args.host, args.port)
     url = f"http://{args.host}:{server.server_port}/"
     print(f"Quarkfoil: {args.deck.resolve()}")

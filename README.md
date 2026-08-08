@@ -3,6 +3,7 @@
 Quarkfoil is a local, browser-based editor for scientific presentations written in Markdown. It combines structured slide layouts with freely positioned Markdown, LaTeX, and image objects, and presents the result with Reveal.js.
 
 **[Read the illustrated documentation](https://juanjosegarciaripoll.github.io/quarkfoil/)**
+· **[View the live sample presentation](https://juanjosegarciaripoll.github.io/quarkfoil/example/)**
 
 [![Quarkfoil editing the included example presentation](docs/assets/editor-overview.png)](https://juanjosegarciaripoll.github.io/quarkfoil/)
 
@@ -15,6 +16,7 @@ The presentation remains a readable Markdown file accompanied by a `figures/` di
 - Image fit, crop focus, overlay position, size, typography, alignment, and fragments are editable graphically.
 - Source, Design, and Present modes use the same Markdown source of truth.
 - Local assets and pinned browser libraries require no runtime CDN or Node/npm toolchain.
+- Presentations export as self-contained static websites, with an optional pinned-CDN mode.
 - Saves are atomic, conflict-checked, and restricted to the selected presentation directory.
 
 ## Install
@@ -49,6 +51,17 @@ uv run quarkfoil example\deck.md
 
 The [`example/`](example/) directory is also a template for new presentation projects.
 
+## Export a static website
+
+```powershell
+quarkfoil export path\to\presentation.md --output presentation-site
+```
+
+The generated folder can be served by GitHub Pages or any ordinary static web
+server. Add `--cdn` to reference exact, integrity-checked jsDelivr packages
+instead of copying the browser libraries. See the
+[export guide](docs/EXPORT.md) for details.
+
 ## Documentation
 
 - [Installation and command-line use](docs/INSTALLATION.md)
@@ -68,7 +81,7 @@ and included in distributed packages:
 
 - [Reveal.js 5.2.1 — MIT](app/vendor/reveal/LICENSE)
 - [KaTeX 0.16.22, including its distributed fonts — MIT](app/vendor/katex/LICENSE)
-- [Marked 15.0.12 — MIT](app/vendor/marked/LICENSE.md)
+- [Marked 15.0.12 — MIT and BSD-3-Clause notices](app/vendor/marked/LICENSE.md)
 - [js-yaml 4.1.0 — MIT](app/vendor/yaml/LICENSE)
 
 Versions, copyright holders, source checksums, and redistribution details are

@@ -16,6 +16,7 @@ objects that need individual attention.
 
 [Get started](QUICK_START.md){ .md-button .md-button--primary }
 [Explore the editor](USER_GUIDE.md){ .md-button }
+[View live example](https://juanjosegarciaripoll.github.io/quarkfoil/example/){ .md-button }
 
 </div>
 
@@ -69,8 +70,9 @@ Markdown annotations.
 
 !!! tip "Start with the example"
     The repository includes a presentation demonstrating every layout, image
-    behavior, equation overlays, and annotations. Open it with
-    `uv run quarkfoil example/deck.md` from a source checkout.
+    behavior, equation overlays, and annotations. [View the exported example](https://juanjosegarciaripoll.github.io/quarkfoil/example/)
+    in presentation mode, or open it with `uv run quarkfoil example/deck.md`
+    from a source checkout.
 
 ## A deliberately small toolchain
 

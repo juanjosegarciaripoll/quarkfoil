@@ -4,16 +4,24 @@ on:
   push:
     branches: [main]
     paths:
+      - app/**
       - docs/**
+      - example/**
       - mkdocs.yml
       - pyproject.toml
+      - src/**
+      - THIRD_PARTY_LICENSES.md
       - uv.lock
       - .github/workflows/docs.yml
   pull_request:
     paths:
+      - app/**
       - docs/**
+      - example/**
       - mkdocs.yml
       - pyproject.toml
+      - src/**
+      - THIRD_PARTY_LICENSES.md
       - uv.lock
       - .github/workflows/docs.yml
   workflow_dispatch:
@@ -36,9 +44,11 @@ jobs:
         with:
           enable-cache: true
       - name: Install documentation dependencies
-        run: uv sync --frozen --only-group docs --no-install-project
+        run: uv sync --frozen --only-group docs
       - name: Build documentation
         run: uv run --frozen --no-sync mkdocs build --strict
+      - name: Export live example
+        run: uv run --frozen --no-sync quarkfoil export example/deck.md --output site/example --cdn
       - name: Configure GitHub Pages
         if: github.event_name != 'pull_request'
         uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5

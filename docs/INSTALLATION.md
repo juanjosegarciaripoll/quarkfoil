@@ -60,6 +60,18 @@ quarkfoil lecture.md --no-open --port 0
 
 Binding to a non-loopback address exposes the editor to the corresponding network. Do so only on a trusted network and after reviewing the security implications.
 
+## Export a presentation website
+
+Create a self-contained static site with:
+
+```console
+quarkfoil export lecture.md --output lecture-site
+```
+
+Add `--cdn` for a smaller, network-dependent export. See the
+[static export guide](EXPORT.md) for the generated structure, deployment, and
+security trade-offs.
+
 ## Project structure
 
 A presentation project is deliberately small:

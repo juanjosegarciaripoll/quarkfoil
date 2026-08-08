@@ -9,7 +9,7 @@ It includes pinned copies of four permissively licensed browser components:
 |---|---:|---|
 | Reveal.js | 5.2.1 | [MIT](https://github.com/juanjosegarciaripoll/quarkfoil/blob/main/app/vendor/reveal/LICENSE) |
 | KaTeX, including its distributed fonts | 0.16.22 | [MIT](https://github.com/juanjosegarciaripoll/quarkfoil/blob/main/app/vendor/katex/LICENSE) |
-| Marked | 15.0.12 | [MIT](https://github.com/juanjosegarciaripoll/quarkfoil/blob/main/app/vendor/marked/LICENSE.md) |
+| Marked | 15.0.12 | [MIT and BSD-3-Clause notices](https://github.com/juanjosegarciaripoll/quarkfoil/blob/main/app/vendor/marked/LICENSE.md) |
 | js-yaml | 4.1.0 | [MIT](https://github.com/juanjosegarciaripoll/quarkfoil/blob/main/app/vendor/yaml/LICENSE) |
 
 Exact copyright notices, checksums, and redistribution information are

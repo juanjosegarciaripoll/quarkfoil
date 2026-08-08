@@ -1,0 +1,78 @@
+from __future__ import annotations
+
+import tempfile
+import unittest
+from pathlib import Path
+
+from scientific_slides.exporter import export_presentation
+from scientific_slides.server import main
+
+
+class ExporterTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory()
+        self.root = Path(self.temporary.name)
+        self.project = self.root / "project"
+        figures = self.project / "figures"
+        figures.mkdir(parents=True)
+        (figures / "diagram.svg").write_text(
+            "<svg xmlns='http://www.w3.org/2000/svg'/>", encoding="utf-8"
+        )
+        self.deck = self.project / "lecture.md"
+        self.deck.write_text(
+            "---\ntitle: Export test\n---\n\n"
+            "## Diagram {.layout-1}\n\n"
+            "::: core\n![](figures/diagram.svg){fit=contain}\n:::\n",
+            encoding="utf-8",
+        )
+
+    def tearDown(self) -> None:
+        self.temporary.cleanup()
+
+    def test_local_export_is_complete(self) -> None:
+        output = export_presentation(self.deck, self.root / "local-site")
+        index = (output / "index.html").read_text(encoding="utf-8")
+        self.assertIn("quarkfoil/vendor/reveal/reveal.js", index)
+        self.assertNotIn("cdn.jsdelivr.net", index)
+        self.assertEqual((output / "presentation.md").read_text(encoding="utf-8"), self.deck.read_text(encoding="utf-8"))
+        self.assertTrue((output / "figures/diagram.svg").is_file())
+        self.assertTrue((output / "quarkfoil/player.js").is_file())
+        self.assertTrue((output / "quarkfoil/vendor/katex/fonts/KaTeX_Main-Regular.woff2").is_file())
+        self.assertIn("Reveal.js", (output / "THIRD_PARTY_LICENSES.txt").read_text(encoding="utf-8"))
+
+    def test_cdn_export_uses_pinned_integrity_checked_urls(self) -> None:
+        output = export_presentation(self.deck, self.root / "cdn-site", assets="cdn")
+        index = (output / "index.html").read_text(encoding="utf-8")
+        self.assertIn("https://cdn.jsdelivr.net/npm/reveal.js@5.2.1/dist/reveal.js", index)
+        self.assertIn("https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css", index)
+        self.assertIn('integrity="sha384-', index)
+        self.assertIn('crossorigin="anonymous"', index)
+        self.assertFalse((output / "quarkfoil/vendor").exists())
+        self.assertTrue((output / "THIRD_PARTY_LICENSES.txt").is_file())
+
+    def test_existing_destination_is_never_overwritten(self) -> None:
+        output = self.root / "existing"
+        output.mkdir()
+        marker = output / "keep.txt"
+        marker.write_text("keep", encoding="utf-8")
+        with self.assertRaises(FileExistsError):
+            export_presentation(self.deck, output)
+        self.assertEqual(marker.read_text(encoding="utf-8"), "keep")
+
+    def test_asset_cannot_leave_project(self) -> None:
+        outside = self.root / "outside.svg"
+        outside.write_text("<svg/>", encoding="utf-8")
+        self.deck.write_text("## Escape\n\n![](../outside.svg)\n", encoding="utf-8")
+        with self.assertRaises(ValueError):
+            export_presentation(self.deck, self.root / "unsafe-site")
+        self.assertFalse((self.root / "unsafe-site").exists())
+
+    def test_cli_export_alias(self) -> None:
+        output = self.root / "cli-site"
+        result = main(["export", str(self.deck), "--output", str(output), "--cdn"])
+        self.assertEqual(result, 0)
+        self.assertTrue((output / "index.html").is_file())
+
+
+if __name__ == "__main__":
+    unittest.main()

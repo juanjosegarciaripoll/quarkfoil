@@ -37,7 +37,7 @@ The files under `docs/` are both the repository documentation and the source
 of the public website. Preview them locally with:
 
 ```console
-uv sync --only-group docs --no-install-project
+uv sync --only-group docs
 uv run --no-sync mkdocs serve
 ```
 
@@ -46,10 +46,12 @@ integration:
 
 ```console
 uv run --no-sync mkdocs build --strict
+uv run --no-sync quarkfoil export example/deck.md --output site/example --cdn
 ```
 
 Pushing documentation changes to `main` triggers the GitHub Pages workflow.
-The generated `site/` directory is disposable and is not committed.
+The workflow publishes both the documentation and this freshly exported live
+example. The generated `site/` directory is disposable and is not committed.
 
 ## Vendored browser dependencies
 

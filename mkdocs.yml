@@ -44,6 +44,7 @@ nav:
   - User guide:
       - Installation and command line: INSTALLATION.md
       - Editor: USER_GUIDE.md
+      - Export a static website: EXPORT.md
       - Presentation format: FORMAT.md
   - Reference:
       - Security: SECURITY.md
