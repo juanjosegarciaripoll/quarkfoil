@@ -234,9 +234,25 @@ function setMode(mode) {
       overview: mode === "present",
       embedded: mode !== "present",
     });
-    setTimeout(() => { reveal.layout(); reveal.slide(state.currentSlide); editor?.refresh(); }, 0);
+    setTimeout(() => {
+      reveal.layout();
+      reveal.slide(state.currentSlide);
+      editor?.refresh();
+    }, 0);
   }
-  if (mode === "source") elements.source.focus();
+  if (mode === "source") requestAnimationFrame(focusSourceOnCurrentSlide);
+}
+
+function focusSourceOnCurrentSlide() {
+  const slide = state.deck?.slides[state.currentSlide];
+  if (!slide) return;
+  const offset = slide.range.start;
+  elements.source.focus();
+  elements.source.setSelectionRange(offset, offset);
+  const lineCount = state.source.slice(0, offset).split(/\r\n|\r|\n/).length - 1;
+  const lineHeight = Number.parseFloat(getComputedStyle(elements.source).lineHeight) || 20;
+  elements.source.scrollTop = Math.max(0, lineCount * lineHeight);
+  elements.source.scrollLeft = 0;
 }
 
 function updateDirtyState() {
