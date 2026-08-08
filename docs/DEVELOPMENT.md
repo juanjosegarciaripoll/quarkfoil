@@ -37,7 +37,7 @@ The files under `docs/` are both the repository documentation and the source
 of the public website. Preview them locally with:
 
 ```console
-uv sync --only-group docs
+uv sync --group docs
 uv run --no-sync mkdocs serve
 ```
 

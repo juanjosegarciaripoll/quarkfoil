@@ -64,7 +64,7 @@ jobs:
         with:
           enable-cache: true
       - name: Install documentation environment
-        run: uv sync --frozen --only-group docs
+        run: uv sync --frozen --group docs
       - name: Build documentation strictly
         run: uv run --frozen --no-sync mkdocs build --strict
       - name: Export live example
