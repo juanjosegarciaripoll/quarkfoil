@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 560" role="img" aria-labelledby="title desc">
+  <title id="title">Hardware to effective-model diagram</title>
+  <desc id="desc">A stylized optical lattice connected to a spin interaction graph.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1">
+      <stop offset="0" stop-color="#e6f4f7"/>
+      <stop offset="1" stop-color="#f8fbfc"/>
+    </linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#146c7e"/>
+    </marker>
+  </defs>
+  <rect width="1000" height="560" rx="24" fill="url(#bg)"/>
+  <g fill="none" stroke="#77b8c4" stroke-width="3" opacity=".75">
+    <path d="M70 115 C120 35 170 195 220 115 S320 35 370 115 S470 195 520 115"/>
+    <path d="M70 220 C120 140 170 300 220 220 S320 140 370 220 S470 300 520 220"/>
+    <path d="M70 325 C120 245 170 405 220 325 S320 245 370 325 S470 405 520 325"/>
+  </g>
+  <g fill="#146c7e" stroke="#fff" stroke-width="5">
+    <circle cx="120" cy="115" r="19"/><circle cx="270" cy="115" r="19"/><circle cx="420" cy="115" r="19"/>
+    <circle cx="120" cy="220" r="19"/><circle cx="270" cy="220" r="19"/><circle cx="420" cy="220" r="19"/>
+    <circle cx="120" cy="325" r="19"/><circle cx="270" cy="325" r="19"/><circle cx="420" cy="325" r="19"/>
+  </g>
+  <path d="M545 220 H665" stroke="#146c7e" stroke-width="8" marker-end="url(#arrow)"/>
+  <g transform="translate(700 80)" stroke="#7b2cbf" stroke-width="8">
+    <path d="M60 40 L180 120 L60 200 L180 280 L60 360" fill="none"/>
+    <g fill="#fff">
+      <circle cx="60" cy="40" r="25"/><circle cx="180" cy="120" r="25"/><circle cx="60" cy="200" r="25"/>
+      <circle cx="180" cy="280" r="25"/><circle cx="60" cy="360" r="25"/>
+    </g>
+    <g stroke="#146c7e" stroke-width="6">
+      <path d="M60 56 V24 M44 40 H76"/><path d="M180 136 V104 M164 120 H196"/>
+      <path d="M60 216 V184 M44 200 H76"/><path d="M180 296 V264 M164 280 H196"/>
+      <path d="M60 376 V344 M44 360 H76"/>
+    </g>
+  </g>
+  <g font-family="Segoe UI,Arial,sans-serif" fill="#17202a">
+    <text x="70" y="440" font-size="34" font-weight="600">controllable hardware</text>
+    <text x="698" y="500" font-size="34" font-weight="600">effective model</text>
+  </g>
+</svg>
