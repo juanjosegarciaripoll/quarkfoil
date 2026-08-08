@@ -93,6 +93,7 @@ function assertFrontLayout() {
   assert(parsed.slides[0].layout === "front", "front-page layout parses");
   assert(Math.abs(title.height - core.height) <= 1, `front page divides title and details equally (${title.height.toFixed(1)} / ${core.height.toFixed(1)})`);
   assert(Math.abs(title.height + core.height - contentHeight) <= 1, `front page fills the padded content height (${(title.height + core.height).toFixed(1)} / ${contentHeight.toFixed(1)})`);
+  assert(getComputedStyle(fixture.querySelector(".slide-cell")).justifyContent === "flex-start", "front-page details align to the top of the lower region");
   fixture.remove();
 }
 

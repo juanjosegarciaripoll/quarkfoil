@@ -121,7 +121,7 @@
 .scientific-slide.layout-front .slide-cell {
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
 }
 .scientific-slide.layout-front .slide-footer { display: none; }
 
