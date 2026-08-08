@@ -128,6 +128,11 @@ function renderSlide(slide, metadata, assetResolver) {
     element.style.width = `${overlay.geometry.w}%`;
     element.style.height = `${overlay.geometry.h}%`;
     element.style.zIndex = String(overlay.geometry.z);
+    if (overlay.type !== "image") {
+      element.style.fontSize = `${overlay.fontSize}em`;
+      element.style.textAlign = overlay.alignment;
+      element.dataset.align = overlay.alignment;
+    }
     fillContent(element, overlay, assetResolver);
     overlayLayer.append(element);
   }

@@ -30,7 +30,7 @@ Left **Markdown**.
 ![](figures/a.svg){fit=cover focus="70 30"}
 :::
 
-::: overlay {#eq type="equation" x="62" y="31" w="24" h="9"}
+::: overlay {#eq type="equation" x="62" y="31" w="24" h="9" font-size="1.4em" align="right"}
 \\[
 E=mc^2
 \\]
@@ -104,14 +104,17 @@ function assertEmptyLayouts() {
   slides.className = "slides";
   fixture.append(slides);
   document.body.append(fixture);
-  const parsed = parseDeck(`---\ndefaults:\n  footer: Footer\n---\n\n## Title and footer {.layout-0}\n\n---\n\n## Hidden structure {.layout-free}\n\n::: overlay {#free-text type="markdown" x="20" y="20" w="40" h="20"}\nFree overlay\n:::`);
+  const parsed = parseDeck(`---\ndefaults:\n  footer: Footer\n---\n\n## Title and footer {.layout-0}\n\n---\n\n## Hidden structure {.layout-free}\n\n::: overlay {#free-text type="markdown" x="20" y="20" w="40" h="20" font-size="0.25em" align="center"}\nFree overlay\n:::\n\n::: overlay {#free-equation type="equation" x="20" y="50" w="60" h="20" align="right"}\n\\[E=mc^2\\]\n:::`);
   renderDeck(parsed, slides, source => source);
   const zero = fixture.querySelector(".layout-0");
   const free = fixture.querySelector(".layout-free");
   assert(zero.querySelectorAll(".slide-cell").length === 0, "layout 0 creates no core cells");
   assert(getComputedStyle(zero.querySelector(".slide-frame")).display === "grid", "layout 0 keeps title and footer structure");
   assert(getComputedStyle(free.querySelector(".slide-frame")).display === "none", "free layout hides title, core and footer");
-  assert(free.querySelectorAll(".slide-overlay").length === 1, "free layout retains positioned overlays");
+  assert(free.querySelectorAll(".slide-overlay").length === 2, "free layout retains positioned overlays");
+  assert(free.querySelector(".overlay-markdown").style.fontSize === "0.25em", "Markdown overlays render relative font sizes down to 0.25 em");
+  assert(free.querySelector(".overlay-markdown").dataset.align === "center", "Markdown overlays render explicit alignment");
+  assert(getComputedStyle(free.querySelector(".overlay-equation .katex-display > .katex")).textAlign === "right", "equation alignment overrides KaTeX inner alignment");
   fixture.remove();
 }
 
@@ -123,6 +126,8 @@ try {
   assert(Math.round(deck.slides[0].columns[0]) === 40, "column ratios parse");
   assert(deck.slides[0].cells.find(cell => cell.id === "top-right").image.attrs.values.fit === "cover", "image attributes parse");
   assert(deck.slides[0].overlays[0].id === "eq", "overlay ID parses");
+  assert(deck.slides[0].overlays[0].fontSize === 1.4, "relative overlay font size parses");
+  assert(deck.slides[0].overlays[0].alignment === "right", "overlay alignment parses");
   assert(deck.slides[1].cells[0]?.range !== null, "ordinary core Markdown retains an editable range");
 
   const duplicated = parseDeck(duplicateSlide(deck, 0));

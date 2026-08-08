@@ -51,6 +51,11 @@ function parseRatio(value, fallback = [50, 50]) {
   return numbers.map(number => 100 * number / total);
 }
 
+function parseFontSize(value) {
+  const match = /^([0-9]+(?:\.[0-9]+)?|\.[0-9]+)(?:em)?$/i.exec(String(value ?? "1").trim());
+  return match ? Number(match[1]) : Number.NaN;
+}
+
 function splitFrontMatter(source, diagnostics) {
   if (!source.startsWith("---")) return { metadata: {}, bodyStart: 0, raw: "" };
   const match = /^---\s*\r?\n([\s\S]*?)\r?\n---\s*(?:\r?\n|$)/.exec(source);
@@ -199,6 +204,7 @@ function parseSlide(source, range, index, diagnostics) {
       const type = block.attrs.values.type || (image ? "image" : "markdown");
       const id = block.attrs.id || `overlay-${index + 1}-${overlays.length + 1}`;
       if (!block.attrs.id) diagnostics.push({ level: "warning", slide: index + 1, message: `Overlay '${id}' has no stable source ID` });
+      const alignment = block.attrs.values.align || (type === "equation" ? "center" : "left");
       overlays.push({
         id,
         type,
@@ -213,6 +219,8 @@ function parseSlide(source, range, index, diagnostics) {
           h: Number(block.attrs.values.h ?? 15),
           z: Number(block.attrs.values.z ?? overlays.length + 10),
         },
+        fontSize: parseFontSize(block.attrs.values["font-size"]),
+        alignment,
         fragment: block.attrs.values.fragment ? Number(block.attrs.values.fragment) : null,
         locked: block.attrs.values.locked === "true",
       });
@@ -235,6 +243,8 @@ function parseSlide(source, range, index, diagnostics) {
   for (const overlay of overlays) {
     const values = Object.values(overlay.geometry);
     if (values.some(value => !Number.isFinite(value))) diagnostics.push({ level: "error", slide: index + 1, message: `Overlay '${overlay.id}' has invalid geometry` });
+    if (!Number.isFinite(overlay.fontSize) || overlay.fontSize <= 0) diagnostics.push({ level: "error", slide: index + 1, message: `Overlay '${overlay.id}' has invalid font size` });
+    if (!["left", "center", "right"].includes(overlay.alignment)) diagnostics.push({ level: "error", slide: index + 1, message: `Overlay '${overlay.id}' has invalid alignment` });
   }
   return {
     index,

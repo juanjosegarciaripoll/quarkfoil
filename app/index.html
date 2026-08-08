@@ -101,6 +101,21 @@
         <label>Focus X <input id="prop-focus-x" type="range" min="0" max="100"></label>
         <label>Focus Y <input id="prop-focus-y" type="range" min="0" max="100"></label>
       </form>
+      <form id="font-properties" hidden>
+        <label>Font size
+          <span class="range-with-value">
+            <input id="prop-font-size" type="range" min="0.25" max="3" step="0.05" value="1">
+            <output id="prop-font-size-value" for="prop-font-size">1.00 em</output>
+          </span>
+        </label>
+        <label>Alignment
+          <span class="alignment-buttons" role="group" aria-label="Text alignment">
+            <button type="button" data-align="left" title="Align left" aria-label="Align left"><span class="align-icon align-icon-left" aria-hidden="true"><i></i><i></i><i></i></span></button>
+            <button type="button" data-align="center" title="Align center" aria-label="Align center"><span class="align-icon align-icon-center" aria-hidden="true"><i></i><i></i><i></i></span></button>
+            <button type="button" data-align="right" title="Align right" aria-label="Align right"><span class="align-icon align-icon-right" aria-hidden="true"><i></i><i></i><i></i></span></button>
+          </span>
+        </label>
+      </form>
     </aside>
   </main>
 

@@ -23,6 +23,7 @@ export class DesignEditor {
     this.stage = document.querySelector("#stage");
     this.properties = document.querySelector("#object-properties");
     this.imageProperties = document.querySelector("#image-properties");
+    this.fontProperties = document.querySelector("#font-properties");
     this.noSelection = document.querySelector("#no-selection");
     this.dialog = document.querySelector("#content-dialog");
     this.contentEditor = document.querySelector("#content-editor");
@@ -74,6 +75,11 @@ export class DesignEditor {
     document.querySelector("#prop-fit").addEventListener("change", () => this.applyImageProperties());
     document.querySelector("#prop-focus-x").addEventListener("change", () => this.applyImageProperties());
     document.querySelector("#prop-focus-y").addEventListener("change", () => this.applyImageProperties());
+    document.querySelector("#prop-font-size").addEventListener("input", event => this.previewFontSize(event.target.value));
+    document.querySelector("#prop-font-size").addEventListener("change", () => this.applyFontSize());
+    document.querySelectorAll(".alignment-buttons [data-align]").forEach(button => {
+      button.addEventListener("click", () => this.applyAlignment(button.dataset.align));
+    });
     this.stage.addEventListener("dragover", event => event.preventDefault());
     this.stage.addEventListener("drop", event => this.onDrop(event));
   }
@@ -153,6 +159,7 @@ export class DesignEditor {
     this.selectedCell = null;
     this.properties.hidden = true;
     this.imageProperties.hidden = true;
+    this.fontProperties.hidden = true;
     this.noSelection.hidden = false;
     this.noSelection.textContent = "Select an overlay or cell.";
     document.querySelector("#duplicate-object").disabled = true;
@@ -171,7 +178,42 @@ export class DesignEditor {
       const focus = (object.image.attrs.values.focus || "50 50").split(/[\s,]+/);
       document.querySelector("#prop-focus-x").value = focus[0] || 50;
       document.querySelector("#prop-focus-y").value = focus[1] || 50;
+    } else {
+      this.fontProperties.hidden = false;
+      document.querySelector("#prop-font-size").value = object.fontSize;
+      this.updateFontSizeOutput(object.fontSize);
+      this.updateAlignmentButtons(object.alignment);
     }
+  }
+
+  updateFontSizeOutput(value) {
+    document.querySelector("#prop-font-size-value").value = `${Number(value).toFixed(2)} em`;
+  }
+
+  previewFontSize(value) {
+    if (!this.selected) return;
+    this.selected.style.fontSize = `${value}em`;
+    this.updateFontSizeOutput(value);
+  }
+
+  applyFontSize() {
+    if (!this.selected) return;
+    const value = Number(document.querySelector("#prop-font-size").value);
+    this.commit(updateOverlay(this.options.getDeck(), this.slideIndex(), this.selected.dataset.objectId, {
+      "font-size": `${Math.round(value * 100) / 100}em`,
+    }));
+  }
+
+  updateAlignmentButtons(alignment) {
+    document.querySelectorAll(".alignment-buttons [data-align]").forEach(button => {
+      button.classList.toggle("active", button.dataset.align === alignment);
+      button.setAttribute("aria-pressed", String(button.dataset.align === alignment));
+    });
+  }
+
+  applyAlignment(alignment) {
+    if (!this.selected || !["left", "center", "right"].includes(alignment)) return;
+    this.commit(updateOverlay(this.options.getDeck(), this.slideIndex(), this.selected.dataset.objectId, { align: alignment }));
   }
 
   onPointerDown(event) {

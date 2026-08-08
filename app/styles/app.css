@@ -70,6 +70,17 @@ button.active { background: #146c7e; border-color: #56cfe1; }
 .properties label.check { display: flex; }
 .properties input, .properties select { min-width: 0; padding: 0.25rem; }
 #image-properties { margin-top: 0.7rem; padding-top: 0.7rem; border-top: 1px solid #3d454e; }
+#font-properties { margin-top: 0.7rem; padding-top: 0.7rem; border-top: 1px solid #3d454e; }
+.range-with-value { display: grid; grid-template-columns: minmax(0, 1fr) 3.8rem; align-items: center; gap: 0.35rem; }
+.range-with-value output { color: #cbd3da; font-size: 0.75rem; text-align: right; }
+.alignment-buttons { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.25rem; }
+.alignment-buttons button { display: grid; place-items: center; min-width: 0; height: 28px; padding: 0; }
+.align-icon { display: flex; flex-direction: column; gap: 3px; width: 16px; }
+.align-icon i { display: block; width: 16px; height: 2px; background: currentColor; }
+.align-icon i:nth-child(2) { width: 11px; }
+.align-icon-left { align-items: flex-start; }
+.align-icon-center { align-items: center; }
+.align-icon-right { align-items: flex-end; }
 .mode-source { grid-template-columns: 170px minmax(400px, 1fr); }
 .mode-source .properties, .mode-source .stage { display: none; }
 .mode-design .source-pane { display: none; }
