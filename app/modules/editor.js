@@ -162,7 +162,6 @@ export class DesignEditor {
   fillProperties(object) {
     if (!object) return;
     document.querySelector("#prop-id").value = object.id;
-    document.querySelector("#prop-type").value = object.type;
     for (const key of ["x", "y", "w", "h", "z"]) document.querySelector(`#prop-${key}`).value = object.geometry[key];
     document.querySelector("#prop-fragment").value = object.fragment ?? "";
     document.querySelector("#prop-locked").checked = object.locked;
