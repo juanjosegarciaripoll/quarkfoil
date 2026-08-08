@@ -80,7 +80,6 @@ const elements = {
   save: document.querySelector("#save-button"),
   download: document.querySelector("#download-button"),
   saveState: document.querySelector("#save-state"),
-  diagnostics: document.querySelector("#diagnostics"),
 };
 
 let reveal;
@@ -102,9 +101,11 @@ async function hashText(text) {
 function parseAndRender(source, { preserveSlide = true } = {}) {
   const previous = preserveSlide ? state.currentSlide : 0;
   const deck = parseDeck(source);
-  const fatal = deck.diagnostics.some(item => item.level === "error");
-  displayDiagnostics(deck.diagnostics);
-  if (fatal) throw new Error("The source contains errors; the last valid presentation is unchanged.");
+  const fatal = deck.diagnostics.find(item => item.level === "error");
+  if (fatal) {
+    const location = fatal.slide ? `Slide ${fatal.slide}: ` : "";
+    throw new Error(`${location}${fatal.message}. The last valid presentation is unchanged.`);
+  }
   state.source = source;
   state.deck = deck;
   elements.source.value = source;
@@ -157,20 +158,6 @@ function redo() {
 function updateHistoryButtons() {
   document.querySelector("#undo-button").disabled = !state.undo.length;
   document.querySelector("#redo-button").disabled = !state.redo.length;
-}
-
-function displayDiagnostics(items) {
-  elements.diagnostics.replaceChildren(...items.map(item => {
-    const li = document.createElement("li");
-    li.className = item.level;
-    li.textContent = `${item.slide ? `Slide ${item.slide}: ` : ""}${item.message}`;
-    return li;
-  }));
-  if (!items.length) {
-    const li = document.createElement("li");
-    li.textContent = "No problems found.";
-    elements.diagnostics.append(li);
-  }
 }
 
 function rebuildSlideList() {

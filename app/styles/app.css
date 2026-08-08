@@ -54,11 +54,6 @@ button.active { background: #146c7e; border-color: #56cfe1; }
 .properties label.check { display: flex; }
 .properties input, .properties select { min-width: 0; padding: 0.25rem; }
 #image-properties { margin-top: 0.7rem; padding-top: 0.7rem; border-top: 1px solid #3d454e; }
-#diagnostics { margin: 0; padding-left: 1.1rem; font-size: 0.75rem; }
-#diagnostics li { margin-bottom: 0.35rem; }
-#diagnostics li.error { color: #ff8787; }
-#diagnostics li.warning { color: #ffd43b; }
-
 .mode-source { grid-template-columns: 170px minmax(400px, 1fr); }
 .mode-source .properties, .mode-source .stage { display: none; }
 .mode-design .source-pane { display: none; }
