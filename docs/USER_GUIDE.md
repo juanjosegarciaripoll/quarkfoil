@@ -1,0 +1,72 @@
+# Editor guide
+
+## Modes
+
+### Source
+
+Source displays the complete Markdown document. When you leave Source for Design or Present, valid edits are applied automatically. Invalid Markdown keeps Source open and reports the error. Saving also applies a pending Source draft before writing it to disk.
+
+Entering Source positions the caret at the currently selected slide.
+
+### Design
+
+Design renders one slide and exposes graphical controls:
+
+- Click a grid region or overlay to select it.
+- Double-click a title, Markdown region, text overlay, or equation overlay to edit its content.
+- Drag floating overlays to move them and use their corner handles to resize them.
+- Use Properties to adjust geometry, layer, fragment, image fit/focus, font scale, and alignment.
+
+The image toolbar action is contextual:
+
+- With a grid region selected, it replaces that region with an image.
+- With no grid region selected, it creates a floating image overlay.
+
+An image embedded alongside text in a Markdown region remains part of that Markdown document block and is not independently selectable.
+
+### Present
+
+Present hides the editor chrome and enables normal Reveal.js navigation. Press `Escape` to return to Design.
+
+## Slides
+
+The left sidebar selects slides. Its top controls add a blank slide with the current layout, duplicate the selected slide, or delete it. The bottom controls move the selected slide up or down.
+
+Double-click a sidebar title to rename a slide. This is especially useful for Free slides, whose organizational title is hidden on the canvas.
+
+## Layouts
+
+- `1`: one core region.
+- `1+1`: two columns.
+- `1+2`: one left region and two stacked right regions.
+- `2+1`: two stacked left regions and one right region.
+- `0`: title and footer, without core regions.
+- `Front page`: title in the upper half and details in the lower half.
+- `Free (nothing)`: no title, footer, or grid; only positioned overlays.
+
+## Images
+
+Image-only regions and image overlays support:
+
+- Fit: contain, crop/fill, fit width, fit height, or native size.
+- Horizontal and vertical crop focus.
+
+New files are copied to the presentation project's `figures/` directory. Undo restores content replaced during the current editing session.
+
+## Saving and recovery
+
+The Save button and `Ctrl+S` write the Markdown file. Unsaved changes are identified in the toolbar. Local-server saves use a content hash to detect external modifications and an atomic replacement to avoid partial files.
+
+The browser also keeps recovery snapshots in IndexedDB. These snapshots supplement the Markdown file; they are not a substitute for version control or backups.
+
+## Keyboard shortcuts
+
+- `Ctrl+S`: save.
+- `Ctrl+Z`: undo.
+- `Ctrl+Shift+Z`: redo.
+- `Ctrl+Enter`: accept a content-editing dialog.
+- `Escape`: cancel a dialog or leave Present mode.
+- Arrow keys: nudge a selected overlay by `0.1%`.
+- `Shift` + arrow keys: nudge by `1%`.
+- `Delete`: delete a selected overlay.
+- `Ctrl+D`: duplicate a selected overlay.

@@ -15,7 +15,9 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 
-APP_ROOT = Path(__file__).resolve().parents[2] / "app"
+PACKAGE_APP_ROOT = Path(__file__).resolve().parent / "app"
+SOURCE_APP_ROOT = Path(__file__).resolve().parents[2] / "app"
+APP_ROOT = PACKAGE_APP_ROOT if PACKAGE_APP_ROOT.is_dir() else SOURCE_APP_ROOT
 MAX_WRITE_BYTES = 20 * 1024 * 1024
 MAX_ASSET_BYTES = 100 * 1024 * 1024
 
@@ -33,7 +35,7 @@ def _json_bytes(value: object) -> bytes:
 
 
 class SlideHandler(SimpleHTTPRequestHandler):
-    server_version = "ScientificSlides/0.1"
+    server_version = "Quarkfoil/0.1"
 
     @property
     def project_root(self) -> Path:
@@ -200,17 +202,19 @@ def create_server(deck: Path, host: str, port: int) -> ThreadingHTTPServer:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Serve a scientific Markdown presentation")
+    parser = argparse.ArgumentParser(description="Open a scientific Markdown presentation in Quarkfoil")
     parser.add_argument("deck", type=Path, help="Markdown presentation to open")
-    parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--port", type=int, default=8765)
-    parser.add_argument("--no-open", action="store_true", help="Do not open a browser")
+    parser.add_argument("--host", default="127.0.0.1", help="Address to bind (default: 127.0.0.1)")
+    parser.add_argument("--port", type=int, default=8765, help="Port to use; 0 chooses an available port (default: 8765)")
+    browser = parser.add_mutually_exclusive_group()
+    browser.add_argument("--open", dest="open_browser", action="store_true", default=True, help="Open the editor in a browser (default)")
+    browser.add_argument("--no-open", dest="open_browser", action="store_false", help="Start the server without opening a browser")
     args = parser.parse_args(argv)
     server = create_server(args.deck, args.host, args.port)
     url = f"http://{args.host}:{server.server_port}/"
-    print(f"Scientific Slides: {args.deck.resolve()}")
+    print(f"Quarkfoil: {args.deck.resolve()}")
     print(f"Open {url}")
-    if not args.no_open:
+    if args.open_browser:
         threading.Timer(0.35, lambda: webbrowser.open(url)).start()
     try:
         server.serve_forever()

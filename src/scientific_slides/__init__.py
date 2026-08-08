@@ -1,4 +1,4 @@
-"""Local launcher for the browser-native scientific slide editor."""
+"""Quarkfoil's local launcher."""
 
 from .server import main
 

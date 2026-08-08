@@ -4,7 +4,7 @@ import { DesignEditor } from "./editor.js";
 import { saveSnapshot } from "./storage.js";
 
 const STARTER = `---
-title: Scientific Slides
+title: Quarkfoil
 author: Your name
 aspect-ratio: 16:9
 theme: scientific-light
@@ -12,7 +12,7 @@ defaults:
   footer: Editable Markdown · Reveal.js
 ---
 
-# Scientific Slides {.title-slide .layout-1}
+# Quarkfoil {.title-slide .layout-1}
 
 A browser-native scientific presentation
 
@@ -315,7 +315,9 @@ async function openPortable() {
     let selected = markdown[0];
     if (markdown.length > 1) {
       const choices = markdown.map(([name], index) => `${index + 1}: ${name}`).join("\n");
-      const answer = Number(prompt(`Choose a presentation:\n${choices}`, "1")) - 1;
+      const response = prompt(`Choose a presentation:\n${choices}`, "1");
+      if (response === null) return;
+      const answer = Number(response) - 1;
       if (!Number.isInteger(answer) || !markdown[answer]) throw new Error("No presentation selected");
       selected = markdown[answer];
     }
@@ -435,7 +437,9 @@ async function importAsset(file) {
 
 function bindUi() {
   document.querySelectorAll("[data-mode]").forEach(button => button.addEventListener("click", () => requestMode(button.dataset.mode)));
-  document.querySelector("#open-button").addEventListener("click", () => openPortable().catch(error => showStatus(error.message, true)));
+  document.querySelector("#open-button").addEventListener("click", () => openPortable().catch(error => {
+    if (error?.name !== "AbortError") showStatus(error.message, true);
+  }));
   elements.save.addEventListener("click", saveDeck);
   elements.download.addEventListener("click", downloadSource);
   elements.source.addEventListener("input", () => {

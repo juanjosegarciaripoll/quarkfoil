@@ -1,68 +1,71 @@
-# Scientific Slides
+# Quarkfoil
 
-A browser-native scientific presentation editor built from Markdown, Reveal.js and KaTeX. It supports structured grids and PowerPoint-like placement of live Markdown, LaTeX and image overlays. It uses no Node/npm toolchain and copies no framework code into presentation projects.
+Quarkfoil is a local, browser-based editor for scientific presentations written in Markdown. It combines structured slide layouts with freely positioned Markdown, LaTeX, and image objects, and presents the result with Reveal.js.
 
-## Run the example
+The presentation remains a readable Markdown file accompanied by a `figures/` directory. Quarkfoil itself is installed once; its application files are not copied into every presentation project.
 
-From this directory in PowerShell:
+## Highlights
 
-```powershell
-& 'C:\Users\juanj\AppData\Local\Microsoft\WinGet\Packages\astral-sh.uv_Microsoft.Winget.Source_8wekyb3d8bbwe\uv.exe' run scientific-slides example\deck.md
-```
+- Seven layouts: `1`, `1+1`, `1+2`, `2+1`, `0`, Front page, and Free canvas.
+- Markdown and KaTeX equations remain editable rather than becoming screenshots.
+- Image fit, crop focus, overlay position, size, typography, alignment, and fragments are editable graphically.
+- Source, Design, and Present modes use the same Markdown source of truth.
+- Local assets and pinned browser libraries require no runtime CDN or Node/npm toolchain.
+- Saves are atomic, conflict-checked, and restricted to the selected presentation directory.
 
-The launcher opens `http://127.0.0.1:8765/`. Stop it with `Ctrl+C`.
+## Install
 
-To open any presentation stored elsewhere:
-
-```powershell
-& 'C:\Users\juanj\AppData\Local\Microsoft\WinGet\Packages\astral-sh.uv_Microsoft.Winget.Source_8wekyb3d8bbwe\uv.exe' run scientific-slides 'C:\path\to\lecture.md'
-```
-
-The application and presentation remain separate. The server grants the browser access only to the directory containing the selected Markdown deck.
-
-## Editing workflow
-
-- **Source:** edit the complete Markdown in a plain text area and apply it.
-- **Design:** resize grid dividers; select, drag and resize overlays; double-click Markdown or equation objects.
-- **Present:** use normal Reveal navigation. Press `Escape` to return to Design mode.
-
-Use `Ctrl+S` to save and `Ctrl+Z` / `Ctrl+Shift+Z` for undo/redo. Saves are atomic in local-project mode. The browser keeps recovery snapshots independently.
-
-## Minimal source
-
-```markdown
----
-title: My lecture
-aspect-ratio: 16:9
-defaults:
-  footer: Course · 2026
----
-
-## Two regions {.layout-1-1 columns="42 58"}
-
-::: left
-Markdown and \(\LaTeX\).
-:::
-
-::: right
-![](figures/experiment.svg){fit=contain}
-:::
-
-::: overlay {#gap type="equation" x="62" y="31" w="24" h="9"}
-\[
-\Delta=E_1-E_0
-\]
-:::
-```
-
-See [FORMAT.md](FORMAT.md) for the supported syntax and [SECURITY.md](SECURITY.md) for the trust model.
-
-## Vendored libraries
-
-The repository vendors pinned Reveal.js, KaTeX, Marked and js-yaml assets under `app/vendor/`. To reproduce them without Node/npm:
+Quarkfoil requires Python 3.11 or newer. The recommended installation uses [uv](https://docs.astral.sh/uv/):
 
 ```powershell
-& 'C:\Users\juanj\AppData\Local\Microsoft\WinGet\Packages\astral-sh.uv_Microsoft.Winget.Source_8wekyb3d8bbwe\uv.exe' run python tools\fetch_vendor.py
+uv tool install quarkfoil
 ```
 
-Release archives are verified against pinned SHA-256 hashes. Individual-file hashes are printed by the fetcher and recorded in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
+Until a package is published, install from a local checkout:
+
+```powershell
+uv tool install .
+```
+
+Run a presentation with:
+
+```powershell
+quarkfoil path\to\presentation.md
+```
+
+Quarkfoil opens a local address such as `http://127.0.0.1:8765/`. Stop the server with `Ctrl+C` in its terminal.
+
+## Try the included example
+
+From a source checkout:
+
+```powershell
+uv run quarkfoil example\deck.md
+```
+
+The [`example/`](example/) directory is also a template for new presentation projects.
+
+## Documentation
+
+- [Installation and command-line use](docs/INSTALLATION.md)
+- [Editor guide](docs/USER_GUIDE.md)
+- [Markdown format reference](docs/FORMAT.md)
+- [Security and trust model](docs/SECURITY.md)
+- [Development and release guide](docs/DEVELOPMENT.md)
+- [Third-party components and licenses](THIRD_PARTY_LICENSES.md)
+
+## Licenses
+
+Quarkfoil itself is released under the [MIT License](LICENSE).
+
+Quarkfoil includes pinned, locally served copies of the following permissively
+licensed components. Their complete license texts are kept in the repository
+and included in distributed packages:
+
+- [Reveal.js 5.2.1 — MIT](app/vendor/reveal/LICENSE)
+- [KaTeX 0.16.22, including its distributed fonts — MIT](app/vendor/katex/LICENSE)
+- [Marked 15.0.12 — MIT](app/vendor/marked/LICENSE.md)
+- [js-yaml 4.1.0 — MIT](app/vendor/yaml/LICENSE)
+
+Versions, copyright holders, source checksums, and redistribution details are
+listed in the [complete third-party licensing notice](THIRD_PARTY_LICENSES.md).

@@ -1,5 +1,5 @@
 ---
-title: Scientific Slides Demonstration
+title: Quarkfoil Demonstration
 author: John Wick
 aspect-ratio: 16:9
 theme: scientific-light
@@ -7,12 +7,12 @@ defaults:
   footer: Browser-native Markdown · Reveal.js · KaTeX
 ---
 
-# Scientific Slides {.title-slide .layout-front}
+# Quarkfoil {.title-slide .layout-front}
 
 ::: core
 **John Wick**
 
-Scientific Slides Demonstration
+Scientific presentation editor
 :::
 
 ---

@@ -67,7 +67,7 @@ FILES = {
 
 
 def download(url: str, destination: Path) -> str:
-    request = urllib.request.Request(url, headers={"User-Agent": "scientific-slides-vendor-fetch/0.1"})
+    request = urllib.request.Request(url, headers={"User-Agent": "quarkfoil-vendor-fetch/0.1"})
     with urllib.request.urlopen(request, timeout=60) as response, destination.open("wb") as target:
         shutil.copyfileobj(response, target)
     return hashlib.sha256(destination.read_bytes()).hexdigest()
@@ -94,7 +94,7 @@ def find_entry(base: Path, relative: str) -> Path:
 
 def main() -> None:
     VENDOR.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="scientific-slides-") as temporary:
+    with tempfile.TemporaryDirectory(prefix="quarkfoil-") as temporary:
         temp = Path(temporary)
         for name, spec in ARCHIVES.items():
             archive = temp / f"{name}.zip"

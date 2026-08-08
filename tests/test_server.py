@@ -13,6 +13,11 @@ from scientific_slides.server import create_server
 
 
 class ServerTests(unittest.TestCase):
+    def test_packaged_app_is_available(self) -> None:
+        from scientific_slides.server import APP_ROOT
+
+        self.assertTrue((APP_ROOT / "index.html").is_file())
+
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name)

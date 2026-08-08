@@ -1,12 +1,26 @@
 [project]
-name = "scientific-slides"
+name = "quarkfoil"
 version = "0.1.0"
-description = "Browser-native Markdown and Reveal.js presentation editor"
+description = "Browser-native editor for scientific Markdown presentations"
+readme = "README.md"
 requires-python = ">=3.11"
 dependencies = []
+license = { file = "LICENSE" }
+authors = [{ name = "Juan José García-Ripoll" }]
+keywords = ["presentations", "markdown", "latex", "reveal.js", "scientific-slides"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Environment :: Web Environment",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Topic :: Multimedia :: Graphics :: Presentation",
+]
 
 [project.scripts]
-scientific-slides = "scientific_slides:main"
+quarkfoil = "scientific_slides:main"
 
 [tool.uv]
 package = true
@@ -17,3 +31,25 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/scientific_slides"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"app" = "scientific_slides/app"
+"THIRD_PARTY_LICENSES.md" = "scientific_slides/THIRD_PARTY_LICENSES.md"
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "/app",
+  "/docs",
+  "/example",
+  "/src",
+  "/tests",
+  "/tools",
+  "/LICENSE",
+  "/README.md",
+  "/THIRD_PARTY_LICENSES.md",
+  "/pyproject.toml",
+  "/uv.lock",
+]
+exclude = [
+  "/tests/browser-*.png",
+]
