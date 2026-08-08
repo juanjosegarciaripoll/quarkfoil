@@ -1,5 +1,8 @@
 # Quarkfoil
 
+[![CI](https://github.com/juanjosegarciaripoll/quarkfoil/actions/workflows/ci.yml/badge.svg)](https://github.com/juanjosegarciaripoll/quarkfoil/actions/workflows/ci.yml)
+[![Documentation](https://github.com/juanjosegarciaripoll/quarkfoil/actions/workflows/docs.yml/badge.svg)](https://juanjosegarciaripoll.github.io/quarkfoil/)
+
 Quarkfoil is a local, browser-based editor for scientific presentations written in Markdown. It combines structured slide layouts with freely positioned Markdown, LaTeX, and image objects, and presents the result with Reveal.js.
 
 **[Read the illustrated documentation](https://juanjosegarciaripoll.github.io/quarkfoil/)**

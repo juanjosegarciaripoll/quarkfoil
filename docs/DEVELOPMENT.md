@@ -53,6 +53,20 @@ Pushing documentation changes to `main` triggers the GitHub Pages workflow.
 The workflow publishes both the documentation and this freshly exported live
 example. The generated `site/` directory is disposable and is not committed.
 
+## Continuous integration
+
+The `CI` workflow runs for every push and pull request. It checks:
+
+- Python 3.11 on Linux and Windows;
+- the current Python release on Linux;
+- the browser self-test in Microsoft Edge on Windows;
+- the strict documentation build and exported live example; and
+- wheel and source-archive creation after all checks pass.
+
+Successful distribution archives are retained as workflow artifacts. Package
+publication is intentionally not part of CI; a future release workflow can use
+PyPI trusted publishing when the project is ready for public releases.
+
 ## Vendored browser dependencies
 
 Reveal.js, KaTeX, Marked, and js-yaml are pinned under `app/vendor/`. Refresh them without Node/npm:
