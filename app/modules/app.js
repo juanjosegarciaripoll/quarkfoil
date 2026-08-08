@@ -1,4 +1,4 @@
-import { parseDeck } from "./parser.js";
+import { deleteSlide, duplicateSlide, insertSlide, parseDeck } from "./parser.js";
 import { renderDeck } from "./render.js";
 import { DesignEditor } from "./editor.js";
 import { saveSnapshot } from "./storage.js";
@@ -171,6 +171,28 @@ function rebuildSlideList() {
     li.append(button);
     return li;
   }));
+  document.querySelector("#duplicate-slide").disabled = !state.deck.slides.length;
+  document.querySelector("#delete-slide").disabled = state.deck.slides.length <= 1;
+}
+
+function duplicateSelectedSlide() {
+  const index = state.currentSlide;
+  state.currentSlide = index + 1;
+  commitSource(duplicateSlide(state.deck, index));
+}
+
+function addSlideAfterSelection() {
+  const index = state.currentSlide;
+  state.currentSlide = index + 1;
+  commitSource(insertSlide(state.deck, index));
+}
+
+function deleteSelectedSlide() {
+  const index = state.currentSlide;
+  const slide = state.deck.slides[index];
+  if (!slide || !confirm(`Delete slide ${index + 1}, “${slide.title || "Untitled"}”?`)) return;
+  state.currentSlide = Math.min(index, state.deck.slides.length - 2);
+  commitSource(deleteSlide(state.deck, index));
 }
 
 function onSlideChanged(event) {
@@ -384,6 +406,9 @@ function bindUi() {
   });
   document.querySelector("#undo-button").addEventListener("click", undo);
   document.querySelector("#redo-button").addEventListener("click", redo);
+  document.querySelector("#add-slide").addEventListener("click", addSlideAfterSelection);
+  document.querySelector("#duplicate-slide").addEventListener("click", duplicateSelectedSlide);
+  document.querySelector("#delete-slide").addEventListener("click", deleteSelectedSlide);
   document.addEventListener("keydown", event => {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") { event.preventDefault(); saveDeck(); }
     if ((event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "z") { event.preventDefault(); undo(); }

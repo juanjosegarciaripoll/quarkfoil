@@ -32,11 +32,25 @@ button.active { background: #146c7e; border-color: #56cfe1; }
   grid-template-columns: 170px minmax(400px, 1fr) 230px;
   min-height: 0;
 }
-.slide-sidebar, .properties { overflow: auto; padding: 0.8rem; background: #171b20; }
-.slide-sidebar { border-right: 1px solid #3d454e; }
+.slide-sidebar, .properties { padding: 0.8rem; background: #171b20; }
+.slide-sidebar { min-width: 0; overflow-x: hidden; overflow-y: auto; border-right: 1px solid #3d454e; }
+.properties { overflow: auto; }
 .properties { border-left: 1px solid #3d454e; }
+.slide-sidebar ol, .slide-sidebar li { min-width: 0; max-width: 100%; }
+.slide-sidebar-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.35rem; margin-bottom: 0.65rem; }
+.slide-sidebar .slide-sidebar-actions button {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  height: 34px;
+  padding: 0;
+  font-size: 1rem;
+  line-height: 1;
+  text-align: center;
+}
+#delete-slide:hover:not(:disabled) { color: #fff; background: #a61e4d; }
 .slide-sidebar ol { display: grid; gap: 0.35rem; margin: 0; padding: 0; list-style: none; }
-.slide-sidebar button { width: 100%; padding: 0.55rem; overflow: hidden; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
+.slide-sidebar button { display: block; min-width: 0; width: 100%; max-width: 100%; padding: 0.55rem; overflow: hidden; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
 .slide-sidebar button.current { border-color: #56cfe1; background: #29444b; }
 
 .stage { position: relative; min-width: 0; min-height: 0; background: #292f36; }

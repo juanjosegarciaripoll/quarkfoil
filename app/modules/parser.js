@@ -230,6 +230,8 @@ function parseSlide(source, range, index, diagnostics) {
   if (!cells.length && layout !== "free") cells.push({ id: "core", type: "markdown", source: "", image: null, range: null, attrs: parseAttributes("") });
   const duplicateCells = cells.map(cell => cell.id).filter((id, position, all) => all.indexOf(id) !== position);
   for (const id of new Set(duplicateCells)) diagnostics.push({ level: "error", slide: index + 1, message: `Duplicate '${id}' cell` });
+  const duplicateOverlays = overlays.map(overlay => overlay.id).filter((id, position, all) => all.indexOf(id) !== position);
+  for (const id of new Set(duplicateOverlays)) diagnostics.push({ level: "error", slide: index + 1, message: `Duplicate overlay ID '${id}'` });
   for (const overlay of overlays) {
     const values = Object.values(overlay.geometry);
     if (values.some(value => !Number.isFinite(value))) diagnostics.push({ level: "error", slide: index + 1, message: `Overlay '${overlay.id}' has invalid geometry` });
@@ -258,15 +260,80 @@ export function parseDeck(source) {
   const ranges = splitSlides(source, front.bodyStart);
   const slides = ranges.map((range, index) => parseSlide(source, range, index, diagnostics));
   if (!slides.length) diagnostics.push({ level: "error", message: "The deck contains no slides" });
-  const ids = [...slides.map(slide => slide.id), ...slides.flatMap(slide => slide.overlays.map(item => item.id))];
-  for (const id of new Set(ids.filter((value, index) => ids.indexOf(value) !== index))) {
-    diagnostics.push({ level: "error", message: `Duplicate object ID '${id}'` });
+  const slideIds = slides.map(slide => slide.id);
+  for (const id of new Set(slideIds.filter((value, index) => slideIds.indexOf(value) !== index))) {
+    diagnostics.push({ level: "error", message: `Duplicate slide ID '${id}'` });
   }
   return { source, metadata: front.metadata, frontMatterRange: { start: 0, end: front.bodyStart }, slides, diagnostics };
 }
 
 export function patchRange(source, start, end, replacement) {
   return source.slice(0, start) + replacement + source.slice(end);
+}
+
+function composeSlides(deck, slideSources) {
+  const frontMatter = deck.source.slice(0, deck.frontMatterRange.end).trimEnd();
+  const body = slideSources.map(source => source.trim()).join("\n\n---\n\n");
+  return `${frontMatter}${frontMatter ? "\n\n" : ""}${body}\n`;
+}
+
+function duplicateSlideSource(deck, slide) {
+  if (!slide.headingAttrs.id || !slide.headingRange) return slide.raw;
+  const usedIds = new Set(deck.slides.map(item => item.id));
+  const base = `${slide.headingAttrs.id}-copy`;
+  let id = base;
+  let counter = 2;
+  while (usedIds.has(id)) id = `${base}-${counter++}`;
+  const attrs = structuredClone(slide.headingAttrs);
+  attrs.id = id;
+  const hashes = slide.raw.match(/^\s*(#{1,2})/)?.[1] || "##";
+  const heading = `${hashes} ${slide.title} {${serializeAttributes(attrs)}}`;
+  return patchRange(
+    slide.raw,
+    slide.headingRange.start - slide.range.start,
+    slide.headingRange.end - slide.range.start,
+    heading,
+  );
+}
+
+function blankSlideSource(slide) {
+  const attrs = structuredClone(slide.headingAttrs);
+  attrs.id = "";
+  const hashes = slide.raw.match(/^\s*(#{1,2})/)?.[1] || "##";
+  const attributes = serializeAttributes(attrs);
+  const cellsByLayout = {
+    "1": ["core"],
+    "1-1": ["left", "right"],
+    "1-2": ["left", "top-right", "bottom-right"],
+    "2-1": ["top-left", "bottom-left", "right"],
+    free: [],
+  };
+  const cells = (cellsByLayout[slide.layout] || ["core"])
+    .map(name => `::: ${name}\n\n:::`)
+    .join("\n\n");
+  return `${hashes} New slide${attributes ? ` {${attributes}}` : ""}${cells ? `\n\n${cells}` : ""}`;
+}
+
+export function insertSlide(deck, slideIndex) {
+  const slide = deck.slides[slideIndex];
+  if (!slide) throw new Error("Unknown slide format to copy");
+  const slides = deck.slides.map(item => item.raw);
+  slides.splice(slideIndex + 1, 0, blankSlideSource(slide));
+  return composeSlides(deck, slides);
+}
+
+export function duplicateSlide(deck, slideIndex) {
+  const slide = deck.slides[slideIndex];
+  if (!slide) throw new Error("Unknown slide to duplicate");
+  const slides = deck.slides.map(item => item.raw);
+  slides.splice(slideIndex + 1, 0, duplicateSlideSource(deck, slide));
+  return composeSlides(deck, slides);
+}
+
+export function deleteSlide(deck, slideIndex) {
+  if (!deck.slides[slideIndex]) throw new Error("Unknown slide to delete");
+  if (deck.slides.length === 1) throw new Error("A presentation must contain at least one slide");
+  return composeSlides(deck, deck.slides.filter((_, index) => index !== slideIndex).map(slide => slide.raw));
 }
 
 export function updateHeadingLayout(deck, slideIndex, layout, columns, rows) {

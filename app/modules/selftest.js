@@ -1,5 +1,8 @@
 import {
   deleteOverlay,
+  deleteSlide,
+  duplicateSlide,
+  insertSlide,
   duplicateOverlay,
   parseDeck,
   setCellContent,
@@ -78,6 +81,19 @@ try {
   assert(deck.slides[0].cells.find(cell => cell.id === "top-right").image.attrs.values.fit === "cover", "image attributes parse");
   assert(deck.slides[0].overlays[0].id === "eq", "overlay ID parses");
   assert(deck.slides[1].cells[0]?.range !== null, "ordinary core Markdown retains an editable range");
+
+  const duplicated = parseDeck(duplicateSlide(deck, 0));
+  assert(duplicated.slides.length === 3 && duplicated.slides[1].title === "First", "selected slide duplicates after itself");
+  assert(duplicated.slides[1].overlays[0].id === "eq", "duplicated slide keeps slide-local overlay IDs");
+  assert(!duplicated.diagnostics.some(item => item.level === "error"), "duplicated slide remains valid");
+  const deleted = parseDeck(deleteSlide(deck, 0));
+  assert(deleted.slides.length === 1 && deleted.slides[0].title === "Second", "selected slide deletes");
+  const inserted = parseDeck(insertSlide(deck, 0));
+  assert(inserted.slides.length === 3 && inserted.slides[1].title === "New slide", "blank slide inserts after selection");
+  assert(inserted.slides[1].layout === "1-2", "new slide copies the previous layout");
+  assert(Math.round(inserted.slides[1].columns[0]) === 40 && Math.round(inserted.slides[1].rows[0]) === 55, "new slide copies grid proportions");
+  assert(inserted.slides[1].overlays.length === 0, "new slide does not copy overlays");
+  assert(inserted.slides[1].cells.every(cell => !cell.source.trim()), "new slide cells contain no content");
 
   assertCompoundLayout("1-2", ["left", "top-right", "bottom-right"], "left");
   assertCompoundLayout("2-1", ["top-left", "bottom-left", "right"], "right");
