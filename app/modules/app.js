@@ -1,4 +1,4 @@
-import { deleteSlide, duplicateSlide, insertSlide, parseDeck } from "./parser.js";
+import { deleteSlide, duplicateSlide, insertSlide, moveSlide, parseDeck } from "./parser.js";
 import { renderDeck } from "./render.js";
 import { DesignEditor } from "./editor.js";
 import { saveSnapshot } from "./storage.js";
@@ -173,6 +173,8 @@ function rebuildSlideList() {
   }));
   document.querySelector("#duplicate-slide").disabled = !state.deck.slides.length;
   document.querySelector("#delete-slide").disabled = state.deck.slides.length <= 1;
+  document.querySelector("#move-slide-up").disabled = state.currentSlide <= 0;
+  document.querySelector("#move-slide-down").disabled = state.currentSlide >= state.deck.slides.length - 1;
 }
 
 function duplicateSelectedSlide() {
@@ -193,6 +195,14 @@ function deleteSelectedSlide() {
   if (!slide || !confirm(`Delete slide ${index + 1}, “${slide.title || "Untitled"}”?`)) return;
   state.currentSlide = Math.min(index, state.deck.slides.length - 2);
   commitSource(deleteSlide(state.deck, index));
+}
+
+function moveSelectedSlide(direction) {
+  const from = state.currentSlide;
+  const to = from + direction;
+  if (to < 0 || to >= state.deck.slides.length) return;
+  state.currentSlide = to;
+  commitSource(moveSlide(state.deck, from, to));
 }
 
 function onSlideChanged(event) {
@@ -409,6 +419,8 @@ function bindUi() {
   document.querySelector("#add-slide").addEventListener("click", addSlideAfterSelection);
   document.querySelector("#duplicate-slide").addEventListener("click", duplicateSelectedSlide);
   document.querySelector("#delete-slide").addEventListener("click", deleteSelectedSlide);
+  document.querySelector("#move-slide-up").addEventListener("click", () => moveSelectedSlide(-1));
+  document.querySelector("#move-slide-down").addEventListener("click", () => moveSelectedSlide(1));
   document.addEventListener("keydown", event => {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") { event.preventDefault(); saveDeck(); }
     if ((event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "z") { event.preventDefault(); undo(); }

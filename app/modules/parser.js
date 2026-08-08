@@ -322,6 +322,15 @@ export function insertSlide(deck, slideIndex) {
   return composeSlides(deck, slides);
 }
 
+export function moveSlide(deck, fromIndex, toIndex) {
+  if (!deck.slides[fromIndex]) throw new Error("Unknown slide to move");
+  const destination = Math.max(0, Math.min(deck.slides.length - 1, toIndex));
+  const slides = deck.slides.map(slide => slide.raw);
+  const [moved] = slides.splice(fromIndex, 1);
+  slides.splice(destination, 0, moved);
+  return composeSlides(deck, slides);
+}
+
 export function duplicateSlide(deck, slideIndex) {
   const slide = deck.slides[slideIndex];
   if (!slide) throw new Error("Unknown slide to duplicate");

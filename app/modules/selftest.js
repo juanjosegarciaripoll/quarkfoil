@@ -3,6 +3,7 @@ import {
   deleteSlide,
   duplicateSlide,
   insertSlide,
+  moveSlide,
   duplicateOverlay,
   parseDeck,
   setCellContent,
@@ -94,6 +95,8 @@ try {
   assert(Math.round(inserted.slides[1].columns[0]) === 40 && Math.round(inserted.slides[1].rows[0]) === 55, "new slide copies grid proportions");
   assert(inserted.slides[1].overlays.length === 0, "new slide does not copy overlays");
   assert(inserted.slides[1].cells.every(cell => !cell.source.trim()), "new slide cells contain no content");
+  const moved = parseDeck(moveSlide(deck, 0, 1));
+  assert(moved.slides[0].title === "Second" && moved.slides[1].title === "First", "selected slide moves within the deck");
 
   assertCompoundLayout("1-2", ["left", "top-right", "bottom-right"], "left");
   assertCompoundLayout("2-1", ["top-left", "bottom-left", "right"], "right");
