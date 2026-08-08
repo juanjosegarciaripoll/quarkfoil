@@ -137,6 +137,9 @@ try {
   assert(!duplicated.diagnostics.some(item => item.level === "error"), "duplicated slide remains valid");
   const deleted = parseDeck(deleteSlide(deck, 0));
   assert(deleted.slides.length === 1 && deleted.slides[0].title === "Second", "selected slide deletes");
+  let finalDeleteRejected = false;
+  try { deleteSlide(deleted, 0); } catch (error) { finalDeleteRejected = /at least one slide/.test(error.message); }
+  assert(finalDeleteRejected, "final slide cannot be deleted");
   const inserted = parseDeck(insertSlide(deck, 0));
   assert(inserted.slides.length === 3 && inserted.slides[1].title === "New slide", "blank slide inserts after selection");
   assert(inserted.slides[1].layout === "1-2", "new slide copies the previous layout");

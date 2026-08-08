@@ -68,9 +68,9 @@ The distribution and command-line tool are named `quarkfoil`.
   not require reselecting the object.
 - Slide-local object IDs need only be unique within their slide.
 - A deck must contain at least one slide. Deleting the final slide is rejected.
-- Opening currently requires an existing `.md` or `.markdown` file. If adding
-  new-deck creation, make it an explicit, tested behavior and start from a
-  small valid presentation rather than silently changing missing-file errors.
+- Opening a missing or whitespace-only `.md`/`.markdown` path initializes a
+  small valid front-page presentation. The parent directory must already
+  exist. Never replace a nonempty file, including a malformed one.
 - The seven layouts are `1`, `1+1`, `1+2`, `2+1`, `0`, Front page, and Free.
 - A newly inserted slide copies the preceding slide's layout and proportions,
   not its content or overlays.

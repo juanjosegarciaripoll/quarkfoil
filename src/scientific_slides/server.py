@@ -21,6 +21,23 @@ SOURCE_APP_ROOT = Path(__file__).resolve().parents[2] / "app"
 APP_ROOT = PACKAGE_APP_ROOT if PACKAGE_APP_ROOT.is_dir() else SOURCE_APP_ROOT
 MAX_WRITE_BYTES = 20 * 1024 * 1024
 MAX_ASSET_BYTES = 100 * 1024 * 1024
+STARTER_DECK = """---
+title: New presentation
+author: Your name
+aspect-ratio: 16:9
+theme: scientific-light
+defaults:
+  footer: Quarkfoil · Reveal.js
+---
+
+# New presentation {.layout-front}
+
+::: core
+**Your name**
+
+Presentation subtitle
+:::
+"""
 
 
 def _inside(root: Path, candidate: Path) -> bool:
@@ -33,6 +50,37 @@ def _inside(root: Path, candidate: Path) -> bool:
 
 def _json_bytes(value: object) -> bytes:
     return json.dumps(value, ensure_ascii=False).encode("utf-8")
+
+
+def initialize_deck(deck: Path) -> Path:
+    resolved = deck.resolve()
+    if resolved.suffix.lower() not in {".md", ".markdown"}:
+        raise ValueError("Presentation source must be Markdown")
+    if not resolved.parent.is_dir():
+        raise FileNotFoundError(f"Presentation directory not found: {resolved.parent}")
+    if not resolved.exists():
+        with resolved.open("x", encoding="utf-8", newline="\n") as stream:
+            stream.write(STARTER_DECK)
+        return resolved
+    if not resolved.is_file():
+        raise FileNotFoundError(f"Presentation is not a file: {resolved}")
+
+    current = resolved.read_bytes()
+    if current.strip():
+        return resolved
+    fd, temporary = tempfile.mkstemp(prefix=".quarkfoil-starter-", suffix=".tmp", dir=resolved.parent)
+    try:
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(STARTER_DECK.encode("utf-8"))
+            stream.flush()
+            os.fsync(stream.fileno())
+        if resolved.read_bytes() != current:
+            raise RuntimeError("Presentation changed while it was being initialized")
+        os.replace(temporary, resolved)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+    return resolved
 
 
 class SlideHandler(SimpleHTTPRequestHandler):
@@ -191,11 +239,7 @@ class SlideHandler(SimpleHTTPRequestHandler):
 
 
 def create_server(deck: Path, host: str, port: int) -> ThreadingHTTPServer:
-    resolved = deck.resolve()
-    if not resolved.is_file():
-        raise FileNotFoundError(f"Presentation not found: {resolved}")
-    if resolved.suffix.lower() not in {".md", ".markdown"}:
-        raise ValueError("Presentation source must be Markdown")
+    resolved = initialize_deck(deck)
     server = ThreadingHTTPServer((host, port), lambda *args, **kwargs: SlideHandler(*args, directory=APP_ROOT, **kwargs))
     server.project_root = resolved.parent  # type: ignore[attr-defined]
     server.deck_path = resolved  # type: ignore[attr-defined]

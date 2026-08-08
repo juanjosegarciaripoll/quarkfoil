@@ -42,6 +42,9 @@ Run a presentation with:
 quarkfoil path\to\presentation.md
 ```
 
+If that Markdown file is missing or empty, Quarkfoil creates a minimal starter
+presentation. It never replaces a nonempty file.
+
 Quarkfoil opens a local address such as `http://127.0.0.1:8765/`. Stop the server with `Ctrl+C` in its terminal.
 
 ## Try the included example

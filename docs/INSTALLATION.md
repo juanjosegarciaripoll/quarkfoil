@@ -40,7 +40,11 @@ uv tool install --reinstall .
 quarkfoil path/to/deck.md
 ```
 
-The deck must be a `.md` or `.markdown` file. Quarkfoil grants the browser access only to the directory containing that file.
+The deck path must end in `.md` or `.markdown`. If the file does not exist, or
+exists but contains only whitespace, Quarkfoil initializes it with a minimal
+front-page presentation. Its parent directory must already exist. A nonempty
+file is never replaced during initialization. Quarkfoil grants the browser
+access only to the directory containing that file.
 
 Options:
 
@@ -56,6 +60,12 @@ For example:
 ```console
 quarkfoil lecture.md --open --port 9000
 quarkfoil lecture.md --no-open --port 0
+```
+
+To start a new presentation directly:
+
+```console
+quarkfoil my-new-lecture.md
 ```
 
 Binding to a non-loopback address exposes the editor to the corresponding network. Do so only on a trusted network and after reviewing the security implications.

@@ -9,7 +9,47 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from scientific_slides.server import create_server
+from scientific_slides.server import STARTER_DECK, create_server, initialize_deck
+
+
+class DeckInitializationTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory()
+        self.root = Path(self.temporary.name)
+
+    def tearDown(self) -> None:
+        self.temporary.cleanup()
+
+    def test_missing_markdown_is_created_from_starter(self) -> None:
+        deck = self.root / "new-deck.md"
+        self.assertEqual(initialize_deck(deck), deck.resolve())
+        self.assertEqual(deck.read_text(encoding="utf-8"), STARTER_DECK)
+        self.assertIn(".layout-front", deck.read_text(encoding="utf-8"))
+
+    def test_whitespace_only_markdown_is_initialized(self) -> None:
+        deck = self.root / "empty.markdown"
+        deck.write_text(" \r\n\t", encoding="utf-8")
+        initialize_deck(deck)
+        self.assertEqual(deck.read_text(encoding="utf-8"), STARTER_DECK)
+
+    def test_nonempty_markdown_is_preserved(self) -> None:
+        deck = self.root / "existing.md"
+        source = "## Keep me {.layout-1}\n"
+        deck.write_text(source, encoding="utf-8")
+        initialize_deck(deck)
+        self.assertEqual(deck.read_text(encoding="utf-8"), source)
+
+    def test_missing_parent_is_not_created(self) -> None:
+        deck = self.root / "missing" / "deck.md"
+        with self.assertRaises(FileNotFoundError):
+            initialize_deck(deck)
+        self.assertFalse(deck.parent.exists())
+
+    def test_non_markdown_path_is_rejected_before_creation(self) -> None:
+        deck = self.root / "deck.txt"
+        with self.assertRaises(ValueError):
+            initialize_deck(deck)
+        self.assertFalse(deck.exists())
 
 
 class ServerTests(unittest.TestCase):
