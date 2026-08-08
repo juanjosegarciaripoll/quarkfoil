@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 470" role="img" aria-labelledby="title desc">
+  <title id="title">The Quarkfoil workflow</title>
+  <desc id="desc">Markdown and figures enter the Quarkfoil visual editor and become a Reveal.js presentation.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#172438"/>
+      <stop offset="1" stop-color="#263f5d"/>
+    </linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0l10 5-10 5z" fill="#28b7c8"/>
+    </marker>
+  </defs>
+  <rect x="10" y="10" width="700" height="450" rx="30" fill="url(#bg)"/>
+  <rect x="53" y="76" width="164" height="208" rx="12" fill="#f7fafc"/>
+  <path d="M78 111h91M78 137h114M78 163h73" stroke="#a7b7c6" stroke-width="8" stroke-linecap="round"/>
+  <path d="M78 203h58l22 28 34-54" fill="none" stroke="#f1b95b" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="135" y="326" text-anchor="middle" fill="#eef6fa" font-family="system-ui, sans-serif" font-size="22" font-weight="600">Markdown + figures</text>
+  <path d="M237 181h63" stroke="#28b7c8" stroke-width="7" marker-end="url(#arrow)"/>
+  <rect x="312" y="53" width="198" height="294" rx="15" fill="#101927" stroke="#526981" stroke-width="2"/>
+  <rect x="326" y="72" width="170" height="25" rx="5" fill="#26384d"/>
+  <circle cx="343" cy="84" r="4" fill="#28b7c8"/>
+  <rect x="326" y="109" width="37" height="210" rx="5" fill="#1d2a3b"/>
+  <rect x="371" y="109" width="125" height="210" rx="5" fill="#f8fafc"/>
+  <rect x="380" y="119" width="107" height="42" fill="#e6edf3" stroke="#28b7c8" stroke-width="2"/>
+  <rect x="380" y="169" width="50" height="112" fill="#dbe8ef"/>
+  <rect x="437" y="169" width="50" height="52" fill="#e9d7ae"/>
+  <rect x="437" y="228" width="50" height="53" fill="#cce7ea"/>
+  <rect x="380" y="288" width="107" height="20" fill="#e6edf3"/>
+  <text x="411" y="382" text-anchor="middle" fill="#eef6fa" font-family="system-ui, sans-serif" font-size="22" font-weight="600">Edit visually</text>
+  <path d="M526 181h57" stroke="#28b7c8" stroke-width="7" marker-end="url(#arrow)"/>
+  <rect x="593" y="95" width="84" height="154" rx="8" fill="#f8fafc"/>
+  <rect x="603" y="105" width="64" height="31" fill="#dbe8ef"/>
+  <rect x="603" y="143" width="29" height="74" fill="#e9d7ae"/>
+  <rect x="638" y="143" width="29" height="34" fill="#cce7ea"/>
+  <rect x="638" y="183" width="29" height="34" fill="#dbe8ef"/>
+  <rect x="603" y="224" width="64" height="15" fill="#dbe8ef"/>
+  <text x="635" y="292" text-anchor="middle" fill="#eef6fa" font-family="system-ui, sans-serif" font-size="22" font-weight="600">Present</text>
+  <path d="M635 326c-84 78-371 78-470 13" fill="none" stroke="#8196aa" stroke-width="3" stroke-dasharray="8 10" marker-end="url(#arrow)"/>
+  <text x="400" y="438" text-anchor="middle" fill="#aebdca" font-family="system-ui, sans-serif" font-size="17">Changes remain readable Markdown</text>
+</svg>

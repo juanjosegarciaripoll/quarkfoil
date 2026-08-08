@@ -2,6 +2,10 @@
 
 Quarkfoil is a local, browser-based editor for scientific presentations written in Markdown. It combines structured slide layouts with freely positioned Markdown, LaTeX, and image objects, and presents the result with Reveal.js.
 
+**[Read the illustrated documentation](https://juanjosegarciaripoll.github.io/quarkfoil/)**
+
+[![Quarkfoil editing the included example presentation](docs/assets/editor-overview.png)](https://juanjosegarciaripoll.github.io/quarkfoil/)
+
 The presentation remains a readable Markdown file accompanied by a `figures/` directory. Quarkfoil itself is installed once; its application files are not copied into every presentation project.
 
 ## Highlights

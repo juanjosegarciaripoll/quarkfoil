@@ -31,6 +31,26 @@ Open the browser self-test while the example server is running:
 http://127.0.0.1:8765/selftest.html
 ```
 
+## Documentation
+
+The files under `docs/` are both the repository documentation and the source
+of the public website. Preview them locally with:
+
+```console
+uv sync --only-group docs --no-install-project
+uv run --no-sync mkdocs serve
+```
+
+Build with the same strict link and configuration checks used by continuous
+integration:
+
+```console
+uv run --no-sync mkdocs build --strict
+```
+
+Pushing documentation changes to `main` triggers the GitHub Pages workflow.
+The generated `site/` directory is disposable and is not committed.
+
 ## Vendored browser dependencies
 
 Reveal.js, KaTeX, Marked, and js-yaml are pinned under `app/vendor/`. Refresh them without Node/npm:

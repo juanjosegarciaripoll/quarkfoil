@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">Quarkfoil</title>
+  <rect width="64" height="64" rx="13" fill="#172438"/>
+  <path d="M17 17h30v22H34l-8 8v-8h-9z" fill="none" stroke="#eef6fa" stroke-width="4" stroke-linejoin="round"/>
+  <circle cx="26" cy="28" r="3.5" fill="#28b7c8"/>
+  <circle cx="38" cy="28" r="3.5" fill="#f1b95b"/>
+</svg>

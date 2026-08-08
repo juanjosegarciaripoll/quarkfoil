@@ -4,6 +4,7 @@ __pycache__/
 .pytest_cache/
 dist/
 build/
+site/
 *.egg-info/
 
 # Browser test captures are generated artifacts.
