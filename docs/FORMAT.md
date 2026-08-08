@@ -10,12 +10,67 @@ title: Quantum simulation platforms
 author: Ada Lovelace
 aspect-ratio: 16:9
 theme: scientific-light
+assets:
+  figures: artwork
+  include:
+    - references
+    - media
 defaults:
   footer: Summer school · 2026
 ---
 ```
 
-The current renderer uses a 16:9 canvas and the bundled scientific theme. `defaults.footer` supplies Markdown shown on slides without a slide-specific footer. A heading attribute `footer="none"` suppresses it.
+The supported preface fields are:
+
+| Field | Purpose | Default |
+|---|---|---|
+| `title` | Presentation title and exported browser-page title | `New presentation` for a generated starter |
+| `author` | Presentation author metadata | Empty, except in a generated starter |
+| `aspect-ratio` | Intended slide aspect ratio | `16:9` |
+| `theme` | Presentation theme identifier | `scientific-light` |
+| `defaults.footer` | Markdown footer inherited by slides | Empty |
+| `assets.figures` | Folder used for newly imported images | `figures` |
+| `assets.include` | Additional folders copied completely during static export | Empty list |
+
+The current renderer uses a 16:9 canvas and the bundled scientific theme.
+`defaults.footer` supplies Markdown shown on slides without a slide-specific
+footer. A heading attribute `footer="none"` suppresses it.
+
+### Asset folders
+
+All asset folders are relative to the directory containing the presentation
+Markdown. Absolute paths, `..`, and paths that resolve outside that directory
+are rejected.
+
+`assets.figures` changes the destination used by the editor's image-import
+button. In the example above, importing `apparatus.svg` produces:
+
+```markdown
+![](artwork/apparatus.svg)
+```
+
+and stores the file at `artwork/apparatus.svg`. Nested relative folders such as
+`assets/images` are allowed and are created when the first image is imported.
+
+`assets.include` lists other directories that belong to the presentation—for
+example papers, videos, downloadable notebooks, or data files linked from
+Markdown:
+
+```markdown
+[Experimental data](references/data.csv)
+```
+
+Static export copies the configured figure folder, every folder in
+`assets.include`, and individually referenced local Markdown assets. A
+configured folder that does not yet exist is ignored; a configured path that
+exists but is not a directory is an export error. The default remains fully
+backward compatible:
+
+```yaml
+assets:
+  figures: figures
+  include: []
+```
 
 ## Slides and layouts
 

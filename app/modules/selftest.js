@@ -16,6 +16,10 @@ import { renderDeck } from "./render.js";
 
 const source = `---
 title: Test deck
+assets:
+  figures: artwork
+  include:
+    - references
 defaults:
   footer: Footer
 ---
@@ -122,6 +126,7 @@ function assertEmptyLayouts() {
 try {
   let deck = parseDeck(source);
   assert(deck.metadata.title === "Test deck", "front matter parses");
+  assert(deck.metadata.assets.figures === "artwork" && deck.metadata.assets.include[0] === "references", "asset folders parse from front matter");
   assert(deck.slides.length === 2, "slides split");
   assert(deck.slides[0].layout === "1-2", "layout parses");
   assert(Math.round(deck.slides[0].columns[0]) === 40, "column ratios parse");

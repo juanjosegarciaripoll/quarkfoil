@@ -3,6 +3,8 @@ title: Quarkfoil Demonstration
 author: John Wick
 aspect-ratio: 16:9
 theme: scientific-light
+assets:
+  figures: figures
 defaults:
   footer: Browser-native Markdown · Reveal.js · KaTeX
 ---

@@ -77,7 +77,10 @@ The distribution and command-line tool are named `quarkfoil`.
 - Free slides have no visible frame; their organizational title remains
   editable from the slide list or Source mode.
 - Images imported through the editor go into the presentation's `figures/`
-  directory and are referenced with relative paths.
+  directory by default and are referenced with relative paths.
+- `assets.figures` in front matter selects the image-import directory;
+  `assets.include` lists additional directories copied by static export. All
+  configured paths remain inside the presentation directory.
 
 ### Local server and security
 

@@ -67,7 +67,7 @@ CDN_FILES = {
     ),
 }
 
-IMAGE_PATTERN = re.compile(r"!\[[^\]]*\]\(([^)\s]+)")
+ASSET_PATTERN = re.compile(r"!?\[[^\]]*\]\(([^)\s]+)")
 
 
 def _integrity(path: Path) -> str:
@@ -85,7 +85,7 @@ def _copy_entry(source: Path, destination: Path) -> None:
 
 def _asset_references(source: str) -> set[str]:
     references = set()
-    for match in IMAGE_PATTERN.finditer(source):
+    for match in ASSET_PATTERN.finditer(source):
         value = unquote(match.group(1)).replace("\\", "/")
         parsed = urlsplit(value)
         if parsed.scheme or parsed.netloc or value.startswith(("/", "#")):
@@ -94,22 +94,80 @@ def _asset_references(source: str) -> set[str]:
     return references
 
 
+def _yaml_scalar(value: str) -> str:
+    value = value.strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
+        value = value[1:-1]
+    return value.strip()
+
+
+def _configured_asset_folders(source: str) -> set[str]:
+    if not source.startswith("---"):
+        return {"figures"}
+    lines = source.splitlines()
+    try:
+        end = lines.index("---", 1)
+    except ValueError:
+        return {"figures"}
+
+    folders = {"figures"}
+    in_assets = False
+    in_include = False
+    for line in lines[1:end]:
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        indent = len(line) - len(line.lstrip(" "))
+        stripped = line.strip()
+        if indent == 0:
+            in_assets = stripped == "assets:"
+            in_include = False
+            continue
+        if not in_assets:
+            continue
+        if indent == 2 and stripped.startswith("figures:"):
+            value = _yaml_scalar(stripped.split(":", 1)[1])
+            if value:
+                folders.discard("figures")
+                folders.add(value)
+            in_include = False
+        elif indent == 2 and stripped == "include:":
+            in_include = True
+        elif in_include and indent >= 4 and stripped.startswith("-"):
+            value = _yaml_scalar(stripped[1:])
+            if value:
+                folders.add(value)
+        elif indent <= 2:
+            in_include = False
+    return folders
+
+
+def _folder_files(project: Path, relative: str) -> set[str]:
+    normalized = unquote(relative).replace("\\", "/")
+    folder = (project / normalized).resolve()
+    if not normalized or folder == project or not _inside(project, folder):
+        raise ValueError(f"Asset folder leaves the presentation directory: {relative}")
+    if not folder.exists():
+        return set()
+    if not folder.is_dir():
+        raise ValueError(f"Configured asset folder is not a directory: {relative}")
+    return {
+        path.relative_to(project).as_posix()
+        for path in folder.rglob("*")
+        if path.is_file() and _inside(project, path)
+    }
+
+
 def _copy_project_assets(deck: Path, source: str, destination: Path) -> None:
     project = deck.parent.resolve()
     references = _asset_references(source)
-    figures = project / "figures"
-    if figures.is_dir():
-        references.update(
-            path.relative_to(project).as_posix()
-            for path in figures.rglob("*")
-            if path.is_file() and _inside(project, path)
-        )
+    for folder in _configured_asset_folders(source):
+        references.update(_folder_files(project, folder))
     for relative in sorted(references):
         asset = (project / relative).resolve()
         if not _inside(project, asset):
-            raise ValueError(f"Image leaves the presentation directory: {relative}")
+            raise ValueError(f"Asset leaves the presentation directory: {relative}")
         if not asset.is_file():
-            raise FileNotFoundError(f"Referenced image not found: {relative}")
+            raise FileNotFoundError(f"Referenced asset not found: {relative}")
         target = destination / Path(relative)
         _copy_entry(asset, target)
 

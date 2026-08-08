@@ -59,6 +59,31 @@ class ExporterTests(unittest.TestCase):
             export_presentation(self.deck, output)
         self.assertEqual(marker.read_text(encoding="utf-8"), "keep")
 
+    def test_configured_asset_folders_are_exported(self) -> None:
+        artwork = self.project / "artwork"
+        resources = self.project / "resources"
+        artwork.mkdir()
+        resources.mkdir()
+        (artwork / "unused.svg").write_text("<svg/>", encoding="utf-8")
+        (resources / "notes.pdf").write_bytes(b"%PDF-test")
+        self.deck.write_text(
+            "---\ntitle: Assets\nassets:\n  figures: artwork\n  include:\n    - resources\n---\n\n"
+            "## Files {.layout-1}\n\n[Notes](resources/notes.pdf)\n",
+            encoding="utf-8",
+        )
+        output = export_presentation(self.deck, self.root / "asset-site")
+        self.assertTrue((output / "artwork/unused.svg").is_file())
+        self.assertEqual((output / "resources/notes.pdf").read_bytes(), b"%PDF-test")
+
+    def test_configured_asset_folder_cannot_leave_project(self) -> None:
+        self.deck.write_text(
+            "---\nassets:\n  include:\n    - ../outside\n---\n\n## Unsafe\n",
+            encoding="utf-8",
+        )
+        with self.assertRaises(ValueError):
+            export_presentation(self.deck, self.root / "unsafe-folder-site")
+        self.assertFalse((self.root / "unsafe-folder-site").exists())
+
     def test_asset_cannot_leave_project(self) -> None:
         outside = self.root / "outside.svg"
         outside.write_text("<svg/>", encoding="utf-8")

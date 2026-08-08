@@ -408,14 +408,21 @@ function downloadSource() {
 
 async function importAsset(file) {
   if (!file?.type.startsWith("image/")) throw new Error("Only image files are supported");
+  const configured = state.deck?.metadata?.assets?.figures;
+  const folder = typeof configured === "string" && configured.trim() ? configured.trim().replaceAll("\\", "/") : "figures";
+  const parts = folder.split("/").filter(Boolean);
+  if (/^(?:\/|[a-z]:)/i.test(folder) || !parts.length || parts.some(part => part === "." || part === "..")) {
+    throw new Error("assets.figures must be a project-relative folder");
+  }
+  const figureFolder = parts.join("/");
   if (state.local) {
-    const response = await fetch(`/api/asset?name=${encodeURIComponent(file.name)}`, { method: "POST", headers: { "Content-Type": file.type }, body: file });
+    const response = await fetch(`/api/asset?name=${encodeURIComponent(file.name)}&folder=${encodeURIComponent(figureFolder)}`, { method: "POST", headers: { "Content-Type": file.type }, body: file });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || "Asset import failed");
     return result.path;
   }
   const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
-  let path = `figures/${safe}`;
+  let path = `${figureFolder}/${safe}`;
   if (state.directoryHandle) {
     const extension = safe.includes(".") ? `.${safe.split(".").pop()}` : "";
     const stem = extension ? safe.slice(0, -extension.length) : safe;
@@ -423,7 +430,7 @@ async function importAsset(file) {
     while (true) {
       try {
         await nestedFileHandle(state.directoryHandle, path);
-        path = `figures/${stem}-${counter++}${extension}`;
+        path = `${figureFolder}/${stem}-${counter++}${extension}`;
       } catch { break; }
     }
     const handle = await nestedFileHandle(state.directoryHandle, path, true);

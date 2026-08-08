@@ -17,6 +17,10 @@ The destination must not already exist. Quarkfoil creates it atomically and
 copies the Markdown source, referenced project images, player files, pinned
 browser libraries, fonts, and complete third-party notices.
 
+The configured `assets.figures` directory and all directories listed under
+`assets.include` in the YAML preface are copied recursively. See the
+[format reference](FORMAT.md#asset-folders) for configuration and path rules.
+
 ```text
 lecture-site/
 ├── index.html

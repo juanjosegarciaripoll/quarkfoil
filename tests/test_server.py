@@ -127,6 +127,29 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(result["path"], "figures/diagram.svg")
         self.assertTrue((self.root / result["path"]).is_file())
 
+    def test_asset_import_uses_requested_project_folder(self) -> None:
+        status, _, payload = self.request(
+            "/api/asset?name=diagram.svg&folder=artwork%2Ffigures",
+            method="POST",
+            body=b"<svg xmlns='http://www.w3.org/2000/svg'/>",
+            headers={"Content-Type": "image/svg+xml"},
+        )
+        self.assertEqual(status, 201)
+        result = json.loads(payload)
+        self.assertEqual(result["path"], "artwork/figures/diagram.svg")
+        self.assertTrue((self.root / result["path"]).is_file())
+
+    def test_asset_import_folder_cannot_leave_project(self) -> None:
+        with self.assertRaises(urllib.error.HTTPError) as context:
+            self.request(
+                "/api/asset?name=diagram.svg&folder=..%2Foutside",
+                method="POST",
+                body=b"<svg/>",
+                headers={"Content-Type": "image/svg+xml"},
+            )
+        self.assertEqual(context.exception.code, 400)
+        self.assertFalse((self.root.parent / "outside").exists())
+
 
 if __name__ == "__main__":
     unittest.main()

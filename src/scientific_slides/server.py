@@ -214,6 +214,7 @@ class SlideHandler(SimpleHTTPRequestHandler):
             return
         query = urllib.parse.parse_qs(parsed.query)
         requested = Path(query.get("name", ["asset.bin"])[0]).name
+        folder = query.get("folder", ["figures"])[0]
         if requested in {"", ".", ".."}:
             requested = "asset.bin"
         try:
@@ -221,8 +222,16 @@ class SlideHandler(SimpleHTTPRequestHandler):
         except ValueError as error:
             self._send_json({"error": str(error)}, HTTPStatus.BAD_REQUEST)
             return
-        asset_dir = self.project_root / "figures"
-        asset_dir.mkdir(exist_ok=True)
+        try:
+            asset_dir = self._project_file(folder)
+            if asset_dir == self.project_root:
+                raise PermissionError("Asset folder must not be the project root")
+            asset_dir.mkdir(parents=True, exist_ok=True)
+            if not asset_dir.is_dir():
+                raise ValueError("Asset folder is not a directory")
+        except (OSError, PermissionError, ValueError) as error:
+            self._send_json({"error": str(error)}, HTTPStatus.BAD_REQUEST)
+            return
         stem, suffix = Path(requested).stem, Path(requested).suffix.lower()
         allowed = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"}
         if suffix not in allowed:
