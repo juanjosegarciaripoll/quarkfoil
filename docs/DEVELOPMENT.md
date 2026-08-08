@@ -63,9 +63,8 @@ The `CI` workflow runs for every push and pull request. It checks:
 - the strict documentation build and exported live example; and
 - wheel and source-archive creation after all checks pass.
 
-Successful distribution archives are retained as workflow artifacts. Package
-publication is intentionally not part of CI; a future release workflow can use
-PyPI trusted publishing when the project is ready for public releases.
+Distribution archives exist only inside the ephemeral CI runner and are not
+uploaded or retained. Quarkfoil has no automated package-publication workflow.
 
 ## Vendored browser dependencies
 

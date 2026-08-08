@@ -71,7 +71,7 @@ jobs:
         run: uv run --frozen --no-sync quarkfoil export example/deck.md --output site/example --cdn
 
   packages:
-    name: Build distributions
+    name: Verify distribution build
     needs: [tests, browser, documentation]
     runs-on: ubuntu-latest
     steps:
@@ -83,9 +83,3 @@ jobs:
           enable-cache: true
       - name: Build wheel and source archive
         run: uv build
-      - name: Retain distributions
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: quarkfoil-distributions
-          path: dist/
-          if-no-files-found: error
