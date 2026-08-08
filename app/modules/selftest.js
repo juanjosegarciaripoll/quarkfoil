@@ -73,6 +73,29 @@ function assertCompoundLayout(layout, cellIds, spanningCellId) {
   fixture.remove();
 }
 
+function assertFrontLayout() {
+  const fixture = document.createElement("div");
+  fixture.id = "layout-fixture";
+  fixture.className = "reveal";
+  const slides = document.createElement("div");
+  slides.className = "slides";
+  fixture.append(slides);
+  document.body.append(fixture);
+  const parsed = parseDeck(`## Front title {.layout-front}\n\n::: core\nAuthor and affiliation\n:::`);
+  renderDeck(parsed, slides, source => source);
+  const section = fixture.querySelector(".scientific-slide");
+  section.classList.add("present");
+  const title = fixture.querySelector(".slide-title").getBoundingClientRect();
+  const core = fixture.querySelector(".slide-core").getBoundingClientRect();
+  const sectionRect = section.getBoundingClientRect();
+  const style = getComputedStyle(section);
+  const contentHeight = sectionRect.height - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
+  assert(parsed.slides[0].layout === "front", "front-page layout parses");
+  assert(Math.abs(title.height - core.height) <= 1, `front page divides title and details equally (${title.height.toFixed(1)} / ${core.height.toFixed(1)})`);
+  assert(Math.abs(title.height + core.height - contentHeight) <= 1, `front page fills the padded content height (${(title.height + core.height).toFixed(1)} / ${contentHeight.toFixed(1)})`);
+  fixture.remove();
+}
+
 try {
   let deck = parseDeck(source);
   assert(deck.metadata.title === "Test deck", "front matter parses");
@@ -100,6 +123,7 @@ try {
 
   assertCompoundLayout("1-2", ["left", "top-right", "bottom-right"], "left");
   assertCompoundLayout("2-1", ["top-left", "bottom-left", "right"], "right");
+  assertFrontLayout();
 
   let next = updateOverlay(deck, 0, "eq", { x: 51.5, y: 22, locked: "true" });
   assert(next.includes('x="51.5"'), "overlay geometry patches source");

@@ -1,15 +1,19 @@
 ---
 title: Scientific Slides Demonstration
-author: Juan José García-Ripoll
+author: John Wick
 aspect-ratio: 16:9
 theme: scientific-light
 defaults:
   footer: Browser-native Markdown · Reveal.js · KaTeX
 ---
 
-# Scientific Slides {.title-slide .layout-1}
+# Scientific Slides {.title-slide .layout-front}
 
-Markdown source, structured grids and free-form scientific annotations
+::: core
+**John Wick**
+
+Scientific Slides Demonstration
+:::
 
 ---
 

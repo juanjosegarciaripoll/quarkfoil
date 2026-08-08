@@ -82,7 +82,28 @@
   grid-template-columns: minmax(0, var(--column-a)) minmax(0, var(--column-b));
   grid-template-rows: minmax(0, var(--row-a)) minmax(0, var(--row-b));
 }
+.layout-front .slide-grid {
+  grid-template-areas: "core";
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+}
 .layout-free .slide-grid { display: none; }
+
+.scientific-slide.layout-front { --title-height: 50%; }
+.scientific-slide.layout-front .slide-title {
+  display: flex;
+  align-items: center;
+  height: 50%;
+  font-size: 1.8em;
+  line-height: 1.08;
+}
+.scientific-slide.layout-front .slide-core { height: 50%; }
+.scientific-slide.layout-front .slide-cell {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.scientific-slide.layout-front .slide-footer { display: none; }
 
 .cell-core { grid-area: core; }
 .cell-left { grid-area: left; }

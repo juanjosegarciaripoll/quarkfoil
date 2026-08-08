@@ -1,4 +1,4 @@
-const LAYOUTS = new Set(["1", "1-1", "1-2", "2-1", "free"]);
+const LAYOUTS = new Set(["1", "1-1", "1-2", "2-1", "front", "free"]);
 const CELL_NAMES = new Set(["core", "left", "right", "top-left", "bottom-left", "top-right", "bottom-right"]);
 
 export function escapeHtml(value) {
@@ -306,6 +306,7 @@ function blankSlideSource(slide) {
     "1-1": ["left", "right"],
     "1-2": ["left", "top-right", "bottom-right"],
     "2-1": ["top-left", "bottom-left", "right"],
+    front: ["core"],
     free: [],
   };
   const cells = (cellsByLayout[slide.layout] || ["core"])

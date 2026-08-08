@@ -81,7 +81,7 @@ function renderSlide(slide, metadata, assetResolver) {
   section.style.setProperty("--row-b", `${slide.rows[1]}fr`);
 
   if (slide.title) {
-    const title = document.createElement(slide.headingAttrs.classes.includes("title-slide") ? "h1" : "h2");
+    const title = document.createElement(slide.layout === "front" || slide.headingAttrs.classes.includes("title-slide") ? "h1" : "h2");
     title.className = "slide-title";
     title.innerHTML = markdown(slide.title).replace(/^<p>|<\/p>\s*$/g, "");
     section.append(title);
