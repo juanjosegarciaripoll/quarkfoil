@@ -53,26 +53,9 @@ jobs:
       - name: Run browser self-test
         run: uv run --frozen --no-group docs --python 3.11 python tests/browser_ci.py
 
-  documentation:
-    name: Documentation and live example
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - name: Install uv
-        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
-        with:
-          enable-cache: true
-      - name: Install documentation environment
-        run: uv sync --frozen --group docs
-      - name: Build documentation strictly
-        run: uv run --frozen --no-sync mkdocs build --strict
-      - name: Export live example
-        run: uv run --frozen --no-sync quarkfoil export example/deck.md --output site/example --cdn
-
   packages:
     name: Verify distribution build
-    needs: [tests, browser, documentation]
+    needs: [tests, browser]
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository

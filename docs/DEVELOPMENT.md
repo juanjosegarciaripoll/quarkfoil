@@ -60,11 +60,13 @@ The `CI` workflow runs for every push and pull request. It checks:
 - Python 3.11 on Linux and Windows;
 - the current Python release on Linux;
 - the browser self-test in Microsoft Edge on Windows;
-- the strict documentation build and exported live example; and
 - wheel and source-archive creation after all checks pass.
 
 Distribution archives exist only inside the ephemeral CI runner and are not
 uploaded or retained. Quarkfoil has no automated package-publication workflow.
+The separate documentation workflow performs the strict site build, exports
+the live example, and deploys GitHub Pages from `main` without duplicating
+those tasks in CI.
 
 ## Vendored browser dependencies
 
