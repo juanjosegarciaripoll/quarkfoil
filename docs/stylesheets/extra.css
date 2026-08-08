@@ -3,6 +3,7 @@
   --md-primary-fg-color--light: #263b58;
   --md-primary-fg-color--dark: #0e1725;
   --md-accent-fg-color: #137c8b;
+  --md-typeset-a-color: #086f7c;
   --qf-cyan: #28b7c8;
   --qf-amber: #f1b95b;
   --qf-panel: #f4f7fa;
@@ -12,6 +13,7 @@
 [data-md-color-scheme="slate"] {
   --md-primary-fg-color: #111a29;
   --md-accent-fg-color: #54cad7;
+  --md-typeset-a-color: #63d2df;
   --qf-panel: #202b3a;
   --qf-line: #344256;
 }
@@ -26,6 +28,13 @@
 .md-typeset h3 {
   font-weight: 650;
   letter-spacing: -0.025em;
+}
+
+.md-typeset a:hover,
+.md-typeset a:focus-visible {
+  color: var(--md-accent-fg-color);
+  text-decoration: underline;
+  text-underline-offset: 0.14em;
 }
 
 .qf-hero {
