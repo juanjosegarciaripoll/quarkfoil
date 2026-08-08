@@ -1,4 +1,4 @@
-const LAYOUTS = new Set(["1", "1-1", "1-2", "2-1", "front", "free"]);
+const LAYOUTS = new Set(["1", "1-1", "1-2", "2-1", "0", "front", "free"]);
 const CELL_NAMES = new Set(["core", "left", "right", "top-left", "bottom-left", "top-right", "bottom-right"]);
 
 export function escapeHtml(value) {
@@ -227,7 +227,7 @@ function parseSlide(source, range, index, diagnostics) {
       : null;
     cells.unshift({ id: "core", type: "markdown", source: ordinary, image: null, range: ordinaryRange, attrs: parseAttributes("") });
   }
-  if (!cells.length && layout !== "free") cells.push({ id: "core", type: "markdown", source: "", image: null, range: null, attrs: parseAttributes("") });
+  if (!cells.length && !["0", "free"].includes(layout)) cells.push({ id: "core", type: "markdown", source: "", image: null, range: null, attrs: parseAttributes("") });
   const duplicateCells = cells.map(cell => cell.id).filter((id, position, all) => all.indexOf(id) !== position);
   for (const id of new Set(duplicateCells)) diagnostics.push({ level: "error", slide: index + 1, message: `Duplicate '${id}' cell` });
   const duplicateOverlays = overlays.map(overlay => overlay.id).filter((id, position, all) => all.indexOf(id) !== position);
@@ -306,6 +306,7 @@ function blankSlideSource(slide) {
     "1-1": ["left", "right"],
     "1-2": ["left", "top-right", "bottom-right"],
     "2-1": ["top-left", "bottom-left", "right"],
+    "0": [],
     front: ["core"],
     free: [],
   };

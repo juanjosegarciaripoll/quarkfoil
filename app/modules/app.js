@@ -166,8 +166,16 @@ function rebuildSlideList() {
     const button = document.createElement("button");
     button.type = "button";
     button.textContent = `${index + 1}. ${slide.title || "Untitled"}`;
+    button.title = "Click to select; double-click to rename";
     button.classList.toggle("current", index === state.currentSlide);
     button.addEventListener("click", () => { reveal.slide(index); setMode(state.mode === "source" ? "design" : state.mode); });
+    button.addEventListener("dblclick", event => {
+      event.preventDefault();
+      state.currentSlide = index;
+      reveal.slide(index);
+      setMode("design");
+      setTimeout(() => editor?.openTitleDialog(), 0);
+    });
     li.append(button);
     return li;
   }));

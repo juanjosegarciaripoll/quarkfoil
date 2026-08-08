@@ -59,6 +59,7 @@ function fillContent(container, item, assetResolver) {
 }
 
 function cellMap(layout) {
+  if (layout === "0") return [];
   if (layout === "1-1") return ["left", "right"];
   if (layout === "1-2") return ["left", "top-right", "bottom-right"];
   if (layout === "2-1") return ["top-left", "bottom-left", "right"];
@@ -80,11 +81,14 @@ function renderSlide(slide, metadata, assetResolver) {
   section.style.setProperty("--row-a", `${slide.rows[0]}fr`);
   section.style.setProperty("--row-b", `${slide.rows[1]}fr`);
 
+  const frame = document.createElement("div");
+  frame.className = "slide-frame";
+
   if (slide.title) {
     const title = document.createElement(slide.layout === "front" || slide.headingAttrs.classes.includes("title-slide") ? "h1" : "h2");
     title.className = "slide-title";
     title.innerHTML = markdown(slide.title).replace(/^<p>|<\/p>\s*$/g, "");
-    section.append(title);
+    frame.append(title);
   } else section.classList.add("no-title");
 
   const core = document.createElement("div");
@@ -127,14 +131,15 @@ function renderSlide(slide, metadata, assetResolver) {
     fillContent(element, overlay, assetResolver);
     overlayLayer.append(element);
   }
-  section.append(core, overlayLayer);
+  frame.append(core);
+  section.append(frame, overlayLayer);
 
   const footerSource = slide.footer?.source ?? metadata?.defaults?.footer ?? "";
   if (footerSource && slide.headingAttrs.values.footer !== "none") {
     const footer = document.createElement("footer");
     footer.className = "slide-footer";
     footer.innerHTML = markdown(String(footerSource));
-    section.append(footer);
+    frame.append(footer);
   } else section.classList.add("no-footer");
 
   if (slide.notes) {

@@ -96,6 +96,25 @@ function assertFrontLayout() {
   fixture.remove();
 }
 
+function assertEmptyLayouts() {
+  const fixture = document.createElement("div");
+  fixture.id = "layout-fixture";
+  fixture.className = "reveal";
+  const slides = document.createElement("div");
+  slides.className = "slides";
+  fixture.append(slides);
+  document.body.append(fixture);
+  const parsed = parseDeck(`---\ndefaults:\n  footer: Footer\n---\n\n## Title and footer {.layout-0}\n\n---\n\n## Hidden structure {.layout-free}\n\n::: overlay {#free-text type="markdown" x="20" y="20" w="40" h="20"}\nFree overlay\n:::`);
+  renderDeck(parsed, slides, source => source);
+  const zero = fixture.querySelector(".layout-0");
+  const free = fixture.querySelector(".layout-free");
+  assert(zero.querySelectorAll(".slide-cell").length === 0, "layout 0 creates no core cells");
+  assert(getComputedStyle(zero.querySelector(".slide-frame")).display === "grid", "layout 0 keeps title and footer structure");
+  assert(getComputedStyle(free.querySelector(".slide-frame")).display === "none", "free layout hides title, core and footer");
+  assert(free.querySelectorAll(".slide-overlay").length === 1, "free layout retains positioned overlays");
+  fixture.remove();
+}
+
 try {
   let deck = parseDeck(source);
   assert(deck.metadata.title === "Test deck", "front matter parses");
@@ -124,6 +143,7 @@ try {
   assertCompoundLayout("1-2", ["left", "top-right", "bottom-right"], "left");
   assertCompoundLayout("2-1", ["top-left", "bottom-left", "right"], "right");
   assertFrontLayout();
+  assertEmptyLayouts();
 
   let next = updateOverlay(deck, 0, "eq", { x: 51.5, y: 22, locked: "true" });
   assert(next.includes('x="51.5"'), "overlay geometry patches source");

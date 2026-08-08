@@ -128,3 +128,26 @@ This annotation remains editable **Markdown**.
 ::: notes
 In Design mode, select and drag the equation or annotation. The underlying image is never modified.
 :::
+
+---
+
+## Free canvas example {.layout-free}
+
+::: overlay {#free-heading type="markdown" x="8" y="8" w="70" h="12" z="10"}
+# A completely free canvas
+:::
+
+::: overlay {#free-model type="image" x="7" y="25" w="52" h="58" z="1"}
+![](figures/hardware-model.svg){fit=contain focus="50 50"}
+:::
+
+::: overlay {#free-description type="markdown" x="63" y="29" w="30" h="22" z="11"}
+Position text, images and equations without title, footer, or grid constraints.
+:::
+
+::: overlay {#free-equation type="equation" x="62" y="58" w="30" h="16" z="12"}
+\[
+H=-J\sum_{\langle i,j\rangle}
+\left(S_i^xS_j^x+S_i^yS_j^y\right)
+\]
+:::
