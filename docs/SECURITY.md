@@ -12,7 +12,7 @@ Quarkfoil is a local editing tool, not a hardened multi-user web service.
 - SVG is loaded through `<img>` elements and is not injected into the application DOM.
 - YAML is parsed as data and is not used to construct code.
 - Deck saves are UTF-8 validated, size-limited, conflict-checked, and atomic.
-- Asset uploads are size-limited and restricted to common image extensions.
+- Asset uploads are size-limited and restricted to supported image and video extensions.
 
 ## User responsibilities
 

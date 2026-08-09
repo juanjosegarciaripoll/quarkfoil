@@ -41,10 +41,18 @@ const IMAGE_EXTENSIONS = {
 };
 
 export function clipboardImageFile(clipboardData, timestamp = Date.now()) {
-  const item = [...(clipboardData?.items || [])]
-    .find(candidate => candidate.kind === "file" && candidate.type.startsWith("image/"));
-  const file = item?.getAsFile() || [...(clipboardData?.files || [])]
-    .find(candidate => candidate.type.startsWith("image/"));
+  const candidates = [...(clipboardData?.files || [])]
+    .filter(candidate => candidate.type.startsWith("image/"));
+  for (const item of clipboardData?.items || []) {
+    if (item.kind !== "file" || !item.type.startsWith("image/")) continue;
+    const file = item.getAsFile();
+    if (file && !candidates.includes(file)) candidates.push(file);
+  }
+  candidates.sort((left, right) => {
+    const score = file => (file.type === "image/png" ? 0 : 4) + (file.name?.includes(".") ? 2 : 0);
+    return score(right) - score(left);
+  });
+  const file = candidates[0];
   if (!file) return null;
   const extension = IMAGE_EXTENSIONS[file.type];
   if (!extension || file.name?.includes(".")) return file;

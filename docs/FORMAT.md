@@ -191,6 +191,14 @@ Supported `fit` values:
 
 `focus="X Y"` gives the crop focus as percentages.
 
+Clipboard paste preserves JPEG, GIF, PNG, WebP, or SVG bytes when the browser
+provides that original file representation. Some browsers expose copied
+rendered pixels—such as an image copied from a web page or a screenshot—only as
+a synthesized PNG. Quarkfoil cannot recover the original encoding or GIF
+animation from that PNG; drag, upload, or paste the original file to preserve
+it. When both an original JPEG/GIF and a synthesized PNG are available,
+Quarkfoil prefers the original representation.
+
 ## Floating overlays
 
 ```markdown

@@ -214,6 +214,14 @@ try {
     items: [{ kind: "file", type: "image/png", getAsFile: () => clipboardPng }],
   }, 1234);
   assert(pastedPng.name === "pasted-image-1234.png" && pastedPng.type === "image/png", "clipboard images receive an importable filename");
+  const clipboardJpeg = new File([new Uint8Array([255, 216, 255])], "photo.jpg", { type: "image/jpeg" });
+  const pastedJpeg = clipboardImageFile({
+    files: [clipboardPng],
+    items: [{ kind: "file", type: "image/jpeg", getAsFile: () => clipboardJpeg }],
+  });
+  assert(pastedJpeg === clipboardJpeg && pastedJpeg.type === "image/jpeg", "an original JPEG clipboard representation is preferred over synthesized PNG");
+  const clipboardGif = new File([new Uint8Array([71, 73, 70])], "animation.gif", { type: "image/gif" });
+  assert(clipboardImageFile({ files: [clipboardGif] }) === clipboardGif, "pasted GIF files retain their original bytes and animation");
   assert(renameClipboardImage(pastedPng, "experiment-result").name === "experiment-result.png", "pasted images accept a chosen filename and infer its extension");
   assert(renameClipboardImage(pastedPng, "plots/result")?.name === "plots-result.png", "pasted image filenames cannot introduce directories");
   assert(renameClipboardImage(pastedPng, "  ") === null, "an empty pasted image filename cancels the import");
