@@ -217,7 +217,7 @@ export class DesignEditor {
     const source = this.dialogTarget?.kind === "title"
       ? this.contentEditor.value.replace(/\r?\n/g, "  \n")
       : this.contentEditor.value;
-    renderMarkdownPreview(source, this.preview);
+    renderMarkdownPreview(source, this.preview, { breaks: this.dialogTarget?.kind === "overlay" });
   }
 
   refresh() {
@@ -536,7 +536,7 @@ export class DesignEditor {
     this.dialogTarget = { kind: "overlay", id: object.id };
     document.querySelector("#content-dialog-title").textContent = object.type === "equation" ? "Edit LaTeX" : object.type === "shape" ? "Edit shape label" : "Edit Markdown";
     this.contentEditor.value = object.source;
-    renderMarkdownPreview(object.source, this.preview);
+    renderMarkdownPreview(object.source, this.preview, { breaks: true });
     this.dialog.showModal();
   }
 

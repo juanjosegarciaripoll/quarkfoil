@@ -2,7 +2,7 @@ import { escapeHtml, THEMES } from "./parser.js";
 import { makeShapeSvg } from "./shapes.js";
 import { renderCitation } from "./bibliography.js";
 
-function markdown(source, bibliography = null) {
+function markdown(source, bibliography = null, { breaks = false } = {}) {
   try {
     const equations = [];
     let protectedSource = String(source || "").replace(
@@ -29,7 +29,7 @@ function markdown(source, bibliography = null) {
       const text = typeof token === "string" ? token : token?.text || token?.raw || "";
       return escapeHtml(text);
     };
-    let html = window.marked.parse(protectedSource, { gfm: true, breaks: false, async: false, renderer });
+    let html = window.marked.parse(protectedSource, { gfm: true, breaks, async: false, renderer });
     for (const equation of equations) {
       const rendered = window.katex.renderToString(equation.expression, {
         displayMode: equation.display,
@@ -86,7 +86,7 @@ function makeVideo(video, assetResolver) {
   return element;
 }
 
-function fillContent(container, item, assetResolver, bibliography) {
+function fillContent(container, item, assetResolver, bibliography, preserveLines = false) {
   if (item.type === "image" && item.image) container.append(makeImage(item.image, assetResolver));
   else if (item.type === "video" && item.video) container.append(makeVideo(item.video, assetResolver));
   else if (item.type === "shape") {
@@ -97,11 +97,11 @@ function fillContent(container, item, assetResolver, bibliography) {
     container.style.setProperty("--shape-stroke-width", String(item.strokeWidth));
     const label = document.createElement("div");
     label.className = "shape-label";
-    label.innerHTML = markdown(item.source, bibliography);
+    label.innerHTML = markdown(item.source, bibliography, { breaks: preserveLines });
     container.append(makeShapeSvg(item.shape), label);
   }
   else if (item.type === "citation") container.innerHTML = renderCitation(item.attrs.values.key || "", bibliography, { brief: item.attrs.values.display !== "number" });
-  else container.innerHTML = markdown(item.source, bibliography);
+  else container.innerHTML = markdown(item.source, bibliography, { breaks: preserveLines && item.type === "markdown" });
 }
 
 function cellMap(layout) {
@@ -186,7 +186,7 @@ function renderSlide(slide, metadata, assetResolver, bibliography) {
       element.style.textAlign = overlay.alignment;
       element.dataset.align = overlay.alignment;
     }
-    fillContent(element, overlay, assetResolver, bibliography);
+    fillContent(element, overlay, assetResolver, bibliography, true);
     overlayLayer.append(element);
   }
   frame.append(core);
@@ -215,8 +215,8 @@ export function renderDeck(deck, target, assetResolver = source => `/project/${s
   target.replaceChildren(fragment);
 }
 
-export function renderMarkdownPreview(source, target) {
-  target.innerHTML = markdown(source);
+export function renderMarkdownPreview(source, target, options = {}) {
+  target.innerHTML = markdown(source, null, options);
 }
 
 export function syncVideoPlayback(activeSlide) {

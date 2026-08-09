@@ -286,6 +286,11 @@ try {
   assertThemes();
   assertTables();
 
+  const multilineFixture = document.createElement("div");
+  const multilineDeck = parseDeck("## Multiline {.layout-free}\n\n::: overlay {#multiline type=\"markdown\"}\nFirst line\nSecond line\n:::\n");
+  renderDeck(multilineDeck, multilineFixture, asset => asset);
+  assert(multilineFixture.querySelector(".overlay-markdown br"), "text overlays preserve textarea line breaks");
+
   let next = updateOverlay(deck, 0, "eq", { x: 51.5, y: 22, locked: "true" });
   assert(next.includes('x="51.5"'), "overlay geometry patches source");
   assert(next.includes("E=mc^2"), "overlay patch preserves content");
