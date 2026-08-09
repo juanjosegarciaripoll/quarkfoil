@@ -262,6 +262,7 @@ function parseSlide(source, range, index, diagnostics) {
           z: Number(block.attrs.values.z ?? overlays.length + 10),
         },
         fontSize: parseFontSize(block.attrs.values["font-size"]),
+        color: block.attrs.values.color || null,
         alignment,
         fragment: block.attrs.values.fragment ? Number(block.attrs.values.fragment) : null,
         locked: block.attrs.values.locked === "true",
@@ -295,6 +296,7 @@ function parseSlide(source, range, index, diagnostics) {
     if (overlay.type === "shape" && !Object.hasOwn(SHAPES, overlay.shape)) diagnostics.push({ level: "error", slide: index + 1, message: `Overlay '${overlay.id}' has unknown shape '${overlay.shape}'` });
     if (overlay.type === "shape" && (!Number.isFinite(overlay.strokeWidth) || overlay.strokeWidth < 0)) diagnostics.push({ level: "error", slide: index + 1, message: `Overlay '${overlay.id}' has invalid stroke width` });
     if (overlay.type === "video" && !overlay.video?.source) diagnostics.push({ level: "error", slide: index + 1, message: `Video overlay '${overlay.id}' has no src` });
+    if (overlay.color && !/^#[0-9a-f]{6}$/i.test(overlay.color)) diagnostics.push({ level: "warning", slide: index + 1, message: `Overlay '${overlay.id}' has invalid text color '${overlay.color}'` });
   }
   return {
     index,

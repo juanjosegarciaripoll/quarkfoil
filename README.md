@@ -75,6 +75,7 @@ instead of copying the browser libraries. See the
 - [Markdown format reference](docs/FORMAT.md)
 - [Security and trust model](docs/SECURITY.md)
 - [Development and release guide](docs/DEVELOPMENT.md)
+- [Changelog](CHANGELOG.md)
 - [Third-party components and licenses](THIRD_PARTY_LICENSES.md)
 
 ## Licenses

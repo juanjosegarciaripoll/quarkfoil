@@ -1,6 +1,6 @@
 [project]
 name = "quarkfoil"
-version = "0.1.0"
+version = "0.2.0"
 description = "Browser-native editor for scientific Markdown presentations"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -51,6 +51,7 @@ include = [
   "/tools",
   "/LICENSE",
   "/README.md",
+  "/CHANGELOG.md",
   "/THIRD_PARTY_LICENSES.md",
   "/pyproject.toml",
   "/uv.lock",

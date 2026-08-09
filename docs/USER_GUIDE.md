@@ -15,7 +15,7 @@ Design renders one slide and exposes graphical controls:
 - Click a grid region or overlay to select it.
 - Double-click a title, Markdown region, text overlay, or equation overlay to edit its content.
 - Drag floating overlays to move them and use their corner handles to resize them.
-- Use Properties to adjust geometry, layer, fragment, image fit/focus, font scale, and alignment.
+- Use Properties to adjust geometry, layer, fragment, image fit/focus, font scale, text color, and alignment. Resetting an explicit text color returns the object to its slide theme.
 
 The image toolbar action is contextual:
 

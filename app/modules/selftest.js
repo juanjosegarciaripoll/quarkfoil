@@ -308,6 +308,16 @@ try {
   assert(next.includes("E=mc^2"), "overlay patch preserves content");
   deck = parseDeck(next);
 
+  next = updateOverlay(deck, 0, "eq", { color: "#c92a2a" });
+  let coloredDeck = parseDeck(next);
+  assert(coloredDeck.slides[0].overlays[0].color === "#c92a2a", "floating text color serializes");
+  const colorFixture = document.createElement("div");
+  renderDeck(coloredDeck, colorFixture, asset => asset);
+  assert(colorFixture.querySelector(".overlay-equation").style.color === "rgb(201, 42, 42)", "floating text color renders");
+  next = updateOverlay(coloredDeck, 0, "eq", { color: null });
+  assert(!next.includes('color="#c92a2a"'), "reset floating text color returns to the theme default");
+  deck = parseDeck(next);
+
   next = updateSlideTitle(deck, 0, "## Edited title");
   assert(next.includes('## Edited title {.layout-1-2'), "title patches without losing layout attributes");
   deck = parseDeck(next);

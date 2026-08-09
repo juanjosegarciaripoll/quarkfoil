@@ -126,7 +126,7 @@ def initialize_deck(deck: Path) -> Path:
 
 
 class SlideHandler(SimpleHTTPRequestHandler):
-    server_version = "Quarkfoil/0.1"
+    server_version = "Quarkfoil/0.2.0"
 
     @property
     def project_root(self) -> Path:
@@ -431,7 +431,7 @@ def fetch_doi_bibtex(value: str) -> str:
         raise ValueError("Invalid DOI")
     request = urllib.request.Request(
         f"https://doi.org/{urllib.parse.quote(doi, safe='/():;._-')}",
-        headers={"Accept": "application/x-bibtex", "User-Agent": "Quarkfoil/0.1 (BibTeX DOI import)"},
+        headers={"Accept": "application/x-bibtex", "User-Agent": "Quarkfoil/0.2.0 (BibTeX DOI import)"},
     )
     with urllib.request.urlopen(request, timeout=12) as response:
         data = response.read(MAX_DOI_BYTES + 1)

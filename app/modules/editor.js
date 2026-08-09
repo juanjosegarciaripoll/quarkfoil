@@ -209,6 +209,8 @@ export class DesignEditor {
     }
     document.querySelector("#prop-font-size").addEventListener("input", event => this.previewFontSize(event.target.value));
     document.querySelector("#prop-font-size").addEventListener("change", () => this.applyFontSize());
+    document.querySelector("#prop-text-color").addEventListener("change", event => this.applyTextColor(event.target.value));
+    document.querySelector("#reset-text-color").addEventListener("click", () => this.applyTextColor(null));
     document.querySelectorAll(".alignment-buttons [data-align]").forEach(button => {
       button.addEventListener("click", () => this.applyAlignment(button.dataset.align));
     });
@@ -357,6 +359,7 @@ export class DesignEditor {
         document.querySelector("#prop-shape-shadow").checked = object.shadow;
       }
       this.fontProperties.hidden = false;
+      document.querySelector("#prop-text-color").value = colorInputValue(getComputedStyle(element).color) || "#17202a";
       document.querySelector("#prop-font-size").value = object.fontSize;
       this.updateFontSizeOutput(object.fontSize);
       this.updateAlignmentButtons(object.alignment);
@@ -379,6 +382,11 @@ export class DesignEditor {
     this.commit(updateOverlay(this.options.getDeck(), this.slideIndex(), this.selected.dataset.objectId, {
       "font-size": `${Math.round(value * 100) / 100}em`,
     }));
+  }
+
+  applyTextColor(color) {
+    if (!this.selected || ["image", "video"].includes(this.selected.dataset.objectType)) return;
+    this.commit(updateOverlay(this.options.getDeck(), this.slideIndex(), this.selected.dataset.objectId, { color }));
   }
 
   updateAlignmentButtons(alignment) {

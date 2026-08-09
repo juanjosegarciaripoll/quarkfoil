@@ -181,6 +181,7 @@ function renderSlide(slide, metadata, assetResolver, bibliography) {
     element.style.width = `${overlay.geometry.w}%`;
     element.style.height = `${overlay.geometry.h}%`;
     element.style.zIndex = String(overlay.geometry.z);
+    if (/^#[0-9a-f]{6}$/i.test(overlay.color || "")) element.style.color = overlay.color;
     if (!["image", "video"].includes(overlay.type)) {
       element.style.fontSize = `${overlay.fontSize}em`;
       element.style.textAlign = overlay.alignment;

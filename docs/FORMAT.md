@@ -218,6 +218,7 @@ Attributes:
 - `locked="true"`: prevent graphical movement.
 - `fragment`: zero-based Reveal fragment index.
 - `font-size`: relative `em` scale for Markdown and equations; the editor exposes `0.25em` through `3em`.
+- `color`: an optional six-digit hexadecimal text color, such as `#c92a2a`.
 - `align`: `left`, `center`, or `right`.
 
 ### Videos
