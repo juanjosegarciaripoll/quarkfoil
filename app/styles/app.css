@@ -82,6 +82,8 @@ button.active { background: #146c7e; border-color: #56cfe1; }
 .properties label.check { display: flex; }
 .properties input, .properties select { min-width: 0; padding: 0.25rem; }
 #image-properties, #shape-properties { margin-top: 0.7rem; padding-top: 0.7rem; border-top: 1px solid #3d454e; }
+.image-source-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; }
+.image-source-actions button { display: grid; place-items: center; min-width: 0; }
 #font-properties { margin-top: 0.7rem; padding-top: 0.7rem; border-top: 1px solid #3d454e; }
 .range-with-value { display: grid; grid-template-columns: minmax(0, 1fr) 3.8rem; align-items: center; gap: 0.35rem; }
 .range-with-value output { color: #cbd3da; font-size: 0.75rem; text-align: right; }
@@ -156,6 +158,14 @@ dialog::backdrop { background: #000a; }
 #bibliography-source { width: 100%; min-width: 0; min-height: 0; resize: none; padding: 0.7rem; color: #edf2f4; background: #111418; border: 1px solid #56616d; font: 13px/1.4 "Cascadia Mono", Consolas, monospace; }
 #bibliography-status { min-height: 1.2em; color: #b9c2ca; }
 #bibliography-status.error { color: #ff8787; }
+#project-image-dialog { width: min(900px, 92vw); max-width: 92vw; }
+.project-image-dialog__form { display: grid; grid-template-rows: auto minmax(180px, 1fr) auto auto; gap: 0.7rem; width: 100%; min-width: 0; height: min(680px, 84vh); padding: 1rem; overflow: hidden; }
+.project-image-dialog__form h2 { margin: 0; }
+.project-image-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); align-content: start; gap: 0.7rem; min-width: 0; padding: 0.2rem; overflow: auto; }
+.project-image-choice { display: grid; grid-template-rows: 100px auto; gap: 0.35rem; min-width: 0; padding: 0.45rem; overflow: hidden; }
+.project-image-choice img { width: 100%; height: 100px; object-fit: contain; background: #f6f7f8; }
+.project-image-choice span { overflow: hidden; font-size: 0.76rem; text-overflow: ellipsis; white-space: nowrap; }
+#project-image-status { min-height: 1.2em; color: #b9c2ca; }
 .content-dialog__form { display: grid; grid-template: auto minmax(180px, 1fr) minmax(120px, 0.7fr) auto / 1fr; gap: 0.8rem; max-height: 82vh; padding: 1rem; }
 .content-dialog__form h2 { margin: 0; font-size: 1.05rem; }
 #content-editor { min-height: 180px; resize: vertical; padding: 0.8rem; color: #edf2f4; background: #111418; border: 1px solid #56616d; font: 14px/1.4 "Cascadia Mono", Consolas, monospace; }

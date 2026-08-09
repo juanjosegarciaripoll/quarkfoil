@@ -107,6 +107,7 @@ export class DesignEditor {
     this.dialog = document.querySelector("#content-dialog");
     this.contentEditor = document.querySelector("#content-editor");
     this.preview = document.querySelector("#content-preview");
+    this.imageInputPurpose = "add";
     this.bind();
   }
 
@@ -119,15 +120,26 @@ export class DesignEditor {
     document.querySelector("#layout-select").addEventListener("change", event => this.changeLayout(event.target.value));
     document.querySelector("#add-text").addEventListener("click", () => this.addObject("markdown"));
     document.querySelector("#add-equation").addEventListener("click", () => this.addObject("equation"));
-    document.querySelector("#add-image").addEventListener("click", () => document.querySelector("#image-input").click());
+    document.querySelector("#add-image").addEventListener("click", () => {
+      this.imageInputPurpose = "add";
+      document.querySelector("#image-input").click();
+    });
     document.querySelector("#add-shape").addEventListener("click", () => this.addShape(document.querySelector("#shape-select").value));
     document.querySelector("#image-input").addEventListener("change", event => {
-      this.addImage(event.target.files?.[0], null, this.selectedCell?.dataset.cellId || null);
+      const file = event.target.files?.[0];
+      if (this.imageInputPurpose === "replace") this.replaceImage(file);
+      else this.addImage(file, null, this.selectedCell?.dataset.cellId || null);
+      this.imageInputPurpose = "add";
       event.target.value = "";
     });
     document.querySelector("#duplicate-object").addEventListener("click", () => this.duplicate());
     document.querySelector("#delete-object").addEventListener("click", () => this.remove());
     document.querySelector("#edit-content").addEventListener("click", () => this.openContentDialog());
+    document.querySelector("#replace-image").addEventListener("click", () => {
+      this.imageInputPurpose = "replace";
+      document.querySelector("#image-input").click();
+    });
+    document.querySelector("#choose-project-image").addEventListener("click", () => this.openProjectImageDialog());
     this.contentEditor.addEventListener("input", () => this.updateContentPreview());
     this.dialog.addEventListener("keydown", event => {
       if (event.key === "Escape") {
@@ -254,6 +266,7 @@ export class DesignEditor {
     this.fontProperties.hidden = true;
     this.noSelection.hidden = false;
     this.noSelection.textContent = "Select an overlay or cell.";
+    document.querySelector("#edit-content").hidden = false;
     document.querySelector("#duplicate-object").disabled = true;
     document.querySelector("#delete-object").disabled = true;
   }
@@ -264,6 +277,7 @@ export class DesignEditor {
     for (const key of ["x", "y", "w", "h", "z"]) document.querySelector(`#prop-${key}`).value = object.geometry[key];
     document.querySelector("#prop-fragment").value = object.fragment ?? "";
     document.querySelector("#prop-locked").checked = object.locked;
+    document.querySelector("#edit-content").hidden = object.type === "image";
     if (object.type === "image" && object.image) {
       this.imageProperties.hidden = false;
       document.querySelector("#prop-fit").value = object.image.attrs.values.fit || "contain";
@@ -531,6 +545,66 @@ export class DesignEditor {
     this.commit(insertOverlay(this.options.getDeck(), this.slideIndex(), { type: "image", content, id, ...geometry }));
   }
 
+  async replaceImage(file) {
+    if (!file) return;
+    const object = this.selected
+      ? this.slide().overlays.find(item => item.id === this.selected.dataset.objectId)
+      : this.selectedCell
+        ? this.slide().cells.find(item => item.id === this.selectedCell.dataset.cellId)
+        : null;
+    if (!object?.image) return;
+    const path = await this.options.importAsset(file);
+    if (!path) return;
+    this.replaceImagePath(path, object);
+  }
+
+  replaceImagePath(path, object = null) {
+    object ||= this.selected
+      ? this.slide().overlays.find(item => item.id === this.selected.dataset.objectId)
+      : this.selectedCell
+        ? this.slide().cells.find(item => item.id === this.selectedCell.dataset.cellId)
+        : null;
+    if (!object?.image || !path) return;
+    const fit = object.image.attrs.values.fit || "contain";
+    const focus = object.image.attrs.values.focus || "50 50";
+    const title = object.image.title ? ` ${JSON.stringify(object.image.title)}` : "";
+    const body = `![${object.image.alt}](${path}${title}){fit=${JSON.stringify(fit)} focus=${JSON.stringify(focus)}}`;
+    if (this.selected) this.commit(updateBlockContent(this.options.getDeck(), this.slideIndex(), object.id, body));
+    else this.commit(setCellContent(this.options.getDeck(), this.slideIndex(), object.id, body));
+  }
+
+  async openProjectImageDialog() {
+    const dialog = document.querySelector("#project-image-dialog");
+    const gallery = document.querySelector("#project-image-gallery");
+    const status = document.querySelector("#project-image-status");
+    gallery.replaceChildren();
+    status.textContent = "Loading images…";
+    dialog.showModal();
+    try {
+      const assets = await this.options.listProjectImages();
+      for (const asset of assets) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "project-image-choice";
+        button.title = asset.path;
+        const image = document.createElement("img");
+        image.src = this.options.resolveAsset(asset.path);
+        image.alt = "";
+        const label = document.createElement("span");
+        label.textContent = asset.path;
+        button.append(image, label);
+        button.addEventListener("click", () => {
+          dialog.close();
+          this.replaceImagePath(asset.path);
+        });
+        gallery.append(button);
+      }
+      status.textContent = assets.length ? `${assets.length} image${assets.length === 1 ? "" : "s"}` : "No images found in the presentation figures folder";
+    } catch (error) {
+      status.textContent = error.message;
+    }
+  }
+
   onDrop(event) {
     if (!this.active()) return;
     event.preventDefault();
@@ -558,7 +632,13 @@ export class DesignEditor {
     const requestedName = window.prompt("Filename for pasted image:", file.name);
     const namedFile = renameClipboardImage(file, requestedName);
     if (!namedFile) return;
-    this.addImage(namedFile, null, this.selectedCell?.dataset.cellId || null);
+    const selectedObject = this.selected
+      ? this.slide().overlays.find(item => item.id === this.selected.dataset.objectId)
+      : this.selectedCell
+        ? this.slide().cells.find(item => item.id === this.selectedCell.dataset.cellId)
+        : null;
+    if (selectedObject?.image) this.replaceImage(namedFile);
+    else this.addImage(namedFile, null, this.selectedCell?.dataset.cellId || null);
   }
 
   duplicate() {

@@ -165,6 +165,22 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(context.exception.code, 400)
         self.assertFalse((self.root.parent / "outside").exists())
 
+    def test_project_images_are_listed_recursively(self) -> None:
+        figures = self.root / "artwork" / "figures"
+        (figures / "nested").mkdir(parents=True)
+        (figures / "diagram.svg").write_text("<svg/>", encoding="utf-8")
+        (figures / "nested" / "photo.PNG").write_bytes(b"png")
+        (figures / "notes.txt").write_text("not an image", encoding="utf-8")
+        status, _, payload = self.request("/api/assets?folder=artwork%2Ffigures")
+        result = json.loads(payload)
+        self.assertEqual(status, 200)
+        self.assertEqual([asset["path"] for asset in result["assets"]], ["artwork/figures/diagram.svg", "artwork/figures/nested/photo.PNG"])
+
+    def test_project_image_listing_cannot_leave_project(self) -> None:
+        with self.assertRaises(urllib.error.HTTPError) as context:
+            self.request("/api/assets?folder=..%2Foutside")
+        self.assertEqual(context.exception.code, 400)
+
 
 if __name__ == "__main__":
     unittest.main()

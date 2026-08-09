@@ -112,6 +112,10 @@
         </label>
         <label>Focus X <input id="prop-focus-x" type="range" min="0" max="100"></label>
         <label>Focus Y <input id="prop-focus-y" type="range" min="0" max="100"></label>
+        <div class="image-source-actions">
+          <button id="replace-image" type="button" title="Upload replacement image" aria-label="Upload replacement image"><svg class="action-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"></path></svg></button>
+          <button id="choose-project-image" type="button" title="Choose image from presentation" aria-label="Choose image from presentation"><svg class="action-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18.5V6a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v1H7l-4 9.5Z"></path><path d="M7 9h14l-3 10H3"></path><circle cx="11" cy="13" r="1"></circle><path d="m7 18 3-3 2 2 2-2 3 3"></path></svg></button>
+        </div>
       </form>
       <form id="shape-properties" hidden>
         <label>Shape
@@ -177,6 +181,15 @@
       </label>
       <div id="bibliography-status" role="status"></div>
       <div class="dialog-actions"><button value="cancel">Cancel</button><button id="bibliography-save" type="button">Save bibliography</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="project-image-dialog">
+    <form method="dialog" class="project-image-dialog__form">
+      <h2>Choose project image</h2>
+      <div id="project-image-gallery" class="project-image-gallery"></div>
+      <div id="project-image-status" role="status"></div>
+      <div class="dialog-actions"><button value="cancel">Cancel</button></div>
     </form>
   </dialog>
 

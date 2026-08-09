@@ -521,23 +521,27 @@ async function saveBibliography() {
   bibliographyMessage("Bibliography saved");
 }
 
-async function importAsset(file) {
-  if (!file?.type.startsWith("image/")) throw new Error("Only image files are supported");
+function figureFolder() {
   const configured = state.deck?.metadata?.assets?.figures;
   const folder = typeof configured === "string" && configured.trim() ? configured.trim().replaceAll("\\", "/") : "figures";
   const parts = folder.split("/").filter(Boolean);
   if (/^(?:\/|[a-z]:)/i.test(folder) || !parts.length || parts.some(part => part === "." || part === "..")) {
     throw new Error("assets.figures must be a project-relative folder");
   }
-  const figureFolder = parts.join("/");
+  return parts.join("/");
+}
+
+async function importAsset(file) {
+  if (!file?.type.startsWith("image/")) throw new Error("Only image files are supported");
+  const assetFolder = figureFolder();
   if (state.local) {
-    const response = await fetch(`/api/asset?name=${encodeURIComponent(file.name)}&folder=${encodeURIComponent(figureFolder)}`, { method: "POST", headers: { "Content-Type": file.type }, body: file });
+    const response = await fetch(`/api/asset?name=${encodeURIComponent(file.name)}&folder=${encodeURIComponent(assetFolder)}`, { method: "POST", headers: { "Content-Type": file.type }, body: file });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || "Asset import failed");
     return result.path;
   }
   const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
-  let path = `${figureFolder}/${safe}`;
+  let path = `${assetFolder}/${safe}`;
   if (state.directoryHandle) {
     const extension = safe.includes(".") ? `.${safe.split(".").pop()}` : "";
     const stem = extension ? safe.slice(0, -extension.length) : safe;
@@ -545,7 +549,7 @@ async function importAsset(file) {
     while (true) {
       try {
         await nestedFileHandle(state.directoryHandle, path);
-        path = `${figureFolder}/${stem}-${counter++}${extension}`;
+        path = `${assetFolder}/${stem}-${counter++}${extension}`;
       } catch { break; }
     }
     const handle = await nestedFileHandle(state.directoryHandle, path, true);
@@ -639,6 +643,14 @@ async function initialize() {
       try { return await importAsset(file); }
       catch (error) { showStatus(error.message, true); return null; }
     },
+    listProjectImages: async () => {
+      if (!state.local) throw new Error("Project image browsing requires the local Quarkfoil server");
+      const response = await fetch(`/api/assets?folder=${encodeURIComponent(figureFolder())}`);
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Cannot list project images");
+      return result.assets;
+    },
+    resolveAsset: assetResolver,
   });
   editor.refresh();
   setMode(state.mode);

@@ -25,6 +25,8 @@ MAX_WRITE_BYTES = 20 * 1024 * 1024
 MAX_ASSET_BYTES = 100 * 1024 * 1024
 MAX_BIBLIOGRAPHY_BYTES = 5 * 1024 * 1024
 MAX_DOI_BYTES = 1024 * 1024
+MAX_LISTED_ASSETS = 1000
+IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"}
 STARTER_DECK = """---
 title: New presentation
 author: Your name
@@ -167,6 +169,23 @@ class SlideHandler(SimpleHTTPRequestHandler):
             except (OSError, ValueError) as error:
                 self._send_json({"error": str(error)}, HTTPStatus.BAD_GATEWAY)
             return
+        if parsed.path == "/api/assets":
+            try:
+                relative = urllib.parse.parse_qs(parsed.query).get("folder", ["figures"])[0]
+                folder = self._project_file(relative)
+                if folder == self.project_root:
+                    raise PermissionError("Asset folder must not be the project root")
+                assets = []
+                if folder.is_dir():
+                    for path in sorted(folder.rglob("*"), key=lambda item: item.as_posix().lower()):
+                        if len(assets) >= MAX_LISTED_ASSETS:
+                            break
+                        if path.is_file() and path.suffix.lower() in IMAGE_SUFFIXES and _inside(folder, path):
+                            assets.append({"path": path.relative_to(self.project_root).as_posix(), "name": path.name})
+                self._send_json({"assets": assets, "folder": folder.relative_to(self.project_root).as_posix(), "truncated": len(assets) >= MAX_LISTED_ASSETS})
+            except (OSError, PermissionError, ValueError) as error:
+                self._send_json({"error": str(error)}, HTTPStatus.BAD_REQUEST)
+            return
         if parsed.path == "/api/deck":
             data = self.deck_path.read_bytes()
             self.send_response(HTTPStatus.OK)
@@ -282,8 +301,7 @@ class SlideHandler(SimpleHTTPRequestHandler):
             self._send_json({"error": str(error)}, HTTPStatus.BAD_REQUEST)
             return
         stem, suffix = Path(requested).stem, Path(requested).suffix.lower()
-        allowed = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"}
-        if suffix not in allowed:
+        if suffix not in IMAGE_SUFFIXES:
             self._send_json({"error": "Unsupported image type"}, HTTPStatus.BAD_REQUEST)
             return
         candidate = asset_dir / f"{stem}{suffix}"

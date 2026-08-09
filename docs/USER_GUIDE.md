@@ -63,10 +63,16 @@ Image-only regions and image overlays support:
 
 - Fit: contain, crop/fill, fit width, fit height, or native size.
 - Horizontal and vertical crop focus.
+- Upload replacement: import a new file from the browser's computer.
+- Choose project image: select an existing image from the configured figures
+  folder. Both replacement actions retain the object's position, size, fit,
+  focus, and stable ID.
 
 New and pasted files are copied to the presentation project's `figures/`
 directory. Repeated clipboard filenames are made unique. Undo restores content
-replaced during the current editing session.
+replaced during the current editing session. Pasting while an image is selected
+replaces that image in place; otherwise it creates a new floating image or
+fills the selected grid region.
 
 New floating images preserve their intrinsic aspect ratio. Their initial box is
 centered and limited to 35% of the slide in its larger dimension; dropped
