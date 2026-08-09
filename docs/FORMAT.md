@@ -204,13 +204,31 @@ J_{\mathrm{ex}} \sim \frac{t^2}{U}
 Attributes:
 
 - `#id`: stable identifier, unique within the slide.
-- `type`: `markdown`, `equation`, `image`, or `shape`.
+- `type`: `markdown`, `equation`, `image`, `video`, or `shape`.
 - `x`, `y`, `w`, `h`: percentages of the full slide.
 - `z`: layer order.
 - `locked="true"`: prevent graphical movement.
 - `fragment`: zero-based Reveal fragment index.
 - `font-size`: relative `em` scale for Markdown and equations; the editor exposes `0.25em` through `3em`.
 - `align`: `left`, `center`, or `right`.
+
+### Videos
+
+Local MP4 and WebM files are first-class media overlays. Their source and
+playback options are stored directly in the overlay annotation:
+
+```markdown
+::: overlay {#experiment type="video" src="figures/experiment.mp4" poster="figures/experiment-poster.jpg" x="10" y="18" w="80" h="60" controls="true" muted="true"}
+:::
+```
+
+`fit` is `contain` by default or may be `cover`. Native controls are enabled by
+default; set `controls="false"` to hide them. The optional `autoplay`, `loop`,
+and `muted` flags are enabled with `"true"`. Browsers generally permit autoplay
+only for muted video. Videos pause when their slide is left. `poster` names an
+optional project-relative image displayed before playback. The editor imports
+video into the configured `assets.figures` directory, and static export copies
+both the video and poster assets.
 
 ### Shapes
 

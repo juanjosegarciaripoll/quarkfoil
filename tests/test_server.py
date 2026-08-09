@@ -157,6 +157,24 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(result["path"], "figures/diagram.svg")
         self.assertTrue((self.root / result["path"]).is_file())
 
+    def test_video_import_and_listing(self) -> None:
+        status, _, payload = self.request(
+            "/api/asset?name=experiment.mp4",
+            method="POST",
+            body=b"video",
+            headers={"Content-Type": "video/mp4"},
+        )
+        self.assertEqual(status, 201)
+        result = json.loads(payload)
+        self.assertEqual(result["path"], "figures/experiment.mp4")
+        status, _, payload = self.request("/api/assets?folder=figures&kind=video")
+        self.assertEqual(status, 200)
+        self.assertEqual([asset["path"] for asset in json.loads(payload)["assets"]], ["figures/experiment.mp4"])
+        status, headers, payload = self.request("/project/figures/experiment.mp4", headers={"Range": "bytes=1-3"})
+        self.assertEqual(status, 206)
+        self.assertEqual(headers["Content-Range"], "bytes 1-3/5")
+        self.assertEqual(payload, b"ide")
+
     def test_asset_import_uses_requested_project_folder(self) -> None:
         status, _, payload = self.request(
             "/api/asset?name=diagram.svg&folder=artwork%2Ffigures",

@@ -1,5 +1,5 @@
 import { parseDeck } from "./parser.js";
-import { renderDeck } from "./render.js";
+import { renderDeck, syncVideoPlayback } from "./render.js";
 import { prepareBibliography } from "./bibliography.js";
 
 function assetPath(source) {
@@ -47,6 +47,8 @@ async function initialize() {
     plugins: window.RevealNotes ? [window.RevealNotes] : [],
   });
   await reveal.initialize();
+  reveal.on("slidechanged", event => syncVideoPlayback(event.currentSlide));
+  syncVideoPlayback(reveal.getCurrentSlide());
   document.querySelector("#loading").remove();
 }
 

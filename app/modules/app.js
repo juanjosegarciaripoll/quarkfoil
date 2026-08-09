@@ -1,5 +1,5 @@
 import { deleteSlide, duplicateSlide, insertOverlay, insertSlide, moveSlide, parseDeck } from "./parser.js";
-import { renderDeck } from "./render.js";
+import { renderDeck, syncVideoPlayback } from "./render.js";
 import { DesignEditor } from "./editor.js";
 import { saveSnapshot } from "./storage.js";
 import { briefReference, parseBibliography, prepareBibliography } from "./bibliography.js";
@@ -252,6 +252,7 @@ function moveSelectedSlide(direction) {
 
 function onSlideChanged(event) {
   state.currentSlide = event.indexh;
+  syncVideoPlayback(event.currentSlide);
   rebuildSlideList();
   editor?.refresh();
 }
@@ -396,13 +397,16 @@ async function preloadPortableAssets(source) {
   for (const url of state.objectUrls.values()) URL.revokeObjectURL(url);
   state.objectUrls.clear();
   const paths = new Set([...source.matchAll(/!\[[^\]]*\]\(([^)\s]+)(?:\s+["'][^"']*["'])?\)/g)].map(match => match[1]));
+  for (const match of source.matchAll(/\b(?:src|poster)=(?:"([^"]+)"|'([^']+)'|([^\s}]+))/g)) {
+    paths.add(match[1] || match[2] || match[3]);
+  }
   for (const path of paths) {
     if (/^[a-z]+:/i.test(path)) continue;
     try {
       const handle = await nestedFileHandle(state.directoryHandle, path);
       const file = await handle.getFile();
       state.objectUrls.set(path, URL.createObjectURL(file));
-    } catch { /* Missing assets are diagnosed by the browser image event. */ }
+    } catch { /* Missing assets are diagnosed by the browser media event. */ }
   }
 }
 
@@ -563,7 +567,7 @@ function figureFolder() {
 }
 
 async function importAsset(file) {
-  if (!file?.type.startsWith("image/")) throw new Error("Only image files are supported");
+  if (!file || !["image/", "video/"].some(prefix => file.type.startsWith(prefix))) throw new Error("Only image and video files are supported");
   const assetFolder = figureFolder();
   if (state.local) {
     const response = await fetch(`/api/asset?name=${encodeURIComponent(file.name)}&folder=${encodeURIComponent(assetFolder)}`, { method: "POST", headers: { "Content-Type": file.type }, body: file });
@@ -669,6 +673,7 @@ async function initialize() {
   await reveal.initialize();
   reveal.on("slidechanged", onSlideChanged);
   reveal.slide(state.currentSlide);
+  syncVideoPlayback(reveal.getCurrentSlide());
   editor = new DesignEditor({
     getDeck: () => state.deck,
     getMode: () => state.mode,
@@ -680,9 +685,16 @@ async function initialize() {
     },
     listProjectImages: async () => {
       if (!state.local) throw new Error("Project image browsing requires the local Quarkfoil server");
-      const response = await fetch(`/api/assets?folder=${encodeURIComponent(figureFolder())}`);
+      const response = await fetch(`/api/assets?folder=${encodeURIComponent(figureFolder())}&kind=image`);
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Cannot list project images");
+      return result.assets;
+    },
+    listProjectVideos: async () => {
+      if (!state.local) throw new Error("Project video browsing requires the local Quarkfoil server");
+      const response = await fetch(`/api/assets?folder=${encodeURIComponent(figureFolder())}&kind=video`);
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Cannot list project videos");
       return result.assets;
     },
     resolveAsset: assetResolver,

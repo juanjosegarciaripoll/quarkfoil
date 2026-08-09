@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scientific_slides.exporter import export_presentation
+from scientific_slides.exporter import _asset_references, export_presentation
 from scientific_slides.server import main
 
 
@@ -28,6 +28,10 @@ class ExporterTests(unittest.TestCase):
 
     def tearDown(self) -> None:
         self.temporary.cleanup()
+
+    def test_video_attribute_assets_are_discovered(self) -> None:
+        source = '::: overlay {type="video" src="media/demo.webm" poster="posters/demo.jpg"}\n:::\n'
+        self.assertEqual(_asset_references(source), {"media/demo.webm", "posters/demo.jpg"})
 
     def test_local_export_is_complete(self) -> None:
         output = export_presentation(self.deck, self.root / "local-site")

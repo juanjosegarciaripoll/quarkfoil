@@ -71,8 +71,24 @@ function makeImage(image, assetResolver) {
   return img;
 }
 
+function makeVideo(video, assetResolver) {
+  const element = document.createElement("video");
+  element.className = "slide-video";
+  element.src = assetResolver(video.source) || safeAssetPath(video.source);
+  if (video.poster) element.poster = assetResolver(video.poster) || safeAssetPath(video.poster);
+  element.controls = video.controls;
+  element.dataset.autoplay = String(video.autoplay);
+  element.loop = video.loop;
+  element.muted = video.muted;
+  element.playsInline = true;
+  element.preload = "metadata";
+  element.dataset.fit = video.fit;
+  return element;
+}
+
 function fillContent(container, item, assetResolver, bibliography) {
   if (item.type === "image" && item.image) container.append(makeImage(item.image, assetResolver));
+  else if (item.type === "video" && item.video) container.append(makeVideo(item.video, assetResolver));
   else if (item.type === "shape") {
     container.dataset.shape = item.shape;
     container.dataset.shadow = String(item.shadow);
@@ -165,7 +181,7 @@ function renderSlide(slide, metadata, assetResolver, bibliography) {
     element.style.width = `${overlay.geometry.w}%`;
     element.style.height = `${overlay.geometry.h}%`;
     element.style.zIndex = String(overlay.geometry.z);
-    if (overlay.type !== "image") {
+    if (!["image", "video"].includes(overlay.type)) {
       element.style.fontSize = `${overlay.fontSize}em`;
       element.style.textAlign = overlay.alignment;
       element.dataset.align = overlay.alignment;
@@ -201,4 +217,11 @@ export function renderDeck(deck, target, assetResolver = source => `/project/${s
 
 export function renderMarkdownPreview(source, target) {
   target.innerHTML = markdown(source);
+}
+
+export function syncVideoPlayback(activeSlide) {
+  document.querySelectorAll(".scientific-slide .slide-video").forEach(video => {
+    if (!activeSlide?.contains(video)) video.pause();
+    else if (video.dataset.autoplay === "true") video.play().catch(() => {});
+  });
 }

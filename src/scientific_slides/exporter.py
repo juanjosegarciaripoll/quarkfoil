@@ -77,6 +77,7 @@ CDN_FILES = {
 }
 
 ASSET_PATTERN = re.compile(r"!?\[[^\]]*\]\(([^)\s]+)")
+ATTRIBUTE_ASSET_PATTERN = re.compile(r"\b(?:src|poster)=(?:\"([^\"]+)\"|'([^']+)'|([^\s}]+))")
 
 
 def _integrity(path: Path) -> str:
@@ -94,8 +95,10 @@ def _copy_entry(source: Path, destination: Path) -> None:
 
 def _asset_references(source: str) -> set[str]:
     references = set()
-    for match in ASSET_PATTERN.finditer(source):
-        value = unquote(match.group(1)).replace("\\", "/")
+    values = [match.group(1) for match in ASSET_PATTERN.finditer(source)]
+    values.extend(next(group for group in match.groups() if group is not None) for match in ATTRIBUTE_ASSET_PATTERN.finditer(source))
+    for raw_value in values:
+        value = unquote(raw_value).replace("\\", "/")
         parsed = urlsplit(value)
         if parsed.scheme or parsed.netloc or value.startswith(("/", "#")):
             continue

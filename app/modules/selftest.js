@@ -43,6 +43,9 @@ E=mc^2
 \\]
 :::
 
+::: overlay {#movie type="video" src="artwork/demo.mp4" poster="artwork/poster.jpg" x="10" y="70" w="30" h="17" autoplay="true" muted="true"}
+:::
+
 ---
 
 ## Second {.layout-free}
@@ -232,6 +235,14 @@ try {
   assert(deck.slides[0].overlays[0].id === "eq", "overlay ID parses");
   assert(deck.slides[0].overlays[0].fontSize === 1.4, "relative overlay font size parses");
   assert(deck.slides[0].overlays[0].alignment === "right", "overlay alignment parses");
+  const video = deck.slides[0].overlays.find(item => item.id === "movie");
+  assert(video.type === "video" && video.video.source === "artwork/demo.mp4", "video source parses from overlay attributes");
+  assert(video.video.controls && video.video.autoplay && video.video.muted && !video.video.loop, "video playback defaults and options parse");
+  const videoFixture = document.createElement("div");
+  renderDeck(deck, videoFixture, asset => `/test/${asset}`);
+  const videoElement = videoFixture.querySelector(".overlay-video video");
+  assert(videoElement.src.endsWith("/test/artwork/demo.mp4") && videoElement.poster.endsWith("/test/artwork/poster.jpg"), "video and poster assets resolve");
+  assert(videoElement.controls && videoElement.muted && videoElement.dataset.autoplay === "true", "native video options render");
   assert(deck.slides[1].cells[0]?.range !== null, "ordinary core Markdown retains an editable range");
 
   let defaultShapeSource = insertOverlay(deck, 0, { type: "shape", content: "Label", id: "default-shape", attributes: {} });
@@ -244,6 +255,9 @@ try {
   defaultShapeDeck = parseDeck(defaultShapeSource);
   defaultShapeSource = updateOverlay(defaultShapeDeck, 0, "default-shape", { shadow: null });
   assert(!defaultShapeSource.includes("shadow="), "disabled shape shadow returns to implicit default");
+
+  const changedVideo = updateOverlay(deck, 0, "movie", { controls: "false", loop: "true", fit: "cover" });
+  assert(changedVideo.includes('controls="false"') && changedVideo.includes('loop="true"') && changedVideo.includes('fit="cover"'), "video properties serialize as readable attributes");
 
   const duplicated = parseDeck(duplicateSlide(deck, 0));
   assert(duplicated.slides.length === 3 && duplicated.slides[1].title === "First", "selected slide duplicates after itself");

@@ -107,6 +107,19 @@ function parseImage(markdown) {
   return { alt: match[1], source: match[2], title: match[3] || "", attrs: parseAttributes(match[4] || "") };
 }
 
+function parseVideo(attrs) {
+  if (attrs.values.type !== "video") return null;
+  return {
+    source: attrs.values.src || "",
+    poster: attrs.values.poster || "",
+    fit: attrs.values.fit || "contain",
+    controls: attrs.values.controls !== "false",
+    autoplay: attrs.values.autoplay === "true",
+    loop: attrs.values.loop === "true",
+    muted: attrs.values.muted === "true",
+  };
+}
+
 function parseDirectiveBlocks(raw, absoluteStart, diagnostics, source) {
   const lines = raw.split(/(?<=\n)/);
   const blocks = [];
@@ -223,10 +236,12 @@ function parseSlide(source, range, index, diagnostics) {
   for (const block of parsed.blocks) {
     if (CELL_NAMES.has(block.name)) {
       const image = parseImage(block.body);
-      cells.push({ id: block.name, type: image ? "image" : "markdown", source: block.body, image, range: block.range, attrs: block.attrs });
+      const video = parseVideo(block.attrs);
+      cells.push({ id: block.name, type: video ? "video" : image ? "image" : "markdown", source: block.body, image, video, range: block.range, attrs: block.attrs });
     } else if (block.name === "overlay") {
       const image = parseImage(block.body);
       const type = block.attrs.values.type || (image ? "image" : "markdown");
+      const video = parseVideo(block.attrs);
       const id = block.attrs.id || `overlay-${index + 1}-${overlays.length + 1}`;
       if (!block.attrs.id) diagnostics.push({ level: "warning", slide: index + 1, message: `Overlay '${id}' has no stable source ID` });
       const alignment = block.attrs.values.align || (["equation", "shape"].includes(type) ? "center" : "left");
@@ -236,6 +251,7 @@ function parseSlide(source, range, index, diagnostics) {
         type,
         source: block.body,
         image,
+        video,
         attrs: block.attrs,
         range: block.range,
         geometry: {
@@ -264,9 +280,9 @@ function parseSlide(source, range, index, diagnostics) {
     const ordinaryRange = parsed.occupied.length === 0
       ? { start: contentStart, headerEnd: contentStart, bodyStart: contentStart, bodyEnd: range.end, end: range.end }
       : null;
-    cells.unshift({ id: "core", type: "markdown", source: ordinary, image: null, range: ordinaryRange, attrs: parseAttributes("") });
+    cells.unshift({ id: "core", type: "markdown", source: ordinary, image: null, video: null, range: ordinaryRange, attrs: parseAttributes("") });
   }
-  if (!cells.length && !["0", "free"].includes(layout)) cells.push({ id: "core", type: "markdown", source: "", image: null, range: null, attrs: parseAttributes("") });
+  if (!cells.length && !["0", "free"].includes(layout)) cells.push({ id: "core", type: "markdown", source: "", image: null, video: null, range: null, attrs: parseAttributes("") });
   const duplicateCells = cells.map(cell => cell.id).filter((id, position, all) => all.indexOf(id) !== position);
   for (const id of new Set(duplicateCells)) diagnostics.push({ level: "error", slide: index + 1, message: `Duplicate '${id}' cell` });
   const duplicateOverlays = overlays.map(overlay => overlay.id).filter((id, position, all) => all.indexOf(id) !== position);
@@ -278,6 +294,7 @@ function parseSlide(source, range, index, diagnostics) {
     if (!["left", "center", "right"].includes(overlay.alignment)) diagnostics.push({ level: "error", slide: index + 1, message: `Overlay '${overlay.id}' has invalid alignment` });
     if (overlay.type === "shape" && !Object.hasOwn(SHAPES, overlay.shape)) diagnostics.push({ level: "error", slide: index + 1, message: `Overlay '${overlay.id}' has unknown shape '${overlay.shape}'` });
     if (overlay.type === "shape" && (!Number.isFinite(overlay.strokeWidth) || overlay.strokeWidth < 0)) diagnostics.push({ level: "error", slide: index + 1, message: `Overlay '${overlay.id}' has invalid stroke width` });
+    if (overlay.type === "video" && !overlay.video?.source) diagnostics.push({ level: "error", slide: index + 1, message: `Video overlay '${overlay.id}' has no src` });
   }
   return {
     index,

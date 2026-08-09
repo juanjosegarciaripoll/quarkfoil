@@ -103,6 +103,7 @@ export class DesignEditor {
     this.properties = document.querySelector("#object-properties");
     this.slideProperties = document.querySelector("#slide-properties");
     this.imageProperties = document.querySelector("#image-properties");
+    this.videoProperties = document.querySelector("#video-properties");
     this.shapeProperties = document.querySelector("#shape-properties");
     this.fontProperties = document.querySelector("#font-properties");
     this.noSelection = document.querySelector("#no-selection");
@@ -110,6 +111,7 @@ export class DesignEditor {
     this.contentEditor = document.querySelector("#content-editor");
     this.preview = document.querySelector("#content-preview");
     this.imageInputPurpose = "add";
+    this.videoInputPurpose = "add";
     this.bind();
   }
 
@@ -131,12 +133,23 @@ export class DesignEditor {
       this.imageInputPurpose = "add";
       document.querySelector("#image-input").click();
     });
+    document.querySelector("#add-video").addEventListener("click", () => {
+      this.videoInputPurpose = "add";
+      document.querySelector("#video-input").click();
+    });
     document.querySelector("#add-shape").addEventListener("click", () => this.addShape(document.querySelector("#shape-select").value));
     document.querySelector("#image-input").addEventListener("change", event => {
       const file = event.target.files?.[0];
       if (this.imageInputPurpose === "replace") this.replaceImage(file);
       else this.addImage(file, null, this.selectedCell?.dataset.cellId || null);
       this.imageInputPurpose = "add";
+      event.target.value = "";
+    });
+    document.querySelector("#video-input").addEventListener("change", event => {
+      const file = event.target.files?.[0];
+      if (this.videoInputPurpose === "replace") this.replaceVideo(file);
+      else this.addVideo(file);
+      this.videoInputPurpose = "add";
       event.target.value = "";
     });
     document.querySelector("#duplicate-object").addEventListener("click", () => this.duplicate());
@@ -147,6 +160,11 @@ export class DesignEditor {
       document.querySelector("#image-input").click();
     });
     document.querySelector("#choose-project-image").addEventListener("click", () => this.openProjectImageDialog());
+    document.querySelector("#replace-video").addEventListener("click", () => {
+      this.videoInputPurpose = "replace";
+      document.querySelector("#video-input").click();
+    });
+    document.querySelector("#choose-project-video").addEventListener("click", () => this.openProjectVideoDialog());
     this.contentEditor.addEventListener("input", () => this.updateContentPreview());
     this.dialog.addEventListener("keydown", event => {
       if (event.key === "Escape") {
@@ -175,6 +193,9 @@ export class DesignEditor {
     document.querySelector("#prop-fit").addEventListener("change", () => this.applyImageProperties());
     document.querySelector("#prop-focus-x").addEventListener("change", () => this.applyImageProperties());
     document.querySelector("#prop-focus-y").addEventListener("change", () => this.applyImageProperties());
+    for (const id of ["video-fit", "video-controls", "video-autoplay", "video-loop", "video-muted", "video-poster"]) {
+      document.querySelector(`#prop-${id}`).addEventListener("change", () => this.applyVideoProperties());
+    }
     for (const id of ["shape", "shape-fill", "shape-stroke", "shape-stroke-width", "shape-shadow"]) {
       document.querySelector(`#prop-${id}`).addEventListener("change", () => this.applyShapeProperties());
     }
@@ -261,6 +282,8 @@ export class DesignEditor {
       const focus = (cell.image.attrs.values.focus || "50 50").split(/[\s,]+/);
       document.querySelector("#prop-focus-x").value = focus[0] || 50;
       document.querySelector("#prop-focus-y").value = focus[1] || 50;
+    } else if (cell?.type === "video") {
+      this.noSelection.textContent = "Video cell properties must currently be edited in Source mode.";
     }
   }
 
@@ -271,6 +294,7 @@ export class DesignEditor {
     this.selectedCell = null;
     this.properties.hidden = true;
     this.imageProperties.hidden = true;
+    this.videoProperties.hidden = true;
     this.shapeProperties.hidden = true;
     this.fontProperties.hidden = true;
     this.noSelection.hidden = true;
@@ -305,13 +329,15 @@ export class DesignEditor {
     for (const key of ["x", "y", "w", "h", "z"]) document.querySelector(`#prop-${key}`).value = object.geometry[key];
     document.querySelector("#prop-fragment").value = object.fragment ?? "";
     document.querySelector("#prop-locked").checked = object.locked;
-    document.querySelector("#edit-content").hidden = object.type === "image";
+    document.querySelector("#edit-content").hidden = ["image", "video"].includes(object.type);
     if (object.type === "image" && object.image) {
       this.imageProperties.hidden = false;
       document.querySelector("#prop-fit").value = object.image.attrs.values.fit || "contain";
       const focus = (object.image.attrs.values.focus || "50 50").split(/[\s,]+/);
       document.querySelector("#prop-focus-x").value = focus[0] || 50;
       document.querySelector("#prop-focus-y").value = focus[1] || 50;
+    } else if (object.type === "video" && object.video) {
+      this.fillVideoProperties(object.video);
     } else {
       if (object.type === "shape") {
         this.shapeProperties.hidden = false;
@@ -464,6 +490,28 @@ export class DesignEditor {
     else this.commit(setCellContent(this.options.getDeck(), this.slideIndex(), object.id, body));
   }
 
+  fillVideoProperties(video) {
+    this.videoProperties.hidden = false;
+    document.querySelector("#prop-video-fit").value = video.fit;
+    document.querySelector("#prop-video-controls").checked = video.controls;
+    document.querySelector("#prop-video-autoplay").checked = video.autoplay;
+    document.querySelector("#prop-video-loop").checked = video.loop;
+    document.querySelector("#prop-video-muted").checked = video.muted;
+    document.querySelector("#prop-video-poster").value = video.poster;
+  }
+
+  applyVideoProperties() {
+    if (!this.selected || this.selected.dataset.objectType !== "video") return;
+    this.commit(updateOverlay(this.options.getDeck(), this.slideIndex(), this.selected.dataset.objectId, {
+      fit: document.querySelector("#prop-video-fit").value === "contain" ? null : "cover",
+      controls: document.querySelector("#prop-video-controls").checked ? null : "false",
+      autoplay: document.querySelector("#prop-video-autoplay").checked ? "true" : null,
+      loop: document.querySelector("#prop-video-loop").checked ? "true" : null,
+      muted: document.querySelector("#prop-video-muted").checked ? "true" : null,
+      poster: document.querySelector("#prop-video-poster").value.trim() || null,
+    }));
+  }
+
   applyShapeProperties() {
     if (!this.selected || this.selected.dataset.objectType !== "shape") return;
     const shape = document.querySelector("#prop-shape").value;
@@ -484,7 +532,7 @@ export class DesignEditor {
   openContentDialog() {
     if (!this.selected) return;
     const object = this.slide().overlays.find(item => item.id === this.selected.dataset.objectId);
-    if (!object || object.type === "image") return;
+    if (!object || ["image", "video"].includes(object.type)) return;
     this.dialogTarget = { kind: "overlay", id: object.id };
     document.querySelector("#content-dialog-title").textContent = object.type === "equation" ? "Edit LaTeX" : object.type === "shape" ? "Edit shape label" : "Edit Markdown";
     this.contentEditor.value = object.source;
@@ -496,8 +544,8 @@ export class DesignEditor {
     if (!this.selectedCell) return;
     const id = this.selectedCell.dataset.cellId;
     const cell = this.slide().cells.find(item => item.id === id);
-    if (cell?.type === "image") {
-      this.noSelection.textContent = `Image cell: use the controls below or drop a replacement image.`;
+    if (["image", "video"].includes(cell?.type)) {
+      this.noSelection.textContent = `${cell.type === "image" ? "Image" : "Video"} cell: use its properties or Source mode.`;
       return;
     }
     if (cell && !cell.range && cell.source.trim()) {
@@ -573,6 +621,36 @@ export class DesignEditor {
     this.commit(insertOverlay(this.options.getDeck(), this.slideIndex(), { type: "image", content, id, ...geometry }));
   }
 
+  async addVideo(file, position = null) {
+    if (!file) return;
+    const path = await this.options.importAsset(file);
+    if (!path) return;
+    const id = this.uniqueId(`video-${this.slideIndex() + 1}`);
+    const w = 40;
+    const h = 22.5;
+    this.commit(insertOverlay(this.options.getDeck(), this.slideIndex(), {
+      type: "video",
+      content: "",
+      id,
+      x: position ? clamp(round(position.x), 0, 100 - w) : 30,
+      y: position ? clamp(round(position.y), 0, 100 - h) : 30,
+      w,
+      h,
+      attributes: { src: path },
+    }));
+  }
+
+  async replaceVideo(file) {
+    if (!file || this.selected?.dataset.objectType !== "video") return;
+    const path = await this.options.importAsset(file);
+    if (path) this.replaceVideoPath(path);
+  }
+
+  replaceVideoPath(path) {
+    if (!path || this.selected?.dataset.objectType !== "video") return;
+    this.commit(updateOverlay(this.options.getDeck(), this.slideIndex(), this.selected.dataset.objectId, { src: path }));
+  }
+
   async replaceImage(file) {
     if (!file) return;
     const object = this.selected
@@ -633,11 +711,52 @@ export class DesignEditor {
     }
   }
 
+  async openProjectVideoDialog() {
+    const dialog = document.querySelector("#project-video-dialog");
+    const gallery = document.querySelector("#project-video-gallery");
+    const status = document.querySelector("#project-video-status");
+    gallery.replaceChildren();
+    status.textContent = "Loading videos…";
+    dialog.showModal();
+    try {
+      const assets = await this.options.listProjectVideos();
+      for (const asset of assets) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "project-image-choice";
+        button.title = asset.path;
+        const video = document.createElement("video");
+        video.src = this.options.resolveAsset(asset.path);
+        video.muted = true;
+        video.preload = "metadata";
+        const label = document.createElement("span");
+        label.textContent = asset.path;
+        button.append(video, label);
+        button.addEventListener("click", () => {
+          dialog.close();
+          this.replaceVideoPath(asset.path);
+        });
+        gallery.append(button);
+      }
+      status.textContent = assets.length ? `${assets.length} video${assets.length === 1 ? "" : "s"}` : "No videos found in the presentation figures folder";
+    } catch (error) {
+      status.textContent = error.message;
+    }
+  }
+
   onDrop(event) {
     if (!this.active()) return;
     event.preventDefault();
-    const file = [...event.dataTransfer.files].find(item => item.type.startsWith("image/"));
+    const file = [...event.dataTransfer.files].find(item => item.type.startsWith("image/") || item.type.startsWith("video/"));
     if (!file) return;
+    if (file.type.startsWith("video/")) {
+      const rect = this.section().getBoundingClientRect();
+      this.addVideo(file, {
+        x: 100 * (event.clientX - rect.left) / rect.width,
+        y: 100 * (event.clientY - rect.top) / rect.height,
+      });
+      return;
+    }
     const cell = event.target.closest(".slide-cell");
     if (cell) {
       this.addImage(file, null, cell.dataset.cellId);

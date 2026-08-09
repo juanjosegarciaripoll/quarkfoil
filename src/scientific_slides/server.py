@@ -27,6 +27,8 @@ MAX_BIBLIOGRAPHY_BYTES = 5 * 1024 * 1024
 MAX_DOI_BYTES = 1024 * 1024
 MAX_LISTED_ASSETS = 1000
 IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"}
+VIDEO_SUFFIXES = {".mp4", ".webm"}
+ASSET_SUFFIXES = IMAGE_SUFFIXES | VIDEO_SUFFIXES
 STARTER_DECK = """---
 title: New presentation
 author: Your name
@@ -210,7 +212,12 @@ class SlideHandler(SimpleHTTPRequestHandler):
             return
         if parsed.path == "/api/assets":
             try:
-                relative = urllib.parse.parse_qs(parsed.query).get("folder", ["figures"])[0]
+                query = urllib.parse.parse_qs(parsed.query)
+                relative = query.get("folder", ["figures"])[0]
+                kind = query.get("kind", ["image"])[0]
+                suffixes = IMAGE_SUFFIXES if kind == "image" else VIDEO_SUFFIXES if kind == "video" else None
+                if suffixes is None:
+                    raise ValueError("Asset kind must be image or video")
                 folder = self._project_file(relative)
                 if folder == self.project_root:
                     raise PermissionError("Asset folder must not be the project root")
@@ -219,7 +226,7 @@ class SlideHandler(SimpleHTTPRequestHandler):
                     for path in sorted(folder.rglob("*"), key=lambda item: item.as_posix().lower()):
                         if len(assets) >= MAX_LISTED_ASSETS:
                             break
-                        if path.is_file() and path.suffix.lower() in IMAGE_SUFFIXES and _inside(folder, path):
+                        if path.is_file() and path.suffix.lower() in suffixes and _inside(folder, path):
                             assets.append({"path": path.relative_to(self.project_root).as_posix(), "name": path.name})
                 self._send_json({"assets": assets, "folder": folder.relative_to(self.project_root).as_posix(), "truncated": len(assets) >= MAX_LISTED_ASSETS})
             except (OSError, PermissionError, ValueError) as error:
@@ -242,17 +249,71 @@ class SlideHandler(SimpleHTTPRequestHandler):
             if not path.is_file():
                 self.send_error(HTTPStatus.NOT_FOUND)
                 return
-            mime = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
-            data = path.read_bytes()
-            self.send_response(HTTPStatus.OK)
-            self.send_header("Content-Type", mime)
-            self.send_header("Content-Length", str(len(data)))
-            self.end_headers()
-            self.wfile.write(data)
+            self._send_project_asset(path)
             return
         if parsed.path in {"", "/"}:
             self.path = "/index.html"
         return super().do_GET()
+
+    def _send_project_asset(self, path: Path, *, head_only: bool = False) -> None:
+        size = path.stat().st_size
+        start, end = 0, max(0, size - 1)
+        status = HTTPStatus.OK
+        requested_range = self.headers.get("Range")
+        if requested_range:
+            match = re.fullmatch(r"bytes=(\d*)-(\d*)", requested_range.strip())
+            if not match or size == 0:
+                self.send_response(HTTPStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
+                self.send_header("Content-Range", f"bytes */{size}")
+                self.end_headers()
+                return
+            first, last = match.groups()
+            if first:
+                start = int(first)
+                end = min(int(last), size - 1) if last else size - 1
+            elif last:
+                length = min(int(last), size)
+                start, end = size - length, size - 1
+            if start >= size or start > end:
+                self.send_response(HTTPStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
+                self.send_header("Content-Range", f"bytes */{size}")
+                self.end_headers()
+                return
+            status = HTTPStatus.PARTIAL_CONTENT
+        length = end - start + 1 if size else 0
+        self.send_response(status)
+        self.send_header("Content-Type", mimetypes.guess_type(path.name)[0] or "application/octet-stream")
+        self.send_header("Accept-Ranges", "bytes")
+        self.send_header("Content-Length", str(length))
+        if status == HTTPStatus.PARTIAL_CONTENT:
+            self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
+        self.end_headers()
+        if head_only:
+            return
+        with path.open("rb") as stream:
+            stream.seek(start)
+            remaining = length
+            while remaining:
+                chunk = stream.read(min(64 * 1024, remaining))
+                if not chunk:
+                    break
+                self.wfile.write(chunk)
+                remaining -= len(chunk)
+
+    def do_HEAD(self) -> None:
+        parsed = urllib.parse.urlsplit(self.path)
+        if parsed.path.startswith("/project/"):
+            try:
+                path = self._project_file(parsed.path[len("/project/") :])
+            except PermissionError:
+                self.send_error(HTTPStatus.FORBIDDEN)
+                return
+            if not path.is_file():
+                self.send_error(HTTPStatus.NOT_FOUND)
+                return
+            self._send_project_asset(path, head_only=True)
+            return
+        return super().do_HEAD()
 
     def do_PUT(self) -> None:
         parsed = urllib.parse.urlsplit(self.path)
@@ -340,8 +401,8 @@ class SlideHandler(SimpleHTTPRequestHandler):
             self._send_json({"error": str(error)}, HTTPStatus.BAD_REQUEST)
             return
         stem, suffix = Path(requested).stem, Path(requested).suffix.lower()
-        if suffix not in IMAGE_SUFFIXES:
-            self._send_json({"error": "Unsupported image type"}, HTTPStatus.BAD_REQUEST)
+        if suffix not in ASSET_SUFFIXES:
+            self._send_json({"error": "Unsupported image or video type"}, HTTPStatus.BAD_REQUEST)
             return
         candidate = asset_dir / f"{stem}{suffix}"
         counter = 2
