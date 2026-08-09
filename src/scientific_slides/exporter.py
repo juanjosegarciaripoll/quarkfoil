@@ -17,12 +17,15 @@ EXPORT_FILES = {
     "modules/parser.js": "quarkfoil/parser.js",
     "modules/render.js": "quarkfoil/render.js",
     "modules/shapes.js": "quarkfoil/shapes.js",
+    "modules/bibliography.js": "quarkfoil/bibliography.js",
     "modules/player.js": "quarkfoil/player.js",
     "styles/theme.css": "quarkfoil/theme.css",
     "styles/player.css": "quarkfoil/player.css",
 }
 
 LOCAL_FILES = {
+    "vendor/bibtex/bibtexParse.js": "quarkfoil/vendor/bibtex/bibtexParse.js",
+    "vendor/bibtex/LICENSE": "quarkfoil/vendor/bibtex/LICENSE",
     "vendor/reveal/reveal.js": "quarkfoil/vendor/reveal/reveal.js",
     "vendor/reveal/reveal.css": "quarkfoil/vendor/reveal/reveal.css",
     "vendor/reveal/notes.js": "quarkfoil/vendor/reveal/notes.js",
@@ -65,6 +68,10 @@ CDN_FILES = {
     "katex_js": (
         "vendor/katex/katex.min.js",
         "https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js",
+    ),
+    "bibtex_js": (
+        "vendor/bibtex/bibtexParse.js",
+        "https://cdn.jsdelivr.net/npm/bibtex-parse-js@0.0.24/bibtexParse.js",
     ),
 }
 
@@ -161,6 +168,9 @@ def _folder_files(project: Path, relative: str) -> set[str]:
 def _copy_project_assets(deck: Path, source: str, destination: Path) -> None:
     project = deck.parent.resolve()
     references = _asset_references(source)
+    match = re.search(r"(?m)^bibliography:\s*[\"']?([^\s\"']+)", source.split("---", 2)[1] if source.startswith("---") else "")
+    if match:
+        references.add(match.group(1))
     for folder in _configured_asset_folders(source):
         references.update(_folder_files(project, folder))
     for relative in sorted(references):
@@ -181,6 +191,7 @@ def _third_party_notice() -> str:
         ("KaTeX", "vendor/katex/LICENSE"),
         ("Marked", "vendor/marked/LICENSE.md"),
         ("js-yaml", "vendor/yaml/LICENSE"),
+        ("bibtexParseJs", "vendor/bibtex/LICENSE"),
     ):
         sections.append(f"# {label}\n\n{(APP_ROOT / relative).read_text(encoding='utf-8').rstrip()}")
     return "\n\n---\n\n".join(sections) + "\n"
@@ -202,6 +213,7 @@ def _resource_tags(assets: str) -> tuple[str, str, str]:
                 "marked/marked.min.js",
                 "yaml/js-yaml.min.js",
                 "katex/katex.min.js",
+                "bibtex/bibtexParse.js",
             )
         )
         return styles, scripts, "'self'"
@@ -214,7 +226,7 @@ def _resource_tags(assets: str) -> tuple[str, str, str]:
         else:
             tags[name] = f'  <script src="{url}" integrity="{integrity}" crossorigin="anonymous"></script>'
     styles = "\n".join((tags["reveal_css"], tags["katex_css"]))
-    scripts = "\n".join(tags[name] for name in ("reveal_js", "notes_js", "marked_js", "yaml_js", "katex_js"))
+    scripts = "\n".join(tags[name] for name in ("reveal_js", "notes_js", "marked_js", "yaml_js", "katex_js", "bibtex_js"))
     return styles, scripts, "'self' https://cdn.jsdelivr.net"
 
 

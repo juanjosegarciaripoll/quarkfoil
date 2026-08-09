@@ -1,7 +1,8 @@
-import { deleteSlide, duplicateSlide, insertSlide, moveSlide, parseDeck } from "./parser.js";
+import { deleteSlide, duplicateSlide, insertOverlay, insertSlide, moveSlide, parseDeck } from "./parser.js";
 import { renderDeck } from "./render.js";
 import { DesignEditor } from "./editor.js";
 import { saveSnapshot } from "./storage.js";
+import { briefReference, parseBibliography, prepareBibliography } from "./bibliography.js";
 
 const STARTER = `---
 title: Quarkfoil
@@ -69,6 +70,9 @@ const state = {
   undo: [],
   redo: [],
   objectUrls: new Map(),
+  bibliographySource: "",
+  bibliographyHash: null,
+  bibliography: null,
 };
 
 const elements = {
@@ -109,7 +113,8 @@ function parseAndRender(source, { preserveSlide = true } = {}) {
   state.source = source;
   state.deck = deck;
   elements.source.value = source;
-  renderDeck(deck, elements.slides, assetResolver);
+  state.bibliography = prepareBibliography(state.bibliographySource, deck);
+  renderDeck(deck, elements.slides, assetResolver, state.bibliography);
   rebuildSlideList();
   state.currentSlide = Math.min(previous, Math.max(0, deck.slides.length - 1));
   if (reveal) {
@@ -406,6 +411,116 @@ function downloadSource() {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+function bibliographyPath() {
+  const value = state.deck?.metadata?.bibliography;
+  return typeof value === "string" && value.trim() ? value.trim().replaceAll("\\", "/") : "references.bib";
+}
+
+async function loadBibliography() {
+  if (!state.local) return;
+  const response = await fetch(`/api/bibliography?path=${encodeURIComponent(bibliographyPath())}`);
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error || "Cannot load bibliography");
+  state.bibliographySource = result.source;
+  state.bibliographyHash = result.hash;
+}
+
+function bibliographyMessage(message, error = false) {
+  const element = document.querySelector("#bibliography-status");
+  element.textContent = message;
+  element.classList.toggle("error", error);
+}
+
+function rebuildBibliographyList() {
+  const target = document.querySelector("#bibliography-list");
+  const query = document.querySelector("#bibliography-search").value.toLowerCase();
+  let entries;
+  try { entries = parseBibliography(document.querySelector("#bibliography-source").value); }
+  catch (error) { bibliographyMessage(error.message, true); return; }
+  target.replaceChildren();
+  for (const entry of entries.filter(item => `${item.key} ${Object.values(item.fields).join(" ")}`.toLowerCase().includes(query))) {
+    const row = document.createElement("div");
+    row.className = "bibliography-entry";
+    const description = document.createElement("div");
+    const title = document.createElement("strong");
+    title.textContent = entry.key;
+    const summary = document.createElement("span");
+    summary.textContent = `${entry.fields.title || "Untitled"} — ${briefReference(entry)}`;
+    description.append(title, summary);
+    const cite = document.createElement("button");
+    cite.type = "button"; cite.textContent = "Insert [n]";
+    cite.addEventListener("click", () => insertInlineCitation(entry.key));
+    const attribute = document.createElement("button");
+    attribute.type = "button"; attribute.textContent = "Add attribution";
+    attribute.addEventListener("click", () => insertCitationOverlay(entry.key));
+    row.append(description, cite, attribute);
+    target.append(row);
+  }
+  bibliographyMessage(`${entries.length} reference${entries.length === 1 ? "" : "s"}`);
+}
+
+function openBibliography() {
+  document.querySelector("#bibliography-source").value = state.bibliographySource;
+  document.querySelector("#bibliography-search").value = "";
+  rebuildBibliographyList();
+  document.querySelector("#bibliography-dialog").showModal();
+}
+
+function insertInlineCitation(key) {
+  if (state.mode !== "source") { bibliographyMessage("Switch to Source mode to insert an inline citation", true); return; }
+  const editor = elements.source;
+  editor.setRangeText(`[@${key}]`, editor.selectionStart, editor.selectionEnd, "end");
+  editor.dispatchEvent(new Event("input"));
+  document.querySelector("#bibliography-dialog").close();
+  editor.focus();
+}
+
+function insertCitationOverlay(key) {
+  const base = `citation-${key.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+  const used = new Set(state.deck.slides[state.currentSlide].overlays.map(item => item.id));
+  let id = base; let counter = 2;
+  while (used.has(id)) id = `${base}-${counter++}`;
+  commitSource(insertOverlay(state.deck, state.currentSlide, { type: "citation", content: "", id, x: 55, y: 82, w: 40, h: 8, attributes: { key, display: "brief", align: "left", "font-size": "0.7em" } }));
+  document.querySelector("#bibliography-dialog").close();
+}
+
+async function fetchDoi() {
+  if (!state.local) { bibliographyMessage("DOI import requires the local Quarkfoil server", true); return; }
+  const doi = document.querySelector("#doi-input").value.trim();
+  bibliographyMessage("Fetching DOI…");
+  try {
+    const response = await fetch(`/api/doi?doi=${encodeURIComponent(doi)}`);
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "DOI lookup failed");
+    const source = document.querySelector("#bibliography-source");
+    const parsed = parseBibliography(result.bibtex);
+    const existing = parseBibliography(source.value);
+    const incoming = parsed[0];
+    if (existing.some(entry => entry.key === incoming.key || (entry.fields.doi && entry.fields.doi.toLowerCase() === incoming.fields.doi?.toLowerCase()))) throw new Error("This DOI or citation key already exists");
+    if (!window.confirm(`Add ${incoming.key}?\n\n${incoming.fields.title || "Untitled"}\n${briefReference(incoming)}`)) { bibliographyMessage("DOI import cancelled"); return; }
+    source.value = `${source.value.trimEnd()}${source.value.trim() ? "\n\n" : ""}${result.bibtex.trim()}\n`;
+    document.querySelector("#doi-input").value = "";
+    rebuildBibliographyList();
+    bibliographyMessage(`Added ${incoming.key} to the draft; save to write the bibliography`);
+  } catch (error) { bibliographyMessage(error.message, true); }
+}
+
+async function saveBibliography() {
+  const source = document.querySelector("#bibliography-source").value;
+  try { parseBibliography(source); }
+  catch (error) { bibliographyMessage(error.message, true); return; }
+  if (!state.local) { bibliographyMessage("Saving requires the local Quarkfoil server", true); return; }
+  const response = await fetch(`/api/bibliography?path=${encodeURIComponent(bibliographyPath())}`, { method: "PUT", headers: { "Content-Type": "application/x-bibtex; charset=utf-8", "If-Match": `"${state.bibliographyHash}"` }, body: source });
+  const result = await response.json();
+  if (!response.ok) { bibliographyMessage(result.error || "Save failed", true); return; }
+  state.bibliographySource = source;
+  state.bibliographyHash = result.hash;
+  if (!state.deck.metadata?.bibliography && /^---\r?\n/.test(state.source)) {
+    commitSource(state.source.replace(/^---\r?\n/, `---\nbibliography: ${bibliographyPath()}\n`));
+  } else parseAndRender(state.source);
+  bibliographyMessage("Bibliography saved");
+}
+
 async function importAsset(file) {
   if (!file?.type.startsWith("image/")) throw new Error("Only image files are supported");
   const configured = state.deck?.metadata?.assets?.figures;
@@ -464,6 +579,11 @@ function bindUi() {
     state.local = false;
     parseAndRender(source, { preserveSlide: false });
   });
+  document.querySelector("#bibliography-button").addEventListener("click", openBibliography);
+  document.querySelector("#bibliography-search").addEventListener("input", rebuildBibliographyList);
+  document.querySelector("#bibliography-source").addEventListener("input", rebuildBibliographyList);
+  document.querySelector("#doi-fetch").addEventListener("click", fetchDoi);
+  document.querySelector("#bibliography-save").addEventListener("click", saveBibliography);
   document.querySelector("#undo-button").addEventListener("click", undo);
   document.querySelector("#redo-button").addEventListener("click", redo);
   document.querySelector("#add-slide").addEventListener("click", addSlideAfterSelection);
@@ -489,6 +609,8 @@ async function initialize() {
     state.savedSource = "";
     parseAndRender(STARTER, { preserveSlide: true });
   }
+  await loadBibliography();
+  parseAndRender(state.source);
   reveal = new window.Reveal(document.querySelector(".reveal"), {
     embedded: true,
     controls: false,

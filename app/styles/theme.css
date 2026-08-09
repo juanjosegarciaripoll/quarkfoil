@@ -187,6 +187,19 @@
 .slide-overlay[data-align="right"] .katex-display,
 .slide-overlay[data-align="right"] .katex-display > .katex { text-align: right; }
 .overlay-image { overflow: hidden; }
+.overlay-citation {
+  padding: 0.35em 0.5em;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--slide-background), transparent 8%);
+  border-left: 3px solid var(--accent);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.12);
+  font-size: 0.7em;
+  line-height: 1.2;
+  overflow: hidden;
+}
+.citation { color: inherit; text-decoration: none; }
+.citation:hover { text-decoration: underline; }
+.citation-missing { color: #c92a2a; font-weight: 700; }
 
 .overlay-shape {
   display: grid;

@@ -1,6 +1,6 @@
 # Third-party licenses
 
-Quarkfoil distributes the following pinned browser components. All four are
+Quarkfoil distributes the following pinned browser components. All five are
 licensed under the permissive MIT License. Their complete upstream notices are
 stored beside the vendored files and are included in Quarkfoil's source and
 binary distributions.
@@ -11,6 +11,7 @@ binary distributions.
 | KaTeX, including its distributed fonts | 0.16.22 | [MIT](app/vendor/katex/LICENSE) — Copyright © 2013–2020 Khan Academy and other contributors | `aecf657d52774c7af21bd72da7825ef7844ac38af8a879e9fd200568f38a5cb4` |
 | Marked | 15.0.12 | [MIT and BSD-3-Clause notices](app/vendor/marked/LICENSE.md) — Copyright © 2018+ MarkedJS, © 2011–2018 Christopher Jeffrey, and © 2004 John Gruber | `3e7e7d7feb3e5d58cb6c804f68ab5c24cc7e5eb6270fd6e5cbb9124739217d0c` |
 | js-yaml | 4.1.0 | [MIT](app/vendor/yaml/LICENSE) — Copyright © 2011–2015 Vitaly Puzrin | `45dc3dd03dc07a06705a2c2989b8c7f709013f04bd5386e3279d4e447f07ebd7` |
+| bibtexParseJs | 0.0.24 | [MIT](app/vendor/bibtex/LICENSE) — Copyright © 2013 ORCID, Inc. and © 2010 Henrik Muehe | `c947148bbe32a92953c0faa7260e4fd898361537ac8520b773b4f3ff31fb5983` |
 
 The MIT licenses permit use, copying, modification, publication, distribution,
 sublicensing, and sale. Marked's notice also retains the BSD-3-Clause terms for

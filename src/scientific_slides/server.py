@@ -5,11 +5,13 @@ import hashlib
 import json
 import mimetypes
 import os
+import re
 import shutil
 import sys
 import tempfile
 import threading
 import urllib.parse
+import urllib.request
 import webbrowser
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -21,6 +23,8 @@ SOURCE_APP_ROOT = Path(__file__).resolve().parents[2] / "app"
 APP_ROOT = PACKAGE_APP_ROOT if PACKAGE_APP_ROOT.is_dir() else SOURCE_APP_ROOT
 MAX_WRITE_BYTES = 20 * 1024 * 1024
 MAX_ASSET_BYTES = 100 * 1024 * 1024
+MAX_BIBLIOGRAPHY_BYTES = 5 * 1024 * 1024
+MAX_DOI_BYTES = 1024 * 1024
 STARTER_DECK = """---
 title: New presentation
 author: Your name
@@ -144,6 +148,25 @@ class SlideHandler(SimpleHTTPRequestHandler):
                 }
             )
             return
+        if parsed.path == "/api/bibliography":
+            try:
+                relative = urllib.parse.parse_qs(parsed.query).get("path", ["references.bib"])[0]
+                path = self._project_file(relative)
+                if path.suffix.lower() != ".bib":
+                    raise ValueError("Bibliography must be a .bib file")
+                data = path.read_bytes() if path.is_file() else b""
+                data.decode("utf-8")
+                self._send_json({"source": data.decode("utf-8"), "hash": hashlib.sha256(data).hexdigest(), "path": path.relative_to(self.project_root).as_posix()})
+            except (OSError, PermissionError, UnicodeDecodeError, ValueError) as error:
+                self._send_json({"error": str(error)}, HTTPStatus.BAD_REQUEST)
+            return
+        if parsed.path == "/api/doi":
+            doi = urllib.parse.parse_qs(parsed.query).get("doi", [""])[0]
+            try:
+                self._send_json({"doi": doi, "bibtex": fetch_doi_bibtex(doi)})
+            except (OSError, ValueError) as error:
+                self._send_json({"error": str(error)}, HTTPStatus.BAD_GATEWAY)
+            return
         if parsed.path == "/api/deck":
             data = self.deck_path.read_bytes()
             self.send_response(HTTPStatus.OK)
@@ -175,6 +198,32 @@ class SlideHandler(SimpleHTTPRequestHandler):
 
     def do_PUT(self) -> None:
         parsed = urllib.parse.urlsplit(self.path)
+        if parsed.path == "/api/bibliography":
+            try:
+                relative = urllib.parse.parse_qs(parsed.query).get("path", ["references.bib"])[0]
+                target = self._project_file(relative)
+                if target.suffix.lower() != ".bib":
+                    raise ValueError("Bibliography must be a .bib file")
+                body = self._read_body(MAX_BIBLIOGRAPHY_BYTES)
+                body.decode("utf-8")
+                current = target.read_bytes() if target.is_file() else b""
+                expected = self.headers.get("If-Match")
+                if expected and expected.strip('"') != hashlib.sha256(current).hexdigest():
+                    self._send_json({"error": "Bibliography changed on disk"}, HTTPStatus.CONFLICT)
+                    return
+                fd, temporary = tempfile.mkstemp(prefix=".quarkfoil-bib-", suffix=".tmp", dir=target.parent)
+                with os.fdopen(fd, "wb") as stream:
+                    stream.write(body)
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                os.replace(temporary, target)
+                self._send_json({"ok": True, "hash": hashlib.sha256(body).hexdigest()})
+            except (OSError, PermissionError, UnicodeDecodeError, ValueError) as error:
+                self._send_json({"error": str(error)}, HTTPStatus.BAD_REQUEST)
+            finally:
+                if "temporary" in locals() and os.path.exists(temporary):
+                    os.unlink(temporary)
+            return
         if parsed.path != "/api/deck":
             self.send_error(HTTPStatus.NOT_FOUND)
             return
@@ -253,6 +302,25 @@ def create_server(deck: Path, host: str, port: int) -> ThreadingHTTPServer:
     server.project_root = resolved.parent  # type: ignore[attr-defined]
     server.deck_path = resolved  # type: ignore[attr-defined]
     return server
+
+
+def fetch_doi_bibtex(value: str) -> str:
+    doi = urllib.parse.unquote(value).strip()
+    doi = doi.removeprefix("https://doi.org/").removeprefix("http://doi.org/").removeprefix("doi:").strip()
+    if not re.fullmatch(r"10\.\d{4,9}/\S{1,500}", doi, re.IGNORECASE):
+        raise ValueError("Invalid DOI")
+    request = urllib.request.Request(
+        f"https://doi.org/{urllib.parse.quote(doi, safe='/():;._-')}",
+        headers={"Accept": "application/x-bibtex", "User-Agent": "Quarkfoil/0.1 (BibTeX DOI import)"},
+    )
+    with urllib.request.urlopen(request, timeout=12) as response:
+        data = response.read(MAX_DOI_BYTES + 1)
+    if len(data) > MAX_DOI_BYTES:
+        raise ValueError("DOI metadata response is too large")
+    text = data.decode("utf-8").strip()
+    if not text.startswith("@"):
+        raise ValueError("DOI service did not return BibTeX")
+    return text + "\n"
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -141,8 +141,21 @@ body.presenting .toolbar { display: none; }
 
 .mode-design .fragment { visibility: visible !important; opacity: 1 !important; transform: none !important; }
 
-dialog { width: min(900px, 88vw); padding: 0; color: #edf2f4; background: #20252b; border: 1px solid #697681; border-radius: 8px; }
+dialog { width: min(900px, 88vw); max-width: 88vw; padding: 0; color: #edf2f4; background: #20252b; border: 1px solid #697681; border-radius: 8px; }
 dialog::backdrop { background: #000a; }
+#bibliography-dialog { width: min(1050px, 92vw); max-width: 92vw; }
+.bibliography-dialog__form { display: grid; grid-template-rows: auto auto minmax(100px, 0.7fr) minmax(220px, 1.3fr) auto auto; gap: 0.7rem; width: 100%; min-width: 0; height: min(780px, 88vh); padding: 1rem; overflow: hidden; }
+.bibliography-dialog__form h2 { margin: 0; }
+.bibliography-tools { display: grid; grid-template-columns: 1fr 1fr auto; gap: 0.5rem; }
+.bibliography-tools input { min-width: 0; padding: 0.4rem; }
+.bibliography-list { min-width: 0; overflow: auto; border: 1px solid #56616d; }
+.bibliography-entry { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 0.5rem; padding: 0.45rem; border-bottom: 1px solid #3d454e; }
+.bibliography-entry > div { display: grid; min-width: 0; }
+.bibliography-entry span { overflow: hidden; color: #b9c2ca; font-size: 0.8rem; text-overflow: ellipsis; white-space: nowrap; }
+.bibliography-source-label { display: grid; grid-template-rows: auto 1fr; gap: 0.3rem; min-width: 0; min-height: 0; }
+#bibliography-source { width: 100%; min-width: 0; min-height: 0; resize: none; padding: 0.7rem; color: #edf2f4; background: #111418; border: 1px solid #56616d; font: 13px/1.4 "Cascadia Mono", Consolas, monospace; }
+#bibliography-status { min-height: 1.2em; color: #b9c2ca; }
+#bibliography-status.error { color: #ff8787; }
 .content-dialog__form { display: grid; grid-template: auto minmax(180px, 1fr) minmax(120px, 0.7fr) auto / 1fr; gap: 0.8rem; max-height: 82vh; padding: 1rem; }
 .content-dialog__form h2 { margin: 0; font-size: 1.05rem; }
 #content-editor { min-height: 180px; resize: vertical; padding: 0.8rem; color: #edf2f4; background: #111418; border: 1px solid #56616d; font: 14px/1.4 "Cascadia Mono", Consolas, monospace; }
@@ -156,6 +169,13 @@ dialog::backdrop { background: #000a; }
   border: 1px solid #65717d;
   border-radius: 3px;
   font: 0.72em/1.2 "Segoe UI", Arial, sans-serif;
+}
+
+@media (max-width: 680px) {
+  .bibliography-tools { grid-template-columns: 1fr auto; }
+  #bibliography-search { grid-column: 1 / -1; }
+  .bibliography-entry { grid-template-columns: minmax(0, 1fr) auto; }
+  .bibliography-entry > button:first-of-type { grid-column: 1 / 2; }
 }
 
 @media print {

@@ -91,6 +91,21 @@ The Save button and `Ctrl+S` write the Markdown file. Unsaved changes are identi
 
 The browser also keeps recovery snapshots in IndexedDB. These snapshots supplement the Markdown file; they are not a substitute for version control or backups.
 
+## Bibliography
+
+The Bibliography toolbar button opens a searchable reference list and complete
+BibTeX source. The source is saved losslessly to the file selected by
+`bibliography` in front matter, or `references.bib` by default. Saves are
+atomic and reject external conflicts.
+
+Enter a DOI and choose **Add DOI** to retrieve BibTeX metadata. Quarkfoil shows
+a preview before appending it to the draft and detects duplicate keys and DOIs.
+DOI lookup is the only bibliography operation that requires the network.
+
+**Insert [n]** inserts an inline citation at the Source editor caret. **Add
+attribution** creates a positioned, resizable brief reference for crediting a
+copied figure. Both forms share deck-wide numbering.
+
 ## Keyboard shortcuts
 
 - `Ctrl+S`: save.

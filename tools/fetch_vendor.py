@@ -63,6 +63,14 @@ FILES = {
         "url": "https://raw.githubusercontent.com/nodeca/js-yaml/4.1.0/LICENSE",
         "sha256": "a07bc24468b9654ce76a547d47a2db282d07733b715db4c73a98bd63961f9550",
     },
+    "bibtex/bibtexParse.js": {
+        "url": "https://cdn.jsdelivr.net/npm/bibtex-parse-js@0.0.24/bibtexParse.js",
+        "sha256": "bfdebc92c299a6955e81781e9cf9482bff6637cd33268d4f5ce0aef9aa3494ac",
+    },
+    "bibtex/LICENSE": {
+        "url": "https://cdn.jsdelivr.net/npm/bibtex-parse-js@0.0.24/LICENSE",
+        "sha256": "da2e3e2bc41f6490fe6915b2e400bd9eac1ccb37c1d88ed2edd544d99090091f",
+    },
 }
 
 

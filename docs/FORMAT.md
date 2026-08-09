@@ -31,6 +31,7 @@ The supported preface fields are:
 | `defaults.footer` | Markdown footer inherited by slides | Empty |
 | `assets.figures` | Folder used for newly imported images | `figures` |
 | `assets.include` | Additional folders copied completely during static export | Empty list |
+| `bibliography` | Project-relative BibTeX bibliography | `references.bib` in the editor |
 
 The current renderer uses a 16:9 canvas and the bundled scientific theme.
 `defaults.footer` supplies Markdown shown on slides without a slide-specific
@@ -189,3 +190,31 @@ Speaker notes for Reveal.js.
 ```
 
 Notes do not appear on the slide canvas.
+
+## Bibliographies and citations
+
+Set a project-relative BibTeX file in front matter:
+
+```yaml
+bibliography: references.bib
+```
+
+Inline citations use Pandoc-style keys and are numbered by first appearance:
+
+```markdown
+The original result is discussed in [@einstein1905].
+Several works may be grouped [@einstein1905; @smith2024].
+```
+
+Escaped citations and citations inside inline or fenced code remain literal.
+A citation overlay provides a positioned figure attribution:
+
+```markdown
+::: overlay {#figure-source type="citation" key="smith2024" display="brief" x="55" y="82" w="40" h="8" font-size="0.7em"}
+
+:::
+```
+
+`display="number"` shows only the shared number; `display="brief"` adds an
+abbreviated reference. DOI and URL fields become links. Missing keys are shown
+as visible errors.

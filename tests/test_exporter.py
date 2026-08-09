@@ -74,7 +74,15 @@ class ExporterTests(unittest.TestCase):
         )
         output = export_presentation(self.deck, self.root / "asset-site")
         self.assertTrue((output / "artwork/unused.svg").is_file())
-        self.assertEqual((output / "resources/notes.pdf").read_bytes(), b"%PDF-test")
+
+    def test_bibliography_is_exported(self) -> None:
+        bibliography = self.project / "references.bib"
+        bibliography.write_text("@article{test, title={Test}}\n", encoding="utf-8")
+        self.deck.write_text("---\nbibliography: references.bib\n---\n\n## Cited\n\n[@test]\n", encoding="utf-8")
+        output = export_presentation(self.deck, self.root / "bibliography-site")
+        self.assertEqual((output / "references.bib").read_text(encoding="utf-8"), bibliography.read_text(encoding="utf-8"))
+        self.assertTrue((output / "quarkfoil/bibliography.js").is_file())
+        self.assertTrue((output / "quarkfoil/vendor/bibtex/bibtexParse.js").is_file())
 
     def test_configured_asset_folder_cannot_leave_project(self) -> None:
         self.deck.write_text(

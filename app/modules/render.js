@@ -1,10 +1,11 @@
 import { escapeHtml } from "./parser.js";
 import { makeShapeSvg } from "./shapes.js";
+import { renderCitation } from "./bibliography.js";
 
-function markdown(source) {
+function markdown(source, bibliography = null) {
   try {
     const equations = [];
-    const protectedSource = String(source || "").replace(
+    let protectedSource = String(source || "").replace(
       /\\\[([\s\S]*?)\\\]|\$\$([\s\S]*?)\$\$|\\\(([\s\S]*?)\\\)|(?<!\\)\$([^\n$]+?)(?<!\\)\$/g,
       (whole, bracketDisplay, dollarDisplay, bracketInline, dollarInline) => {
         const display = bracketDisplay !== undefined || dollarDisplay !== undefined;
@@ -14,6 +15,15 @@ function markdown(source) {
         return token;
       },
     );
+    const citations = [];
+    protectedSource = protectedSource.split(/(```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]*`)/g).map((part, index) => {
+      if (index % 2) return part;
+      return part.replace(/(?<!\\)\[@([\w:./+-]+)(?:\s*;\s*@([\w:./+-]+))*\]/g, whole => {
+        const token = `SCICITATIONPLACEHOLDER${citations.length}X`;
+        citations.push({ token, keys: [...whole.matchAll(/@([\w:./+-]+)/g)].map(match => match[1]) });
+        return token;
+      });
+    }).join("");
     const renderer = new window.marked.Renderer();
     renderer.html = token => {
       const text = typeof token === "string" ? token : token?.text || token?.raw || "";
@@ -29,6 +39,7 @@ function markdown(source) {
       });
       html = html.replaceAll(equation.token, rendered);
     }
+    for (const citation of citations) html = html.replaceAll(citation.token, citation.keys.map(key => renderCitation(key, bibliography)).join(", "));
     return html;
   } catch (error) {
     return `<pre class="render-error">${escapeHtml(error.message)}</pre>`;
@@ -54,7 +65,7 @@ function makeImage(image, assetResolver) {
   return img;
 }
 
-function fillContent(container, item, assetResolver) {
+function fillContent(container, item, assetResolver, bibliography) {
   if (item.type === "image" && item.image) container.append(makeImage(item.image, assetResolver));
   else if (item.type === "shape") {
     container.dataset.shape = item.shape;
@@ -64,10 +75,11 @@ function fillContent(container, item, assetResolver) {
     container.style.setProperty("--shape-stroke-width", String(item.strokeWidth));
     const label = document.createElement("div");
     label.className = "shape-label";
-    label.innerHTML = markdown(item.source);
+    label.innerHTML = markdown(item.source, bibliography);
     container.append(makeShapeSvg(item.shape), label);
   }
-  else container.innerHTML = markdown(item.source);
+  else if (item.type === "citation") container.innerHTML = renderCitation(item.attrs.values.key || "", bibliography, { brief: item.attrs.values.display !== "number" });
+  else container.innerHTML = markdown(item.source, bibliography);
 }
 
 function cellMap(layout) {
@@ -83,7 +95,7 @@ function findCell(slide, name) {
   return slide.cells.find(cell => cell.id === name) || (name === "core" ? slide.cells[0] : null);
 }
 
-function renderSlide(slide, metadata, assetResolver) {
+function renderSlide(slide, metadata, assetResolver, bibliography) {
   const section = document.createElement("section");
   section.className = `scientific-slide layout-${slide.layout}`;
   section.dataset.slideIndex = String(slide.index);
@@ -114,7 +126,7 @@ function renderSlide(slide, metadata, assetResolver) {
     const item = findCell(slide, name);
     if (item) {
       cell.dataset.contentType = item.type;
-      fillContent(cell, item, assetResolver);
+      fillContent(cell, item, assetResolver, bibliography);
     } else {
       cell.dataset.empty = "true";
       cell.innerHTML = `<span class="empty-cell-label">${escapeHtml(name)}</span>`;
@@ -145,7 +157,7 @@ function renderSlide(slide, metadata, assetResolver) {
       element.style.textAlign = overlay.alignment;
       element.dataset.align = overlay.alignment;
     }
-    fillContent(element, overlay, assetResolver);
+    fillContent(element, overlay, assetResolver, bibliography);
     overlayLayer.append(element);
   }
   frame.append(core);
@@ -155,7 +167,7 @@ function renderSlide(slide, metadata, assetResolver) {
   if (footerSource && slide.headingAttrs.values.footer !== "none") {
     const footer = document.createElement("footer");
     footer.className = "slide-footer";
-    footer.innerHTML = markdown(String(footerSource));
+    footer.innerHTML = markdown(String(footerSource), bibliography);
     frame.append(footer);
   } else section.classList.add("no-footer");
 
@@ -168,9 +180,9 @@ function renderSlide(slide, metadata, assetResolver) {
   return section;
 }
 
-export function renderDeck(deck, target, assetResolver = source => `/project/${safeAssetPath(source)}`) {
+export function renderDeck(deck, target, assetResolver = source => `/project/${safeAssetPath(source)}`, bibliography = null) {
   const fragment = document.createDocumentFragment();
-  for (const slide of deck.slides) fragment.append(renderSlide(slide, deck.metadata, assetResolver));
+  for (const slide of deck.slides) fragment.append(renderSlide(slide, deck.metadata, assetResolver, bibliography));
   target.replaceChildren(fragment);
 }
 

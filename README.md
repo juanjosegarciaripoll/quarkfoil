@@ -89,6 +89,7 @@ and included in distributed packages:
 - [KaTeX 0.16.22, including its distributed fonts — MIT](app/vendor/katex/LICENSE)
 - [Marked 15.0.12 — MIT and BSD-3-Clause notices](app/vendor/marked/LICENSE.md)
 - [js-yaml 4.1.0 — MIT](app/vendor/yaml/LICENSE)
+- [bibtexParseJs 0.0.24 — MIT](app/vendor/bibtex/LICENSE)
 
 Versions, copyright holders, source checksums, and redistribution details are
 listed in the [complete third-party licensing notice](THIRD_PARTY_LICENSES.md).

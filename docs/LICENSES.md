@@ -3,7 +3,7 @@
 Quarkfoil is free and open-source software distributed under the
 [MIT License](https://github.com/juanjosegarciaripoll/quarkfoil/blob/main/LICENSE).
 
-It includes pinned copies of four permissively licensed browser components:
+It includes pinned copies of five permissively licensed browser components:
 
 | Component | Version | License |
 |---|---:|---|
@@ -11,6 +11,7 @@ It includes pinned copies of four permissively licensed browser components:
 | KaTeX, including its distributed fonts | 0.16.22 | [MIT](https://github.com/juanjosegarciaripoll/quarkfoil/blob/main/app/vendor/katex/LICENSE) |
 | Marked | 15.0.12 | [MIT and BSD-3-Clause notices](https://github.com/juanjosegarciaripoll/quarkfoil/blob/main/app/vendor/marked/LICENSE.md) |
 | js-yaml | 4.1.0 | [MIT](https://github.com/juanjosegarciaripoll/quarkfoil/blob/main/app/vendor/yaml/LICENSE) |
+| bibtexParseJs | 0.0.24 | [MIT](https://github.com/juanjosegarciaripoll/quarkfoil/blob/main/app/vendor/bibtex/LICENSE) |
 
 Exact copyright notices, checksums, and redistribution information are
 maintained in the repository's

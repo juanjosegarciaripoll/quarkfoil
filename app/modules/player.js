@@ -1,5 +1,6 @@
 import { parseDeck } from "./parser.js";
 import { renderDeck } from "./render.js";
+import { prepareBibliography } from "./bibliography.js";
 
 function assetPath(source) {
   if (!source || /^(?:javascript|data:text\/html):/i.test(source)) return "";
@@ -20,7 +21,14 @@ async function initialize() {
   if (errors.length) throw new Error(errors.map(item => item.message).join("; "));
 
   if (deck.metadata?.title) document.title = String(deck.metadata.title);
-  renderDeck(deck, document.querySelector("#slides"), assetPath);
+  const bibliographyPath = typeof deck.metadata?.bibliography === "string" ? deck.metadata.bibliography : null;
+  let bibliographySource = "";
+  if (bibliographyPath) {
+    const bibliographyResponse = await fetch(assetPath(bibliographyPath), { cache: "no-store" });
+    if (!bibliographyResponse.ok) throw new Error(`Bibliography returned HTTP ${bibliographyResponse.status}`);
+    bibliographySource = await bibliographyResponse.text();
+  }
+  renderDeck(deck, document.querySelector("#slides"), assetPath, prepareBibliography(bibliographySource, deck));
   const reveal = new window.Reveal(document.querySelector(".reveal"), {
     controls: true,
     progress: true,

@@ -15,6 +15,7 @@
       <button id="open-button" class="toolbar-icon-button" type="button" title="Open presentation" aria-label="Open presentation"><svg class="action-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18.5V6a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v1H7l-4 9.5Z"></path><path d="M7 9h14l-3 10H3"></path></svg></button>
       <button id="save-button" class="toolbar-icon-button" type="button" title="Save presentation" aria-label="Save presentation" disabled><svg class="action-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h13l3 3v13H4Z"></path><path d="M8 4v6h8V4M8 20v-6h8v6"></path></svg></button>
       <button id="download-button" class="toolbar-icon-button" type="button" title="Download presentation" aria-label="Download presentation" disabled><svg class="action-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M4 20h16"></path></svg></button>
+      <button id="bibliography-button" class="toolbar-icon-button" type="button" title="Bibliography" aria-label="Bibliography"><svg class="action-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5V18a3 3 0 0 1-3 3h11a3 3 0 0 0 3-3V5.5"></path><path d="M8 6a3 3 0 0 0-3-3h11a3 3 0 0 1 3 3H8Z"></path><path d="M11 10h5M11 13h5M11 16h3"></path></svg></button>
       <span id="save-state" class="save-state">No deck</span>
     </div>
     <div class="toolbar__group toolbar__modes" role="group" aria-label="Mode">
@@ -162,12 +163,30 @@
     </form>
   </dialog>
 
+  <dialog id="bibliography-dialog">
+    <form method="dialog" class="bibliography-dialog__form">
+      <h2>Bibliography</h2>
+      <div class="bibliography-tools">
+        <input id="bibliography-search" type="search" placeholder="Search references" aria-label="Search references">
+        <input id="doi-input" type="text" placeholder="10.xxxx/…" aria-label="DOI">
+        <button id="doi-fetch" type="button">Add DOI</button>
+      </div>
+      <div id="bibliography-list" class="bibliography-list"></div>
+      <label class="bibliography-source-label">BibTeX source
+        <textarea id="bibliography-source" spellcheck="false"></textarea>
+      </label>
+      <div id="bibliography-status" role="status"></div>
+      <div class="dialog-actions"><button value="cancel">Cancel</button><button id="bibliography-save" type="button">Save bibliography</button></div>
+    </form>
+  </dialog>
+
   <input id="file-input" type="file" accept=".md,.markdown,text/markdown" hidden>
   <input id="image-input" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" hidden>
 
   <script src="vendor/reveal/reveal.js"></script>
   <script src="vendor/marked/marked.min.js"></script>
   <script src="vendor/yaml/js-yaml.min.js"></script>
+  <script src="vendor/bibtex/bibtexParse.js"></script>
   <script src="vendor/katex/katex.min.js"></script>
   <script type="module" src="modules/app.js"></script>
 </body>

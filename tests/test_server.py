@@ -101,14 +101,29 @@ class ServerTests(unittest.TestCase):
         self.assertTrue(json.loads(payload)["ok"])
         self.assertEqual(self.deck.read_bytes(), next_source)
         with self.assertRaises(urllib.error.HTTPError) as context:
-            self.request(
-                "/api/deck",
-                method="PUT",
-                body=b"stale",
-                headers={"If-Match": f'"{digest}"'},
-            )
+            self.request("/api/deck", method="PUT", body=b"stale", headers={"If-Match": f'"{digest}"'})
         self.assertEqual(context.exception.code, 409)
         self.assertEqual(self.deck.read_bytes(), next_source)
+
+    def test_bibliography_load_save_and_conflict(self) -> None:
+        status, _, payload = self.request("/api/bibliography?path=references.bib")
+        result = json.loads(payload)
+        self.assertEqual(status, 200)
+        self.assertEqual(result["source"], "")
+        source = b"@article{test, title={Test}}\n"
+        status, _, payload = self.request("/api/bibliography?path=references.bib", method="PUT", body=source, headers={"If-Match": f'"{result["hash"]}"'})
+        saved = json.loads(payload)
+        self.assertEqual(status, 200)
+        self.assertEqual((self.root / "references.bib").read_bytes(), source)
+        with self.assertRaises(urllib.error.HTTPError) as context:
+            self.request("/api/bibliography?path=references.bib", method="PUT", body=b"stale", headers={"If-Match": f'"{result["hash"]}"'})
+        self.assertEqual(context.exception.code, 409)
+        self.assertTrue(saved["hash"])
+
+    def test_bibliography_cannot_leave_project(self) -> None:
+        with self.assertRaises(urllib.error.HTTPError) as context:
+            self.request("/api/bibliography?path=..%2Foutside.bib")
+        self.assertEqual(context.exception.code, 400)
 
     def test_project_boundary(self) -> None:
         with self.assertRaises(urllib.error.HTTPError) as context:
