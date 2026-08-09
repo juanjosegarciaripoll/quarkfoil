@@ -89,11 +89,42 @@ const elements = {
 let reveal;
 let editor;
 let snapshotTimer;
+let reloadToken = null;
+let reloadCheckPending = false;
+let lastReloadCheck = 0;
 
 function assetResolver(source) {
   if (state.objectUrls.has(source)) return state.objectUrls.get(source);
   if (state.local) return `/project/${source.replaceAll("\\", "/").split("/").map(encodeURIComponent).join("/")}`;
   return source;
+}
+
+async function pollForReload() {
+  if (!state.local || !state.config?.reload || document.hidden || reloadCheckPending) return;
+  const now = Date.now();
+  if (now - lastReloadCheck < 750) return;
+  lastReloadCheck = now;
+  reloadCheckPending = true;
+  try {
+    const response = await fetch("/api/reload", { cache: "no-store" });
+    if (!response.ok) return;
+    const { token } = await response.json();
+    if (reloadToken && token !== reloadToken) location.reload();
+    reloadToken = token;
+  } catch {
+    // A Python reload briefly closes the listener; the next action reconnects.
+  } finally {
+    reloadCheckPending = false;
+  }
+}
+
+function bindReloadChecks() {
+  window.addEventListener("focus", pollForReload);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) pollForReload();
+  });
+  document.addEventListener("pointerdown", pollForReload, { capture: true });
+  document.addEventListener("keydown", pollForReload, { capture: true });
 }
 
 async function hashText(text) {
@@ -609,6 +640,10 @@ function bindUi() {
 async function initialize() {
   bindUi();
   const loaded = await loadLocalDeck();
+  if (state.local && state.config?.reload) {
+    await pollForReload();
+    bindReloadChecks();
+  }
   if (!loaded) {
     state.savedSource = "";
     parseAndRender(STARTER, { preserveSlide: true });

@@ -54,7 +54,16 @@ Options:
 --open          Open the browser automatically; this is the default
 --no-open       Start the server without opening a browser
 --verbose       Log individual HTTP requests; quiet by default
+--reload        Restart after Quarkfoil Python files change; this is the default
+--no-reload     Disable automatic server restarts
 ```
+
+With reloading enabled, changes to Quarkfoil's Python files restart the local
+server with the same arguments. Changes to editor HTML, JavaScript, or CSS also
+refresh an editor page when it next gains focus, becomes visible, or receives
+keyboard or pointer input. Idle editor pages do not poll the server.
+Presentation Markdown and figure changes remain under the editor's normal save
+and conflict controls.
 
 For example:
 

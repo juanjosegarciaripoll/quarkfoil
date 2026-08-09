@@ -9,7 +9,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from scientific_slides.server import STARTER_DECK, create_server, initialize_deck
+from scientific_slides.server import STARTER_DECK, _python_snapshot, create_server, initialize_deck
 
 
 class DeckInitializationTests(unittest.TestCase):
@@ -51,6 +51,15 @@ class DeckInitializationTests(unittest.TestCase):
             initialize_deck(deck)
         self.assertFalse(deck.exists())
 
+    def test_python_snapshot_tracks_source_changes(self) -> None:
+        package = self.root / "package"
+        package.mkdir()
+        source = package / "server.py"
+        source.write_text("first", encoding="utf-8")
+        first = _python_snapshot(package)
+        source.write_text("second version", encoding="utf-8")
+        self.assertNotEqual(first, _python_snapshot(package))
+
 
 class ServerTests(unittest.TestCase):
     def test_packaged_app_is_available(self) -> None:
@@ -83,10 +92,15 @@ class ServerTests(unittest.TestCase):
         self.assertFalse(self.server.verbose)
         status, _, payload = self.request("/api/config")
         self.assertEqual(status, 200)
-        self.assertEqual(json.loads(payload)["deck"], "deck.md")
+        config = json.loads(payload)
+        self.assertEqual(config["deck"], "deck.md")
+        self.assertTrue(config["reload"])
         _, headers, payload = self.request("/api/deck")
         self.assertIn("text/markdown", headers["Content-Type"])
         self.assertEqual(payload, self.deck.read_bytes())
+        status, _, payload = self.request("/api/reload")
+        self.assertEqual(status, 200)
+        self.assertRegex(json.loads(payload)["token"], r"^[0-9a-f]{64}$")
 
     def test_atomic_save_and_conflict(self) -> None:
         previous = self.deck.read_bytes()

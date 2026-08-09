@@ -58,6 +58,40 @@ def _json_bytes(value: object) -> bytes:
     return json.dumps(value, ensure_ascii=False).encode("utf-8")
 
 
+def _python_snapshot(root: Path) -> tuple[tuple[str, int, int], ...]:
+    snapshot = []
+    for path in sorted(root.rglob("*.py")):
+        try:
+            stat = path.stat()
+        except OSError:
+            continue
+        snapshot.append((path.relative_to(root).as_posix(), stat.st_mtime_ns, stat.st_size))
+    return tuple(snapshot)
+
+
+def _app_reload_token() -> str:
+    entries = []
+    for path in sorted(APP_ROOT.rglob("*")):
+        if not path.is_file() or path.suffix.lower() not in {".html", ".js", ".css"} or "vendor" in path.parts:
+            continue
+        try:
+            stat = path.stat()
+        except OSError:
+            continue
+        entries.append(f"{path.relative_to(APP_ROOT).as_posix()}:{stat.st_mtime_ns}:{stat.st_size}")
+    return hashlib.sha256("\n".join(entries).encode("utf-8")).hexdigest()
+
+
+def _watch_python_changes(server: ThreadingHTTPServer, stop: threading.Event, reload_requested: threading.Event) -> None:
+    root = Path(__file__).resolve().parent
+    baseline = _python_snapshot(root)
+    while not stop.wait(0.5):
+        if _python_snapshot(root) != baseline:
+            reload_requested.set()
+            server.shutdown()
+            return
+
+
 def initialize_deck(deck: Path) -> Path:
     resolved = deck.resolve()
     if resolved.suffix.lower() not in {".md", ".markdown"}:
@@ -148,8 +182,12 @@ class SlideHandler(SimpleHTTPRequestHandler):
                     "mode": "local",
                     "deck": self.deck_path.relative_to(self.project_root).as_posix(),
                     "projectName": self.project_root.name,
+                    "reload": getattr(self.server, "reload", True),
                 }
             )
+            return
+        if parsed.path == "/api/reload":
+            self._send_json({"token": _app_reload_token()})
             return
         if parsed.path == "/api/bibliography":
             try:
@@ -315,12 +353,13 @@ class SlideHandler(SimpleHTTPRequestHandler):
         self._send_json({"ok": True, "path": relative}, HTTPStatus.CREATED)
 
 
-def create_server(deck: Path, host: str, port: int, *, verbose: bool = False) -> ThreadingHTTPServer:
+def create_server(deck: Path, host: str, port: int, *, verbose: bool = False, reload: bool = True) -> ThreadingHTTPServer:
     resolved = initialize_deck(deck)
     server = ThreadingHTTPServer((host, port), lambda *args, **kwargs: SlideHandler(*args, directory=APP_ROOT, **kwargs))
     server.project_root = resolved.parent  # type: ignore[attr-defined]
     server.deck_path = resolved  # type: ignore[attr-defined]
     server.verbose = verbose  # type: ignore[attr-defined]
+    server.reload = reload  # type: ignore[attr-defined]
     return server
 
 
@@ -368,20 +407,37 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--host", default="127.0.0.1", help="Address to bind (default: 127.0.0.1)")
     parser.add_argument("--port", type=int, default=8765, help="Port to use; 0 chooses an available port (default: 8765)")
     parser.add_argument("--verbose", action="store_true", help="Log HTTP requests")
+    reload_group = parser.add_mutually_exclusive_group()
+    reload_group.add_argument("--reload", dest="reload", action="store_true", default=True, help="Restart when Quarkfoil Python files change (default)")
+    reload_group.add_argument("--no-reload", dest="reload", action="store_false", help="Disable automatic server restarts")
     browser = parser.add_mutually_exclusive_group()
     browser.add_argument("--open", dest="open_browser", action="store_true", default=True, help="Open the editor in a browser (default)")
     browser.add_argument("--no-open", dest="open_browser", action="store_false", help="Start the server without opening a browser")
     args = parser.parse_args(arguments)
-    server = create_server(args.deck, args.host, args.port, verbose=args.verbose)
+    server = create_server(args.deck, args.host, args.port, verbose=args.verbose, reload=args.reload)
     url = f"http://{args.host}:{server.server_port}/"
     print(f"Quarkfoil: {args.deck.resolve()}")
     print(f"Open {url}")
-    if args.open_browser:
+    if args.open_browser and os.environ.get("QUARKFOIL_RELOADED") != "1":
         threading.Timer(0.35, lambda: webbrowser.open(url)).start()
+    reload_requested = threading.Event()
+    watcher_stop = threading.Event()
+    watcher = None
+    if args.reload:
+        watcher = threading.Thread(target=_watch_python_changes, args=(server, watcher_stop, reload_requested), daemon=True)
+        watcher.start()
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         pass
     finally:
+        watcher_stop.set()
         server.server_close()
+        if watcher:
+            watcher.join(timeout=1)
+    if reload_requested.is_set():
+        print("Quarkfoil changed; restarting…")
+        environment = os.environ.copy()
+        environment["QUARKFOIL_RELOADED"] = "1"
+        os.execve(sys.executable, [sys.executable, "-m", "scientific_slides", *arguments], environment)
     return 0
