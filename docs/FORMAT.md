@@ -165,6 +165,16 @@ J_{\mathrm{ex}} \sim \frac{t^2}{U}.
 
 Raw HTML is escaped and executable JavaScript is unsupported.
 
+GitHub-style Markdown tables are supported and receive theme-aware headers,
+rules, alternating rows, and colors:
+
+```markdown
+| Parameter | Value | Unit |
+|---|---:|---|
+| Tunnelling | 1.2 | kHz |
+| Interaction | 8.4 | kHz |
+```
+
 ## Images
 
 ```markdown
@@ -219,7 +229,8 @@ The available shapes are `rectangle`, `rounded-rectangle`, `ellipse`, `circle`,
 `diamond`, `hexagon`, `cloud`, `callout`, `sine`, and `cosine`. The trigonometric
 curves show one complete cycle from 0 to 2π. `fill` controls the
 background, `stroke` controls the outline or curve, and `stroke-width` controls
-its width. Set `shadow="true"` to enable a drop shadow. Default-valued shape
+its width. Shape geometry and labels have no implicit padding, so an overlay at
+a slide boundary reaches that boundary. Set `shadow="true"` to enable a drop shadow. Default-valued shape
 styles are normally omitted: rectangle, theme fill and stroke colors, line
 width `2`, centered label, and no shadow. Consequently, implicit shape colors
 follow the presentation theme while explicit `fill` and `stroke` values remain

@@ -162,7 +162,7 @@ Thought
   assert(calloutSurface.fill === "rgb(219, 239, 242)" && calloutSurface.stroke === "rgb(20, 108, 126)", "implicit shape colors inherit from the theme");
   assert(fixture.querySelectorAll(".shape-curve").length === 2, "sine and cosine render as scalable curves");
   const [sine, cosine] = fixture.querySelectorAll(".shape-curve");
-  assert(sine.getAttribute("d").startsWith("M5.00,50.00") && cosine.getAttribute("d").startsWith("M5.00,12.00"), "curves span a full cycle from zero phase");
+  assert(sine.getAttribute("d").startsWith("M0.00,50.00") && cosine.getAttribute("d").startsWith("M0.00,12.00"), "curves span a full cycle from zero phase without outer padding");
   fixture.remove();
 }
 
@@ -191,6 +191,18 @@ function assertThemes() {
   assert(dark.style.getPropertyValue("--slide-background") === "#101820" && dark.style.getPropertyValue("--slide-foreground") === "#f0f4f8", "slide colors override theme variables");
   deck = parseDeck(updateSlideProperties(deck, 1, { theme: null, background: null, foreground: null }));
   assert(!deck.slides[1].headingAttrs.values.theme && !deck.slides[1].headingAttrs.values.background, "inherited slide theme values do not occupy source state");
+}
+
+function assertTables() {
+  const fixture = document.createElement("div");
+  fixture.className = "reveal";
+  document.body.append(fixture);
+  const deck = parseDeck("## Data {.layout-1 theme=\"scientific-dark\"}\n\n::: core\n| Parameter | Value |\n|---|---:|\n| Tunnelling | 1.2 |\n| Interaction | 8.4 |\n:::\n");
+  renderDeck(deck, fixture, source => source);
+  const table = fixture.querySelector("table");
+  assert(table?.querySelectorAll("tbody tr").length === 2, "Markdown tables render with header and body rows");
+  assert(getComputedStyle(table.querySelector("th")).backgroundColor !== "rgba(0, 0, 0, 0)", "table headers receive theme-aware styling");
+  fixture.remove();
 }
 
 try {
@@ -258,6 +270,7 @@ try {
   assertShapes();
   assertCitations();
   assertThemes();
+  assertTables();
 
   let next = updateOverlay(deck, 0, "eq", { x: 51.5, y: 22, locked: "true" });
   assert(next.includes('x="51.5"'), "overlay geometry patches source");

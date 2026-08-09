@@ -8,6 +8,9 @@
   --shape-default-stroke: var(--accent);
   --font-sans: Aptos, "Segoe UI", Arial, sans-serif;
   --font-mono: "Cascadia Mono", Consolas, monospace;
+  --table-border: color-mix(in srgb, var(--slide-foreground), transparent 78%);
+  --table-header-background: color-mix(in srgb, var(--accent), var(--slide-background) 82%);
+  --table-stripe-background: color-mix(in srgb, var(--slide-foreground), transparent 96%);
 }
 
 .theme-scientific-dark {
@@ -20,4 +23,7 @@
   --shape-default-stroke: var(--accent);
   --font-sans: Aptos, "Segoe UI", Arial, sans-serif;
   --font-mono: "Cascadia Mono", Consolas, monospace;
+  --table-border: color-mix(in srgb, var(--slide-foreground), transparent 72%);
+  --table-header-background: color-mix(in srgb, var(--accent), var(--slide-background) 78%);
+  --table-stripe-background: color-mix(in srgb, var(--slide-foreground), transparent 94%);
 }

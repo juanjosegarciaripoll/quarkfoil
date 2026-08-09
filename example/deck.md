@@ -3,6 +3,7 @@ title: Quarkfoil Demonstration
 author: John Wick
 aspect-ratio: 16:9
 theme: scientific-light
+bibliography: references.bib
 assets:
   figures: figures
 defaults:
@@ -10,6 +11,8 @@ defaults:
 ---
 
 # Quarkfoil {.title-slide .layout-front}
+
+## *Scientific presentations as readable Markdown*
 
 ::: core
 **John Wick**
@@ -129,6 +132,79 @@ This annotation remains editable **Markdown**.
 
 ::: notes
 In Design mode, select and drag the equation or annotation. The underlying image is never modified.
+:::
+
+---
+
+## Native diagram shapes {.layout-0 theme="scientific-dark"}
+
+::: overlay {#thought type="shape" shape="cloud" x="7" y="20" w="28" h="24"}
+A hypothesis
+:::
+
+::: overlay {#model-step type="shape" shape="rounded-rectangle" x="39" y="22" w="25" h="18" shadow="true"}
+\(H_{\mathrm{eff}}\)
+:::
+
+::: overlay {#decision type="shape" shape="diamond" x="70" y="20" w="20" h="22"}
+Valid?
+:::
+
+::: overlay {#comment type="shape" shape="callout" x="8" y="56" w="27" h="25"}
+Markdown and $\LaTeX$
+:::
+
+::: overlay {#sine-wave type="shape" shape="sine" x="42" y="57" w="21" h="18"}
+
+:::
+
+::: overlay {#cosine-wave type="shape" shape="cosine" x="69" y="57" w="21" h="18"}
+
+:::
+
+---
+
+## Slide-local appearance {.layout-1 background="#2b1745" foreground="#f8f0ff"}
+
+::: core
+### Themes establish defaults
+
+This slide inherits the deck typography and accent palette, while its heading
+stores explicit background and foreground overrides.
+
+Click an empty part of the slide in Design mode to edit slide-wide Properties.
+Resetting a color removes it from the Markdown and restores theme inheritance.
+
+| Layer | Inherited | Slide override |
+|---|---:|---:|
+| Background | Theme | `#2b1745` |
+| Foreground | Theme | `#f8f0ff` |
+| Accent | Theme | — |
+:::
+
+---
+
+## Citations and attribution {.layout-1-1 columns="48 52"}
+
+::: left
+### Numbered citations
+
+Optical lattices provide a controlled setting for quantum many-body models
+[@bloch2008]. Repeated citations retain the same number [@bloch2008].
+
+Bibliography entries remain in a normal project-local BibTeX file.
+:::
+
+::: right
+![](figures/hardware-model.svg){fit=contain focus="50 50"}
+:::
+
+::: overlay {#attribution-label type="markdown" x="54" y="74" w="40" h="5" font-size="0.6em"}
+Positioned brief-reference example:
+:::
+
+::: overlay {#figure-attribution type="citation" key="bloch2008" display="brief" x="54" y="79" w="40" h="7" font-size="0.65em"}
+
 :::
 
 ---
