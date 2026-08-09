@@ -37,6 +37,7 @@ class ExporterTests(unittest.TestCase):
         self.assertEqual((output / "presentation.md").read_text(encoding="utf-8"), self.deck.read_text(encoding="utf-8"))
         self.assertTrue((output / "figures/diagram.svg").is_file())
         self.assertTrue((output / "quarkfoil/player.js").is_file())
+        self.assertTrue((output / "quarkfoil/shapes.js").is_file())
         self.assertTrue((output / "quarkfoil/vendor/katex/fonts/KaTeX_Main-Regular.woff2").is_file())
         self.assertIn("Reveal.js", (output / "THIRD_PARTY_LICENSES.txt").read_text(encoding="utf-8"))
 

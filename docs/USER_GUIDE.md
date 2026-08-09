@@ -67,6 +67,24 @@ centered and limited to 35% of the slide in its larger dimension; dropped
 images use the drop point instead and are kept inside the slide. Images placed
 in grid regions use the size of that region.
 
+## Shapes
+
+Choose a template from the Shape palette in Design mode, then use the adjacent
+button to add it to the current slide. The palette includes rectangles,
+ellipses, a circle, diamond, hexagon, thought cloud, comic callout, and sine and
+cosine curves covering one cycle from 0 to 2π.
+
+Shapes resize and move like other overlays. Their Properties include the
+template, background color, line color, line width, and an optional shadow.
+Default-valued styles are omitted from the Markdown source. Double-click a
+shape to edit its label as Markdown or LaTeX; the label is rendered
+independently of the SVG background so equations use the same KaTeX renderer as
+the rest of the presentation.
+
+Shapes without explicit background or line colors inherit those colors from
+the active presentation theme. Selecting a specific color creates a fixed
+override in the Markdown source.
+
 ## Saving and recovery
 
 The Save button and `Ctrl+S` write the Markdown file. Unsaved changes are identified in the toolbar. Local-server saves use a content hash to detect external modifications and an atomic replacement to avoid partial files.

@@ -145,13 +145,36 @@ J_{\mathrm{ex}} \sim \frac{t^2}{U}
 Attributes:
 
 - `#id`: stable identifier, unique within the slide.
-- `type`: `markdown`, `equation`, or `image`.
+- `type`: `markdown`, `equation`, `image`, or `shape`.
 - `x`, `y`, `w`, `h`: percentages of the full slide.
 - `z`: layer order.
 - `locked="true"`: prevent graphical movement.
 - `fragment`: zero-based Reveal fragment index.
 - `font-size`: relative `em` scale for Markdown and equations; the editor exposes `0.25em` through `3em`.
 - `align`: `left`, `center`, or `right`.
+
+### Shapes
+
+Shape overlays use trusted, scalable SVG templates with Markdown or KaTeX
+content rendered as a separate label:
+
+```markdown
+::: overlay {#idea type="shape" shape="cloud" x="12" y="24" w="30" h="22" fill="#fff3bf" stroke="#e67700" stroke-width="2" align="center"}
+\[
+E = mc^2
+\]
+:::
+```
+
+The available shapes are `rectangle`, `rounded-rectangle`, `ellipse`, `circle`,
+`diamond`, `hexagon`, `cloud`, `callout`, `sine`, and `cosine`. The trigonometric
+curves show one complete cycle from 0 to 2π. `fill` controls the
+background, `stroke` controls the outline or curve, and `stroke-width` controls
+its width. Set `shadow="true"` to enable a drop shadow. Default-valued shape
+styles are normally omitted: rectangle, theme fill and stroke colors, line
+width `2`, centered label, and no shadow. Consequently, implicit shape colors
+follow the presentation theme while explicit `fill` and `stroke` values remain
+fixed.
 
 ## Footer and notes
 

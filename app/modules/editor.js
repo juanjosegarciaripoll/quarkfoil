@@ -13,6 +13,24 @@ import { renderMarkdownPreview } from "./render.js";
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
 const round = value => Math.round(value * 10) / 10;
 
+function colorInputValue(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (/^#[0-9a-f]{6}$/.test(normalized)) return normalized;
+  if (/^#[0-9a-f]{3}$/.test(normalized)) return `#${[...normalized.slice(1)].map(character => character.repeat(2)).join("")}`;
+  const rgb = /^rgba?\(\s*(\d+)\D+(\d+)\D+(\d+)/.exec(normalized);
+  if (!rgb) return null;
+  return `#${rgb.slice(1, 4).map(component => Number(component).toString(16).padStart(2, "0")).join("")}`;
+}
+
+function resolvedThemeColor(container, variable) {
+  const probe = document.createElement("span");
+  probe.style.color = `var(${variable})`;
+  container.append(probe);
+  const color = colorInputValue(getComputedStyle(probe).color);
+  probe.remove();
+  return color;
+}
+
 const IMAGE_EXTENSIONS = {
   "image/gif": "gif",
   "image/jpeg": "jpg",
@@ -83,6 +101,7 @@ export class DesignEditor {
     this.stage = document.querySelector("#stage");
     this.properties = document.querySelector("#object-properties");
     this.imageProperties = document.querySelector("#image-properties");
+    this.shapeProperties = document.querySelector("#shape-properties");
     this.fontProperties = document.querySelector("#font-properties");
     this.noSelection = document.querySelector("#no-selection");
     this.dialog = document.querySelector("#content-dialog");
@@ -101,6 +120,7 @@ export class DesignEditor {
     document.querySelector("#add-text").addEventListener("click", () => this.addObject("markdown"));
     document.querySelector("#add-equation").addEventListener("click", () => this.addObject("equation"));
     document.querySelector("#add-image").addEventListener("click", () => document.querySelector("#image-input").click());
+    document.querySelector("#add-shape").addEventListener("click", () => this.addShape(document.querySelector("#shape-select").value));
     document.querySelector("#image-input").addEventListener("change", event => {
       this.addImage(event.target.files?.[0], null, this.selectedCell?.dataset.cellId || null);
       event.target.value = "";
@@ -136,6 +156,9 @@ export class DesignEditor {
     document.querySelector("#prop-fit").addEventListener("change", () => this.applyImageProperties());
     document.querySelector("#prop-focus-x").addEventListener("change", () => this.applyImageProperties());
     document.querySelector("#prop-focus-y").addEventListener("change", () => this.applyImageProperties());
+    for (const id of ["shape", "shape-fill", "shape-stroke", "shape-stroke-width", "shape-shadow"]) {
+      document.querySelector(`#prop-${id}`).addEventListener("change", () => this.applyShapeProperties());
+    }
     document.querySelector("#prop-font-size").addEventListener("input", event => this.previewFontSize(event.target.value));
     document.querySelector("#prop-font-size").addEventListener("change", () => this.applyFontSize());
     document.querySelectorAll(".alignment-buttons [data-align]").forEach(button => {
@@ -220,6 +243,7 @@ export class DesignEditor {
     this.selectedCell = null;
     this.properties.hidden = true;
     this.imageProperties.hidden = true;
+    this.shapeProperties.hidden = true;
     this.fontProperties.hidden = true;
     this.noSelection.hidden = false;
     this.noSelection.textContent = "Select an overlay or cell.";
@@ -240,6 +264,15 @@ export class DesignEditor {
       document.querySelector("#prop-focus-x").value = focus[0] || 50;
       document.querySelector("#prop-focus-y").value = focus[1] || 50;
     } else {
+      if (object.type === "shape") {
+        this.shapeProperties.hidden = false;
+        document.querySelector("#prop-shape").value = object.shape;
+        const surfaceStyle = getComputedStyle(element.querySelector(".shape-surface"));
+        document.querySelector("#prop-shape-fill").value = colorInputValue(surfaceStyle.fill) || "#dbeff2";
+        document.querySelector("#prop-shape-stroke").value = colorInputValue(surfaceStyle.stroke) || "#146c7e";
+        document.querySelector("#prop-shape-stroke-width").value = object.strokeWidth;
+        document.querySelector("#prop-shape-shadow").checked = object.shadow;
+      }
       this.fontProperties.hidden = false;
       document.querySelector("#prop-font-size").value = object.fontSize;
       this.updateFontSizeOutput(object.fontSize);
@@ -382,12 +415,29 @@ export class DesignEditor {
     else this.commit(setCellContent(this.options.getDeck(), this.slideIndex(), object.id, body));
   }
 
+  applyShapeProperties() {
+    if (!this.selected || this.selected.dataset.objectType !== "shape") return;
+    const shape = document.querySelector("#prop-shape").value;
+    const fill = document.querySelector("#prop-shape-fill").value;
+    const stroke = document.querySelector("#prop-shape-stroke").value;
+    const strokeWidth = Number(document.querySelector("#prop-shape-stroke-width").value);
+    const defaultFill = resolvedThemeColor(this.section(), "--shape-default-fill");
+    const defaultStroke = resolvedThemeColor(this.section(), "--shape-default-stroke");
+    this.commit(updateOverlay(this.options.getDeck(), this.slideIndex(), this.selected.dataset.objectId, {
+      shape: shape === "rectangle" ? null : shape,
+      fill: fill === defaultFill ? null : fill,
+      stroke: stroke === defaultStroke ? null : stroke,
+      "stroke-width": strokeWidth === 2 ? null : strokeWidth,
+      shadow: document.querySelector("#prop-shape-shadow").checked ? "true" : null,
+    }));
+  }
+
   openContentDialog() {
     if (!this.selected) return;
     const object = this.slide().overlays.find(item => item.id === this.selected.dataset.objectId);
     if (!object || object.type === "image") return;
     this.dialogTarget = { kind: "overlay", id: object.id };
-    document.querySelector("#content-dialog-title").textContent = object.type === "equation" ? "Edit LaTeX" : "Edit Markdown";
+    document.querySelector("#content-dialog-title").textContent = object.type === "equation" ? "Edit LaTeX" : object.type === "shape" ? "Edit shape label" : "Edit Markdown";
     this.contentEditor.value = object.source;
     renderMarkdownPreview(object.source, this.preview);
     this.dialog.showModal();
@@ -437,6 +487,21 @@ export class DesignEditor {
     const id = this.uniqueId(`${base}-${this.slideIndex() + 1}`);
     const content = type === "equation" ? "\\[\nE = \\hbar \\omega\n\\]" : "Editable **Markdown**";
     this.commit(insertOverlay(deck, this.slideIndex(), { type, content, id }));
+  }
+
+  addShape(shape) {
+    const id = this.uniqueId(`${shape}-${this.slideIndex() + 1}`);
+    const content = ["sine", "cosine"].includes(shape) ? "" : "Editable **label**";
+    this.commit(insertOverlay(this.options.getDeck(), this.slideIndex(), {
+      type: "shape",
+      content,
+      id,
+      x: 35,
+      y: 35,
+      w: 30,
+      h: 20,
+      attributes: shape === "rectangle" ? {} : { shape },
+    }));
   }
 
   async addImage(file, position = null, cellId = null) {

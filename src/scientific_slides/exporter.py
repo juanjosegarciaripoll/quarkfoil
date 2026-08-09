@@ -16,6 +16,7 @@ from .server import APP_ROOT, _inside
 EXPORT_FILES = {
     "modules/parser.js": "quarkfoil/parser.js",
     "modules/render.js": "quarkfoil/render.js",
+    "modules/shapes.js": "quarkfoil/shapes.js",
     "modules/player.js": "quarkfoil/player.js",
     "styles/theme.css": "quarkfoil/theme.css",
     "styles/player.css": "quarkfoil/player.css",

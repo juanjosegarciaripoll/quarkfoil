@@ -1,4 +1,5 @@
 import { escapeHtml } from "./parser.js";
+import { makeShapeSvg } from "./shapes.js";
 
 function markdown(source) {
   try {
@@ -55,6 +56,17 @@ function makeImage(image, assetResolver) {
 
 function fillContent(container, item, assetResolver) {
   if (item.type === "image" && item.image) container.append(makeImage(item.image, assetResolver));
+  else if (item.type === "shape") {
+    container.dataset.shape = item.shape;
+    container.dataset.shadow = String(item.shadow);
+    if (item.fill) container.style.setProperty("--shape-fill", item.fill);
+    if (item.stroke) container.style.setProperty("--shape-stroke", item.stroke);
+    container.style.setProperty("--shape-stroke-width", String(item.strokeWidth));
+    const label = document.createElement("div");
+    label.className = "shape-label";
+    label.innerHTML = markdown(item.source);
+    container.append(makeShapeSvg(item.shape), label);
+  }
   else container.innerHTML = markdown(item.source);
 }
 

@@ -81,7 +81,7 @@ button.active { background: #146c7e; border-color: #56cfe1; }
 .properties label { display: grid; grid-template-columns: 72px 1fr; align-items: center; gap: 0.4rem; font-size: 0.78rem; }
 .properties label.check { display: flex; }
 .properties input, .properties select { min-width: 0; padding: 0.25rem; }
-#image-properties { margin-top: 0.7rem; padding-top: 0.7rem; border-top: 1px solid #3d454e; }
+#image-properties, #shape-properties { margin-top: 0.7rem; padding-top: 0.7rem; border-top: 1px solid #3d454e; }
 #font-properties { margin-top: 0.7rem; padding-top: 0.7rem; border-top: 1px solid #3d454e; }
 .range-with-value { display: grid; grid-template-columns: minmax(0, 1fr) 3.8rem; align-items: center; gap: 0.35rem; }
 .range-with-value output { color: #cbd3da; font-size: 0.75rem; text-align: right; }

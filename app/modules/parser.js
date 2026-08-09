@@ -1,3 +1,5 @@
+import { SHAPES } from "./shapes.js";
+
 const LAYOUTS = new Set(["1", "1-1", "1-2", "2-1", "0", "front", "free"]);
 const CELL_NAMES = new Set(["core", "left", "right", "top-left", "bottom-left", "top-right", "bottom-right"]);
 
@@ -204,7 +206,8 @@ function parseSlide(source, range, index, diagnostics) {
       const type = block.attrs.values.type || (image ? "image" : "markdown");
       const id = block.attrs.id || `overlay-${index + 1}-${overlays.length + 1}`;
       if (!block.attrs.id) diagnostics.push({ level: "warning", slide: index + 1, message: `Overlay '${id}' has no stable source ID` });
-      const alignment = block.attrs.values.align || (type === "equation" ? "center" : "left");
+      const alignment = block.attrs.values.align || (["equation", "shape"].includes(type) ? "center" : "left");
+      const shape = block.attrs.values.shape || "rectangle";
       overlays.push({
         id,
         type,
@@ -223,6 +226,11 @@ function parseSlide(source, range, index, diagnostics) {
         alignment,
         fragment: block.attrs.values.fragment ? Number(block.attrs.values.fragment) : null,
         locked: block.attrs.values.locked === "true",
+        shape,
+        fill: block.attrs.values.fill || null,
+        stroke: block.attrs.values.stroke || null,
+        strokeWidth: Number(block.attrs.values["stroke-width"] ?? 2),
+        shadow: block.attrs.values.shadow === "true",
       });
     } else if (block.name === "footer") footer = { source: block.body, range: block.range };
     else if (block.name === "notes") notes = block.body;
@@ -245,6 +253,8 @@ function parseSlide(source, range, index, diagnostics) {
     if (values.some(value => !Number.isFinite(value))) diagnostics.push({ level: "error", slide: index + 1, message: `Overlay '${overlay.id}' has invalid geometry` });
     if (!Number.isFinite(overlay.fontSize) || overlay.fontSize <= 0) diagnostics.push({ level: "error", slide: index + 1, message: `Overlay '${overlay.id}' has invalid font size` });
     if (!["left", "center", "right"].includes(overlay.alignment)) diagnostics.push({ level: "error", slide: index + 1, message: `Overlay '${overlay.id}' has invalid alignment` });
+    if (overlay.type === "shape" && !Object.hasOwn(SHAPES, overlay.shape)) diagnostics.push({ level: "error", slide: index + 1, message: `Overlay '${overlay.id}' has unknown shape '${overlay.shape}'` });
+    if (overlay.type === "shape" && (!Number.isFinite(overlay.strokeWidth) || overlay.strokeWidth < 0)) diagnostics.push({ level: "error", slide: index + 1, message: `Overlay '${overlay.id}' has invalid stroke width` });
   }
   return {
     index,
@@ -414,10 +424,11 @@ export function setCellContent(deck, slideIndex, cellId, content) {
   return patchRange(deck.source, slide.range.end, slide.range.end, block);
 }
 
-export function insertOverlay(deck, slideIndex, { type, content, id, x = 35, y = 30, w = 30, h = 15 }) {
+export function insertOverlay(deck, slideIndex, { type, content, id, x = 35, y = 30, w = 30, h = 15, attributes = {} }) {
   const slide = deck.slides[slideIndex];
   const safeId = id.replace(/[^a-zA-Z0-9_-]/g, "-");
-  const block = `\n\n::: overlay {#${safeId} type=${JSON.stringify(type)} x="${x}" y="${y}" w="${w}" h="${h}"}\n${content.trim()}\n:::\n`;
+  const extra = Object.entries(attributes).map(([key, value]) => ` ${key}=${JSON.stringify(value)}`).join("");
+  const block = `\n\n::: overlay {#${safeId} type=${JSON.stringify(type)} x="${x}" y="${y}" w="${w}" h="${h}"${extra}}\n${content.trim()}\n:::\n`;
   return patchRange(deck.source, slide.range.end, slide.range.end, block);
 }
 

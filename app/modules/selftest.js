@@ -124,6 +124,48 @@ function assertEmptyLayouts() {
   fixture.remove();
 }
 
+function assertShapes() {
+  const fixture = document.createElement("div");
+  fixture.id = "layout-fixture";
+  fixture.className = "reveal";
+  fixture.style.setProperty("--shape-default-fill", "#abcdef");
+  fixture.style.setProperty("--shape-default-stroke", "#123456");
+  const slides = document.createElement("div");
+  slides.className = "slides";
+  fixture.append(slides);
+  document.body.append(fixture);
+  const parsed = parseDeck(`## Shapes {.layout-free}
+
+::: overlay {#cloud type="shape" shape="cloud" x="5" y="5" w="25" h="20" fill="#ffeecc" stroke="#112233" stroke-width="3" shadow="true"}
+Thought
+:::
+
+::: overlay {#callout type="shape" shape="callout" x="35" y="5" w="25" h="20"}
+\\(E=mc^2\\)
+:::
+
+::: overlay {#sine type="shape" shape="sine" x="5" y="35" w="40" h="25"}
+
+:::
+
+::: overlay {#cosine type="shape" shape="cosine" x="50" y="35" w="40" h="25"}
+
+:::`);
+  renderDeck(parsed, slides, source => source);
+  const cloud = fixture.querySelector('[data-object-id="cloud"]');
+  assert(parsed.slides[0].overlays[0].shape === "cloud", "shape kind parses");
+  assert(parsed.slides[0].overlays[0].fill === "#ffeecc" && parsed.slides[0].overlays[0].strokeWidth === 3, "shape styles parse");
+  assert(parsed.slides[0].overlays[0].shadow && cloud.dataset.shadow === "true", "shape shadow parses and renders");
+  assert(cloud.querySelector(".shape-background path") && cloud.querySelector(".shape-label").textContent.includes("Thought"), "cloud renders with a Markdown label");
+  assert(fixture.querySelector('[data-object-id="callout"] .katex'), "comic callout renders an equation label");
+  const calloutSurface = getComputedStyle(fixture.querySelector('[data-object-id="callout"] .shape-surface'));
+  assert(calloutSurface.fill === "rgb(171, 205, 239)" && calloutSurface.stroke === "rgb(18, 52, 86)", "implicit shape colors inherit from the theme");
+  assert(fixture.querySelectorAll(".shape-curve").length === 2, "sine and cosine render as scalable curves");
+  const [sine, cosine] = fixture.querySelectorAll(".shape-curve");
+  assert(sine.getAttribute("d").startsWith("M5.00,50.00") && cosine.getAttribute("d").startsWith("M5.00,12.00"), "curves span a full cycle from zero phase");
+  fixture.remove();
+}
+
 try {
   const clipboardPng = new File([new Uint8Array([137, 80, 78, 71])], "", { type: "image/png" });
   const pastedPng = clipboardImageFile({
@@ -153,6 +195,17 @@ try {
   assert(deck.slides[0].overlays[0].alignment === "right", "overlay alignment parses");
   assert(deck.slides[1].cells[0]?.range !== null, "ordinary core Markdown retains an editable range");
 
+  let defaultShapeSource = insertOverlay(deck, 0, { type: "shape", content: "Label", id: "default-shape", attributes: {} });
+  assert(!defaultShapeSource.includes("fill=") && !defaultShapeSource.includes("stroke=") && !defaultShapeSource.includes("shadow="), "new shapes omit default style attributes");
+  let defaultShapeDeck = parseDeck(defaultShapeSource);
+  const defaultShape = defaultShapeDeck.slides[0].overlays.find(item => item.id === "default-shape");
+  assert(defaultShape.shape === "rectangle" && defaultShape.alignment === "center" && !defaultShape.fill && !defaultShape.stroke && !defaultShape.shadow, "omitted shape styles resolve to theme defaults");
+  defaultShapeSource = updateOverlay(defaultShapeDeck, 0, "default-shape", { shadow: "true" });
+  assert(defaultShapeSource.includes('shadow="true"'), "enabled shape shadow serializes");
+  defaultShapeDeck = parseDeck(defaultShapeSource);
+  defaultShapeSource = updateOverlay(defaultShapeDeck, 0, "default-shape", { shadow: null });
+  assert(!defaultShapeSource.includes("shadow="), "disabled shape shadow returns to implicit default");
+
   const duplicated = parseDeck(duplicateSlide(deck, 0));
   assert(duplicated.slides.length === 3 && duplicated.slides[1].title === "First", "selected slide duplicates after itself");
   assert(duplicated.slides[1].overlays[0].id === "eq", "duplicated slide keeps slide-local overlay IDs");
@@ -175,6 +228,7 @@ try {
   assertCompoundLayout("2-1", ["top-left", "bottom-left", "right"], "right");
   assertFrontLayout();
   assertEmptyLayouts();
+  assertShapes();
 
   let next = updateOverlay(deck, 0, "eq", { x: 51.5, y: 22, locked: "true" });
   assert(next.includes('x="51.5"'), "overlay geometry patches source");
