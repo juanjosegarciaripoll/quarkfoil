@@ -1,6 +1,8 @@
 import { SHAPES } from "./shapes.js";
 
 const LAYOUTS = new Set(["1", "1-1", "1-2", "2-1", "0", "front", "free"]);
+export const THEMES = ["scientific-light", "scientific-dark"];
+const THEME_SET = new Set(THEMES);
 const CELL_NAMES = new Set(["core", "left", "right", "top-left", "bottom-left", "top-right", "bottom-right"]);
 
 export function escapeHtml(value) {
@@ -302,6 +304,15 @@ export function parseDeck(source) {
   const front = splitFrontMatter(source, diagnostics);
   const ranges = splitSlides(source, front.bodyStart);
   const slides = ranges.map((range, index) => parseSlide(source, range, index, diagnostics));
+  if (front.metadata.theme && !THEME_SET.has(String(front.metadata.theme))) diagnostics.push({ level: "warning", message: `Unknown deck theme '${front.metadata.theme}', using scientific-light` });
+  for (const slide of slides) {
+    const theme = slide.headingAttrs.values.theme;
+    if (theme && !THEME_SET.has(theme)) diagnostics.push({ level: "warning", slide: slide.index + 1, message: `Unknown theme '${theme}', using the deck theme` });
+    for (const name of ["background", "foreground"]) {
+      const color = slide.headingAttrs.values[name];
+      if (color && !/^#[0-9a-f]{6}$/i.test(color)) diagnostics.push({ level: "warning", slide: slide.index + 1, message: `Invalid ${name} color '${color}', using the theme color` });
+    }
+  }
   if (!slides.length) diagnostics.push({ level: "error", message: "The deck contains no slides" });
   const slideIds = slides.map(slide => slide.id);
   for (const id of new Set(slideIds.filter((value, index) => slideIds.indexOf(value) !== index))) {
@@ -402,6 +413,20 @@ export function updateHeadingLayout(deck, slideIndex, layout, columns, rows) {
   else delete attrs.values.rows;
   const hashes = slide.raw.match(/^\s*(#{1,6})/)?.[1] || "##";
   const replacement = `${hashes} ${slide.title} {${serializeAttributes(attrs)}}`;
+  return patchRange(deck.source, slide.headingRange.start, slide.headingRange.end, replacement);
+}
+
+export function updateSlideProperties(deck, slideIndex, changes) {
+  const slide = deck.slides[slideIndex];
+  if (!slide?.headingRange) throw new Error("Slide properties require a heading");
+  const attrs = structuredClone(slide.headingAttrs);
+  for (const [key, value] of Object.entries(changes)) {
+    if (value === null || value === "") delete attrs.values[key];
+    else attrs.values[key] = String(value);
+  }
+  const hashes = slide.raw.match(/^\s*(#{1,6})/)?.[1] || "##";
+  const attributes = serializeAttributes(attrs);
+  const replacement = `${hashes} ${slide.title}${attributes ? ` {${attributes}}` : ""}`;
   return patchRange(deck.source, slide.headingRange.start, slide.headingRange.end, replacement);
 }
 

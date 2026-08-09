@@ -68,8 +68,8 @@ button.active { background: #146c7e; border-color: #56cfe1; }
 .slide-sidebar button { display: block; min-width: 0; width: 100%; max-width: 100%; padding: 0.55rem; overflow: hidden; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
 .slide-sidebar button.current { border-color: #56cfe1; background: #29444b; }
 
-.stage { position: relative; min-width: 0; min-height: 0; background: #292f36; }
-.stage .reveal { width: 100%; height: 100%; }
+.stage { position: relative; min-width: 0; min-height: 0; background: #0f1216; }
+.stage .reveal { width: 100%; height: 100%; background: #0f1216; }
 .mode-design .stage .reveal { width: calc(100% - 36px); height: calc(100% - 36px); margin: 18px; }
 .mode-design .reveal .slides { outline: 1px solid #65717d; box-shadow: 0 12px 35px #0008; }
 
@@ -81,6 +81,10 @@ button.active { background: #146c7e; border-color: #56cfe1; }
 .properties label { display: grid; grid-template-columns: 72px 1fr; align-items: center; gap: 0.4rem; font-size: 0.78rem; }
 .properties label.check { display: flex; }
 .properties input, .properties select { min-width: 0; padding: 0.25rem; }
+.color-with-reset { display: grid; grid-template-columns: minmax(0, 1fr) 28px; gap: 0.3rem; }
+.color-with-reset input { width: 100%; height: 28px; padding: 1px; }
+.color-with-reset button { display: grid; place-items: center; min-width: 0; padding: 0; }
+#slide-color-state { color: #aab4bd; font-size: 0.72rem; line-height: 1.3; }
 #image-properties, #shape-properties { margin-top: 0.7rem; padding-top: 0.7rem; border-top: 1px solid #3d454e; }
 .image-source-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; }
 .image-source-actions button { display: grid; place-items: center; min-width: 0; }

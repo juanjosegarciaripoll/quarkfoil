@@ -6,7 +6,8 @@
   <title>Quarkfoil</title>
   <link rel="stylesheet" href="vendor/reveal/reveal.css">
   <link rel="stylesheet" href="vendor/katex/katex.min.css">
-  <link rel="stylesheet" href="styles/theme.css">
+  <link rel="stylesheet" href="styles/layout.css">
+  <link rel="stylesheet" href="styles/themes.css">
   <link rel="stylesheet" href="styles/app.css">
 </head>
 <body>
@@ -86,9 +87,25 @@
       </div>
     </section>
 
-    <aside id="properties" class="properties design-only" aria-label="Object properties">
+    <aside id="properties" class="properties design-only" aria-label="Properties">
       <h2>Properties</h2>
-      <div id="no-selection">Select an overlay or cell.</div>
+      <div id="no-selection" hidden></div>
+      <form id="slide-properties">
+        <label>Theme
+          <select id="prop-slide-theme">
+            <option value="">Deck default</option>
+            <option value="scientific-light">Scientific light</option>
+            <option value="scientific-dark">Scientific dark</option>
+          </select>
+        </label>
+        <label>Background
+          <span class="color-with-reset"><input id="prop-slide-background" type="color"><button id="reset-slide-background" type="button" title="Use theme background" aria-label="Use theme background">↺</button></span>
+        </label>
+        <label>Foreground
+          <span class="color-with-reset"><input id="prop-slide-foreground" type="color"><button id="reset-slide-foreground" type="button" title="Use theme foreground" aria-label="Use theme foreground">↺</button></span>
+        </label>
+        <small id="slide-color-state">Colors inherited from theme</small>
+      </form>
       <form id="object-properties" hidden>
         <label>ID <input id="prop-id" readonly></label>
         <label>X <input id="prop-x" type="number" step="0.1"></label>

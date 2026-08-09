@@ -11,6 +11,7 @@ import {
   updateHeadingLayout,
   updateOverlay,
   updateSlideTitle,
+  updateSlideProperties,
 } from "./parser.js";
 import { renderDeck } from "./render.js";
 import { clipboardImageFile, initialImageGeometry, renameClipboardImage } from "./editor.js";
@@ -129,8 +130,6 @@ function assertShapes() {
   const fixture = document.createElement("div");
   fixture.id = "layout-fixture";
   fixture.className = "reveal";
-  fixture.style.setProperty("--shape-default-fill", "#abcdef");
-  fixture.style.setProperty("--shape-default-stroke", "#123456");
   const slides = document.createElement("div");
   slides.className = "slides";
   fixture.append(slides);
@@ -160,7 +159,7 @@ Thought
   assert(cloud.querySelector(".shape-background path") && cloud.querySelector(".shape-label").textContent.includes("Thought"), "cloud renders with a Markdown label");
   assert(fixture.querySelector('[data-object-id="callout"] .katex'), "comic callout renders an equation label");
   const calloutSurface = getComputedStyle(fixture.querySelector('[data-object-id="callout"] .shape-surface'));
-  assert(calloutSurface.fill === "rgb(171, 205, 239)" && calloutSurface.stroke === "rgb(18, 52, 86)", "implicit shape colors inherit from the theme");
+  assert(calloutSurface.fill === "rgb(219, 239, 242)" && calloutSurface.stroke === "rgb(20, 108, 126)", "implicit shape colors inherit from the theme");
   assert(fixture.querySelectorAll(".shape-curve").length === 2, "sine and cosine render as scalable curves");
   const [sine, cosine] = fixture.querySelectorAll(".shape-curve");
   assert(sine.getAttribute("d").startsWith("M5.00,50.00") && cosine.getAttribute("d").startsWith("M5.00,12.00"), "curves span a full cycle from zero phase");
@@ -180,6 +179,18 @@ function assertCitations() {
   assert(fixture.querySelectorAll(".citation-number").length === 3, "inline and attribution citations render while code remains literal");
   assert(fixture.querySelector(".overlay-citation").textContent.includes("Smith et al."), "positioned citation renders a brief reference");
   fixture.remove();
+}
+
+function assertThemes() {
+  let deck = parseDeck("---\ntheme: scientific-light\n---\n\n## Light {.layout-1}\n\n---\n\n## Dark {.layout-1 theme=\"scientific-dark\" background=\"#101820\" foreground=\"#f0f4f8\"}\n");
+  const fixture = document.createElement("div");
+  renderDeck(deck, fixture, source => source);
+  const [light, dark] = fixture.querySelectorAll(".scientific-slide");
+  assert(light.classList.contains("theme-scientific-light"), "slide inherits the deck theme");
+  assert(dark.classList.contains("theme-scientific-dark"), "slide selects its own theme");
+  assert(dark.style.getPropertyValue("--slide-background") === "#101820" && dark.style.getPropertyValue("--slide-foreground") === "#f0f4f8", "slide colors override theme variables");
+  deck = parseDeck(updateSlideProperties(deck, 1, { theme: null, background: null, foreground: null }));
+  assert(!deck.slides[1].headingAttrs.values.theme && !deck.slides[1].headingAttrs.values.background, "inherited slide theme values do not occupy source state");
 }
 
 try {
@@ -246,6 +257,7 @@ try {
   assertEmptyLayouts();
   assertShapes();
   assertCitations();
+  assertThemes();
 
   let next = updateOverlay(deck, 0, "eq", { x: 51.5, y: 22, locked: "true" });
   assert(next.includes('x="51.5"'), "overlay geometry patches source");

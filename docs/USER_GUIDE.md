@@ -57,6 +57,14 @@ for a complete source example.
 - `Front page`: title in the upper half and details in the lower half.
 - `Free (nothing)`: no title, footer, or grid; only positioned overlays.
 
+## Slide appearance
+
+Click an empty part of the slide to show slide-wide Properties. Theme chooses
+the deck default, Scientific light, or Scientific dark for that slide.
+Background and Foreground create explicit color overrides; the reset buttons
+beside them remove those attributes and return to the theme colors. Omitted
+theme and color values do not occupy Markdown state.
+
 ## Images
 
 Image-only regions and image overlays support:

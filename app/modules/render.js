@@ -1,4 +1,4 @@
-import { escapeHtml } from "./parser.js";
+import { escapeHtml, THEMES } from "./parser.js";
 import { makeShapeSvg } from "./shapes.js";
 import { renderCitation } from "./bibliography.js";
 
@@ -103,13 +103,20 @@ function findCell(slide, name) {
 
 function renderSlide(slide, metadata, assetResolver, bibliography) {
   const section = document.createElement("section");
-  section.className = `scientific-slide layout-${slide.layout}`;
+  const deckTheme = THEMES.includes(String(metadata?.theme)) ? String(metadata.theme) : "scientific-light";
+  const requestedTheme = slide.headingAttrs.values.theme;
+  const theme = THEMES.includes(requestedTheme) ? requestedTheme : deckTheme;
+  section.className = `scientific-slide layout-${slide.layout} theme-${theme}`;
   section.dataset.slideIndex = String(slide.index);
   section.dataset.slideId = slide.id;
   section.style.setProperty("--column-a", `${slide.columns[0]}fr`);
   section.style.setProperty("--column-b", `${slide.columns[1]}fr`);
   section.style.setProperty("--row-a", `${slide.rows[0]}fr`);
   section.style.setProperty("--row-b", `${slide.rows[1]}fr`);
+  for (const [attribute, variable] of [["background", "--slide-background"], ["foreground", "--slide-foreground"]]) {
+    const color = slide.headingAttrs.values[attribute];
+    if (/^#[0-9a-f]{6}$/i.test(color || "")) section.style.setProperty(variable, color);
+  }
 
   const frame = document.createElement("div");
   frame.className = "slide-frame";

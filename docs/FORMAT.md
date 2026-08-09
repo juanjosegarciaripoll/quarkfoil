@@ -27,13 +27,14 @@ The supported preface fields are:
 | `title` | Presentation title and exported browser-page title | `New presentation` for a generated starter |
 | `author` | Presentation author metadata | Empty, except in a generated starter |
 | `aspect-ratio` | Intended slide aspect ratio | `16:9` |
-| `theme` | Presentation theme identifier | `scientific-light` |
+| `theme` | Default presentation theme (`scientific-light` or `scientific-dark`) | `scientific-light` |
 | `defaults.footer` | Markdown footer inherited by slides | Empty |
 | `assets.figures` | Folder used for newly imported images | `figures` |
 | `assets.include` | Additional folders copied completely during static export | Empty list |
 | `bibliography` | Project-relative BibTeX bibliography | `references.bib` in the editor |
 
-The current renderer uses a 16:9 canvas and the bundled scientific theme.
+The current renderer uses a 16:9 canvas. Layout behavior is defined separately
+from the bundled visual themes.
 `defaults.footer` supplies Markdown shown on slides without a slide-specific
 footer. A heading attribute `footer="none"` suppresses it.
 
@@ -130,6 +131,25 @@ Markdown for the left region.
 ```
 
 Valid region names are `core`, `left`, `right`, `top-left`, `bottom-left`, `top-right`, and `bottom-right`, according to the selected layout.
+
+### Per-slide themes and colors
+
+A slide inherits the deck's front-matter theme unless its heading selects one:
+
+```markdown
+## Dark interlude {.layout-1 theme="scientific-dark"}
+```
+
+The bundled choices are `scientific-light` and `scientific-dark`. A slide may
+also override its background and foreground colors independently:
+
+```markdown
+## Highlight {.layout-1 background="#402060" foreground="#ffffff"}
+```
+
+Resolution is explicit slide color, then slide theme, then deck theme, then
+`scientific-light`. Removing an override restores inheritance. Theme defaults
+also supply accent, muted, font, citation, and implicit shape colors.
 
 ## Markdown and equations
 

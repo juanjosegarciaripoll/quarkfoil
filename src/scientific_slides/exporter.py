@@ -19,7 +19,8 @@ EXPORT_FILES = {
     "modules/shapes.js": "quarkfoil/shapes.js",
     "modules/bibliography.js": "quarkfoil/bibliography.js",
     "modules/player.js": "quarkfoil/player.js",
-    "styles/theme.css": "quarkfoil/theme.css",
+    "styles/layout.css": "quarkfoil/layout.css",
+    "styles/themes.css": "quarkfoil/themes.css",
     "styles/player.css": "quarkfoil/player.css",
 }
 
@@ -247,7 +248,8 @@ def _index_html(assets: str) -> str:
   <meta http-equiv="Content-Security-Policy" content="{html.escape(policy, quote=True)}">
   <title>Quarkfoil presentation</title>
 {styles}
-  <link rel="stylesheet" href="quarkfoil/theme.css">
+  <link rel="stylesheet" href="quarkfoil/layout.css">
+  <link rel="stylesheet" href="quarkfoil/themes.css">
   <link rel="stylesheet" href="quarkfoil/player.css">
 </head>
 <body>

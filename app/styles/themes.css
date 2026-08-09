@@ -1,0 +1,23 @@
+.theme-scientific-light {
+  --slide-background: #fbfcfd;
+  --slide-foreground: #17202a;
+  --accent: #146c7e;
+  --accent-soft: #dbeff2;
+  --muted: #66737d;
+  --shape-default-fill: var(--accent-soft);
+  --shape-default-stroke: var(--accent);
+  --font-sans: Aptos, "Segoe UI", Arial, sans-serif;
+  --font-mono: "Cascadia Mono", Consolas, monospace;
+}
+
+.theme-scientific-dark {
+  --slide-background: #17202a;
+  --slide-foreground: #f1f3f5;
+  --accent: #56cfe1;
+  --accent-soft: #23434a;
+  --muted: #adb5bd;
+  --shape-default-fill: var(--accent-soft);
+  --shape-default-stroke: var(--accent);
+  --font-sans: Aptos, "Segoe UI", Arial, sans-serif;
+  --font-mono: "Cascadia Mono", Consolas, monospace;
+}

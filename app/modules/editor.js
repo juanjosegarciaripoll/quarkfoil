@@ -7,6 +7,7 @@ import {
   updateHeadingLayout,
   updateOverlay,
   updateSlideTitle,
+  updateSlideProperties,
 } from "./parser.js";
 import { renderMarkdownPreview } from "./render.js";
 
@@ -100,6 +101,7 @@ export class DesignEditor {
     this.dialogTarget = null;
     this.stage = document.querySelector("#stage");
     this.properties = document.querySelector("#object-properties");
+    this.slideProperties = document.querySelector("#slide-properties");
     this.imageProperties = document.querySelector("#image-properties");
     this.shapeProperties = document.querySelector("#shape-properties");
     this.fontProperties = document.querySelector("#font-properties");
@@ -118,6 +120,11 @@ export class DesignEditor {
     document.addEventListener("keydown", event => this.onKeyDown(event));
     document.addEventListener("paste", event => this.onPaste(event));
     document.querySelector("#layout-select").addEventListener("change", event => this.changeLayout(event.target.value));
+    document.querySelector("#prop-slide-theme").addEventListener("change", event => this.applySlideProperties({ theme: event.target.value || null }));
+    document.querySelector("#prop-slide-background").addEventListener("change", event => this.applySlideProperties({ background: event.target.value }));
+    document.querySelector("#prop-slide-foreground").addEventListener("change", event => this.applySlideProperties({ foreground: event.target.value }));
+    document.querySelector("#reset-slide-background").addEventListener("click", () => this.applySlideProperties({ background: null }));
+    document.querySelector("#reset-slide-foreground").addEventListener("click", () => this.applySlideProperties({ foreground: null }));
     document.querySelector("#add-text").addEventListener("click", () => this.addObject("markdown"));
     document.querySelector("#add-equation").addEventListener("click", () => this.addObject("equation"));
     document.querySelector("#add-image").addEventListener("click", () => {
@@ -224,6 +231,7 @@ export class DesignEditor {
 
   selectOverlay(element) {
     this.clearSelection();
+    this.slideProperties.hidden = true;
     this.selected = element;
     element.classList.add("selected-object");
     for (const corner of ["nw", "ne", "se", "sw"]) {
@@ -235,13 +243,14 @@ export class DesignEditor {
     this.noSelection.hidden = true;
     this.properties.hidden = false;
     const object = this.slide().overlays.find(item => item.id === element.dataset.objectId);
-    this.fillProperties(object);
+    this.fillProperties(object, element);
     document.querySelector("#duplicate-object").disabled = false;
     document.querySelector("#delete-object").disabled = false;
   }
 
   selectCell(element) {
     this.clearSelection();
+    this.slideProperties.hidden = true;
     this.selectedCell = element;
     element.classList.add("selected-cell");
     const cell = this.slide().cells.find(item => item.id === element.dataset.cellId);
@@ -264,14 +273,33 @@ export class DesignEditor {
     this.imageProperties.hidden = true;
     this.shapeProperties.hidden = true;
     this.fontProperties.hidden = true;
-    this.noSelection.hidden = false;
-    this.noSelection.textContent = "Select an overlay or cell.";
+    this.noSelection.hidden = true;
+    this.slideProperties.hidden = false;
     document.querySelector("#edit-content").hidden = false;
     document.querySelector("#duplicate-object").disabled = true;
     document.querySelector("#delete-object").disabled = true;
+    this.fillSlideProperties();
   }
 
-  fillProperties(object) {
+  fillSlideProperties() {
+    const slide = this.slide();
+    const section = this.section();
+    if (!slide || !section) return;
+    const style = getComputedStyle(section);
+    document.querySelector("#prop-slide-theme").value = slide.headingAttrs.values.theme || "";
+    document.querySelector("#prop-slide-background").value = colorInputValue(style.getPropertyValue("--slide-background")) || "#fbfcfd";
+    document.querySelector("#prop-slide-foreground").value = colorInputValue(style.getPropertyValue("--slide-foreground")) || "#17202a";
+    const overrides = ["background", "foreground"].filter(name => slide.headingAttrs.values[name]);
+    document.querySelector("#slide-color-state").textContent = overrides.length
+      ? `Explicit ${overrides.join(" and ")} override${overrides.length === 1 ? "" : "s"}`
+      : "Colors inherited from theme";
+  }
+
+  applySlideProperties(changes) {
+    this.commit(updateSlideProperties(this.options.getDeck(), this.slideIndex(), changes));
+  }
+
+  fillProperties(object, element) {
     if (!object) return;
     document.querySelector("#prop-id").value = object.id;
     for (const key of ["x", "y", "w", "h", "z"]) document.querySelector(`#prop-${key}`).value = object.geometry[key];

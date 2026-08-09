@@ -31,7 +31,8 @@ lecture-site/
     ├── player.js
     ├── parser.js
     ├── render.js
-    ├── theme.css
+    ├── layout.css
+    ├── themes.css
     └── vendor/
 ```
 
