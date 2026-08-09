@@ -51,6 +51,12 @@ function safeAssetPath(source) {
   return source.replaceAll("\\", "/").split("/").map(part => encodeURIComponent(part)).join("/");
 }
 
+function titleMarkdown(source) {
+  return String(source || "").split(/\r?\n/).map(line =>
+    line.trim() ? markdown(line) : '<div class="slide-title-spacer" aria-hidden="true"></div>',
+  ).join("");
+}
+
 function makeImage(image, assetResolver) {
   const img = document.createElement("img");
   img.className = "slide-image";
@@ -108,10 +114,10 @@ function renderSlide(slide, metadata, assetResolver, bibliography) {
   const frame = document.createElement("div");
   frame.className = "slide-frame";
 
-  if (slide.title) {
-    const title = document.createElement(slide.layout === "front" || slide.headingAttrs.classes.includes("title-slide") ? "h1" : "h2");
+  if (slide.titleSource) {
+    const title = document.createElement("div");
     title.className = "slide-title";
-    title.innerHTML = markdown(slide.title).replace(/^<p>|<\/p>\s*$/g, "");
+    title.innerHTML = titleMarkdown(slide.titleSource);
     frame.append(title);
   } else section.classList.add("no-title");
 

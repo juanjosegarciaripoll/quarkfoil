@@ -128,7 +128,7 @@ export class DesignEditor {
     document.querySelector("#duplicate-object").addEventListener("click", () => this.duplicate());
     document.querySelector("#delete-object").addEventListener("click", () => this.remove());
     document.querySelector("#edit-content").addEventListener("click", () => this.openContentDialog());
-    this.contentEditor.addEventListener("input", () => renderMarkdownPreview(this.contentEditor.value, this.preview));
+    this.contentEditor.addEventListener("input", () => this.updateContentPreview());
     this.dialog.addEventListener("keydown", event => {
       if (event.key === "Escape") {
         event.preventDefault();
@@ -172,6 +172,13 @@ export class DesignEditor {
   slideIndex() { return this.options.getSlideIndex(); }
   slide() { return this.options.getDeck().slides[this.slideIndex()]; }
   section() { return document.querySelector(`.scientific-slide[data-slide-index="${this.slideIndex()}"]`); }
+
+  updateContentPreview() {
+    const source = this.dialogTarget?.kind === "title"
+      ? this.contentEditor.value.replace(/\r?\n/g, "  \n")
+      : this.contentEditor.value;
+    renderMarkdownPreview(source, this.preview);
+  }
 
   refresh() {
     this.clearSelection();
@@ -447,16 +454,18 @@ export class DesignEditor {
     if (!this.selectedCell) return;
     const id = this.selectedCell.dataset.cellId;
     const cell = this.slide().cells.find(item => item.id === id);
-    if (!cell?.range || cell.type === "image") {
-      this.noSelection.textContent = cell?.type === "image"
-        ? `Image cell: use the controls below or drop a replacement image.`
-        : `This mixed core content must be edited in Source mode.`;
+    if (cell?.type === "image") {
+      this.noSelection.textContent = `Image cell: use the controls below or drop a replacement image.`;
+      return;
+    }
+    if (cell && !cell.range && cell.source.trim()) {
+      this.noSelection.textContent = `This mixed core content must be edited in Source mode.`;
       return;
     }
     this.dialogTarget = { kind: "cell", id };
     document.querySelector("#content-dialog-title").textContent = `Edit ${id} Markdown`;
-    this.contentEditor.value = cell.source;
-    renderMarkdownPreview(cell.source, this.preview);
+    this.contentEditor.value = cell?.source || "";
+    renderMarkdownPreview(cell?.source || "", this.preview);
     this.dialog.showModal();
   }
 
@@ -466,8 +475,8 @@ export class DesignEditor {
     this.clearSelection();
     this.dialogTarget = { kind: "title", id: slide.id };
     document.querySelector("#content-dialog-title").textContent = "Edit slide title";
-    this.contentEditor.value = slide.title;
-    renderMarkdownPreview(slide.title, this.preview);
+    this.contentEditor.value = slide.titleSource;
+    this.updateContentPreview();
     this.dialog.showModal();
   }
 
@@ -475,6 +484,8 @@ export class DesignEditor {
     if (!this.dialogTarget) return;
     const next = this.dialogTarget.kind === "title"
       ? updateSlideTitle(this.options.getDeck(), this.slideIndex(), this.contentEditor.value)
+      : this.dialogTarget.kind === "cell"
+        ? setCellContent(this.options.getDeck(), this.slideIndex(), this.dialogTarget.id, this.contentEditor.value)
       : updateBlockContent(this.options.getDeck(), this.slideIndex(), this.dialogTarget.id, this.contentEditor.value);
     this.dialog.close();
     this.dialogTarget = null;

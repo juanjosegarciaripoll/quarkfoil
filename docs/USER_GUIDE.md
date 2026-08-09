@@ -40,6 +40,12 @@ Present hides the editor chrome and enables normal Reveal.js navigation. Press `
 The left sidebar selects slides. Its top controls add a blank slide with the current layout, duplicate the selected slide, or delete it. The bottom controls move the selected slide up or down.
 
 Double-click a sidebar title to rename a slide. This is especially useful for Free slides, whose organizational title is hidden on the canvas.
+The title editor exposes Markdown headings while hiding the structural `{...}`
+attributes. Use `#`, `##`, and smaller heading levels on consecutive lines to
+create differently sized title lines. Quarkfoil restores the attributes to the
+first heading when applying the edit. Leave an empty line between headings to
+add vertical space between them. See [Title Markdown and spacing](FORMAT.md#title-markdown-and-spacing)
+for a complete source example.
 
 ## Layouts
 

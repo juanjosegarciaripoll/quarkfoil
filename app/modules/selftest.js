@@ -252,9 +252,23 @@ try {
   assert(next.includes("E=mc^2"), "overlay patch preserves content");
   deck = parseDeck(next);
 
-  next = updateSlideTitle(deck, 0, "Edited title");
+  next = updateSlideTitle(deck, 0, "## Edited title");
   assert(next.includes('## Edited title {.layout-1-2'), "title patches without losing layout attributes");
   deck = parseDeck(next);
+
+  next = updateSlideTitle(deck, 0, "# First line\n\n### Second line");
+  assert(next.includes("# First line {.layout-1-2") && next.includes("### Second line"), "multiline title preserves heading levels and layout attributes");
+  assert(next.includes("### Second line\n\n::: left"), "multiline title remains separated from the first content block");
+  const titleFixture = document.createElement("div");
+  renderDeck(parseDeck(next), titleFixture, source => source);
+  assert(titleFixture.querySelector(".slide-title h1") && titleFixture.querySelector(".slide-title h3"), "multiline title renders as separate headings");
+  assert(titleFixture.querySelector(".slide-title-spacer"), "blank title line renders as vertical space");
+  deck = parseDeck(next);
+
+  const tightFront = parseDeck("# Front {.layout-front}\n::: core\nDetails\n:::\n");
+  const editedFront = updateSlideTitle(tightFront, 0, "# Front\n## *A simple roadmap*");
+  assert(editedFront.includes("## *A simple roadmap*\n::: core"), "title editing preserves an adjacent core directive boundary");
+  assert(parseDeck(editedFront).slides[0].cells.some(cell => cell.id === "core" && cell.source === "Details"), "adjacent core directive remains parsed as content");
 
   next = updateBlockContent(deck, 0, "eq", "\\[F=ma\\]");
   assert(next.includes("F=ma"), "block content patches source");

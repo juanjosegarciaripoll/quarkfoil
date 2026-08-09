@@ -173,7 +173,9 @@ function parseSlide(source, range, index, diagnostics) {
   let title = "";
   let headingRange = null;
   let headingAttrs = parseAttributes("");
-  const heading = /^\s*(#{1,2})\s+([^\r\n]+)\r?\n?/.exec(raw);
+  const heading = /^\s*(#{1,6})\s+([^\r\n]+)\r?\n?/.exec(raw);
+  let titleRange = null;
+  let titleSource = "";
   if (heading) {
     let headingText = heading[2].trim();
     const attrMatch = /\s+\{([^}]*)\}\s*$/.exec(headingText);
@@ -183,7 +185,26 @@ function parseSlide(source, range, index, diagnostics) {
     }
     title = headingText;
     headingRange = { start: range.start + heading.index, end: range.start + heading.index + heading[0].replace(/\r?\n$/, "").length };
-    contentStart = range.start + heading[0].length;
+    const titleLines = [`${heading[1]} ${headingText}`];
+    let titleEnd = heading[0].length;
+    let scan = heading[0].length;
+    let pendingWhitespace = "";
+    while (scan < raw.length) {
+      const line = /^[^\r\n]*(?:\r?\n|$)/.exec(raw.slice(scan))?.[0] || "";
+      if (!line) break;
+      const text = line.replace(/\r?\n$/, "");
+      if (!text.trim()) pendingWhitespace += line;
+      else if (/^\s*#{1,6}\s+\S/.test(text)) {
+        if (pendingWhitespace) titleLines.push(...Array(pendingWhitespace.match(/\r?\n/g)?.length || 1).fill(""));
+        titleLines.push(text.trim());
+        titleEnd = scan + line.length;
+        pendingWhitespace = "";
+      } else break;
+      scan += line.length;
+    }
+    titleRange = { start: range.start + heading.index, end: range.start + titleEnd };
+    titleSource = titleLines.join("\n");
+    contentStart = range.start + titleEnd;
   }
   const layoutClass = headingAttrs.classes.find(cls => cls.startsWith("layout-"));
   let layout = layoutClass ? layoutClass.slice(7) : "1";
@@ -263,6 +284,8 @@ function parseSlide(source, range, index, diagnostics) {
     raw,
     range,
     headingRange,
+    titleRange,
+    titleSource,
     headingAttrs,
     layout,
     columns: parseRatio(headingAttrs.values.columns),
@@ -306,7 +329,7 @@ function duplicateSlideSource(deck, slide) {
   while (usedIds.has(id)) id = `${base}-${counter++}`;
   const attrs = structuredClone(slide.headingAttrs);
   attrs.id = id;
-  const hashes = slide.raw.match(/^\s*(#{1,2})/)?.[1] || "##";
+  const hashes = slide.raw.match(/^\s*(#{1,6})/)?.[1] || "##";
   const heading = `${hashes} ${slide.title} {${serializeAttributes(attrs)}}`;
   return patchRange(
     slide.raw,
@@ -319,7 +342,7 @@ function duplicateSlideSource(deck, slide) {
 function blankSlideSource(slide) {
   const attrs = structuredClone(slide.headingAttrs);
   attrs.id = "";
-  const hashes = slide.raw.match(/^\s*(#{1,2})/)?.[1] || "##";
+  const hashes = slide.raw.match(/^\s*(#{1,6})/)?.[1] || "##";
   const attributes = serializeAttributes(attrs);
   const cellsByLayout = {
     "1": ["core"],
@@ -377,7 +400,7 @@ export function updateHeadingLayout(deck, slideIndex, layout, columns, rows) {
   else delete attrs.values.columns;
   if (["1-2", "2-1"].includes(layout)) attrs.values.rows = rows.map(value => Math.round(value * 10) / 10).join(" ");
   else delete attrs.values.rows;
-  const hashes = slide.raw.match(/^\s*(#{1,2})/)?.[1] || "##";
+  const hashes = slide.raw.match(/^\s*(#{1,6})/)?.[1] || "##";
   const replacement = `${hashes} ${slide.title} {${serializeAttributes(attrs)}}`;
   return patchRange(deck.source, slide.headingRange.start, slide.headingRange.end, replacement);
 }
@@ -385,12 +408,13 @@ export function updateHeadingLayout(deck, slideIndex, layout, columns, rows) {
 export function updateSlideTitle(deck, slideIndex, title) {
   const slide = deck.slides[slideIndex];
   if (!slide?.headingRange) throw new Error("This slide has no title heading; add one in Source mode first");
-  const hashes = slide.raw.match(/^\s*(#{1,2})/)?.[1] || "##";
   const attributes = serializeAttributes(slide.headingAttrs);
-  const normalized = String(title).replace(/[\r\n]+/g, " ").trim();
-  if (!normalized) throw new Error("Use Source mode to remove a slide title entirely");
-  const replacement = `${hashes} ${normalized}${attributes ? ` {${attributes}}` : ""}`;
-  return patchRange(deck.source, slide.headingRange.start, slide.headingRange.end, replacement);
+  const lines = String(title).trim().split(/\r?\n/).map(line => line.trim());
+  if (!lines.some(Boolean)) lines.splice(0, lines.length, "## ---");
+  if (lines.some(line => line && !/^#{1,6}\s+\S/.test(line))) throw new Error("Each non-empty title line must be a Markdown heading beginning with #");
+  lines[0] = lines[0].replace(/\s+\{[^}]*\}\s*$/, "");
+  if (attributes) lines[0] += ` {${attributes}}`;
+  return patchRange(deck.source, slide.titleRange.start, slide.titleRange.end, `${lines.join("\n")}\n`);
 }
 
 export function updateOverlay(deck, slideIndex, objectId, changes) {

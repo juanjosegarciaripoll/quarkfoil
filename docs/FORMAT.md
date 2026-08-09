@@ -75,7 +75,7 @@ assets:
 
 ## Slides and layouts
 
-Each slide begins with a level-one or level-two heading and layout attributes:
+Each slide begins with a Markdown heading and layout attributes:
 
 ```markdown
 ## One region {.layout-1}
@@ -88,6 +88,34 @@ Each slide begins with a level-one or level-two heading and layout attributes:
 ```
 
 `columns` and `rows` are relative proportions and are normalized by the parser.
+
+### Title Markdown and spacing
+
+The Design title editor exposes the real heading Markdown but hides the
+structural attribute block. For example, editing this front-page title:
+
+```markdown
+# New presentation
+
+## *A new roadmap for life*
+```
+
+produces source like this when applied:
+
+```markdown
+# New presentation {.layout-front}
+
+## *A new roadmap for life*
+```
+
+The first heading supplies the slide's organizational title and retains the
+layout attributes. Consecutive `#` through `######` headings remain in the same
+visible title region, with their Markdown heading levels determining their
+relative sizes. Quarkfoil renders each empty line between those headings as
+vertical spacing. Multiple empty lines create proportionally more space; no
+trailing spaces or backslashes are required. If the title editor is emptied,
+Quarkfoil inserts `## ---` so the slide still has a heading on which to retain
+its structural attributes.
 
 Grid regions use fenced directives:
 
