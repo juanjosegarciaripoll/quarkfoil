@@ -62,6 +62,11 @@ New and pasted files are copied to the presentation project's `figures/`
 directory. Repeated clipboard filenames are made unique. Undo restores content
 replaced during the current editing session.
 
+New floating images preserve their intrinsic aspect ratio. Their initial box is
+centered and limited to 35% of the slide in its larger dimension; dropped
+images use the drop point instead and are kept inside the slide. Images placed
+in grid regions use the size of that region.
+
 ## Saving and recovery
 
 The Save button and `Ctrl+S` write the Markdown file. Unsaved changes are identified in the toolbar. Local-server saves use a content hash to detect external modifications and an atomic replacement to avoid partial files.

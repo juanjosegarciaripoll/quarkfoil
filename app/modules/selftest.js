@@ -13,7 +13,7 @@ import {
   updateSlideTitle,
 } from "./parser.js";
 import { renderDeck } from "./render.js";
-import { clipboardImageFile, renameClipboardImage } from "./editor.js";
+import { clipboardImageFile, initialImageGeometry, renameClipboardImage } from "./editor.js";
 
 const source = `---
 title: Test deck
@@ -134,6 +134,12 @@ try {
   assert(renameClipboardImage(pastedPng, "plots/result")?.name === "plots-result.png", "pasted image filenames cannot introduce directories");
   assert(renameClipboardImage(pastedPng, "  ") === null, "an empty pasted image filename cancels the import");
   assert(clipboardImageFile({ items: [{ kind: "string", type: "text/plain", getAsFile: () => null }] }) === null, "text-only clipboard data is ignored");
+  const landscapeGeometry = initialImageGeometry(2, 16 / 9);
+  assert(landscapeGeometry.w === 35 && landscapeGeometry.h === 31.1, "landscape image overlays preserve their pixel aspect ratio");
+  assert(landscapeGeometry.x === 32.5 && landscapeGeometry.y === 34.5, "new image overlays are centered");
+  const portraitGeometry = initialImageGeometry(0.5, 16 / 9, { x: 95, y: 90 });
+  assert(portraitGeometry.w === 9.8 && portraitGeometry.h === 35, "portrait image overlays preserve their pixel aspect ratio");
+  assert(portraitGeometry.x === 90.2 && portraitGeometry.y === 65, "dropped image overlays stay inside the slide");
 
   let deck = parseDeck(source);
   assert(deck.metadata.title === "Test deck", "front matter parses");

@@ -44,6 +44,35 @@ export function renameClipboardImage(file, requestedName) {
   return new File([file], completeName, { type: file.type, lastModified: file.lastModified });
 }
 
+export function initialImageGeometry(imageAspect, slideAspect, position = null) {
+  const maximum = 35;
+  const percentageAspect = imageAspect / slideAspect;
+  const w = round(percentageAspect >= 1 ? maximum : maximum * percentageAspect);
+  const h = round(percentageAspect >= 1 ? maximum / percentageAspect : maximum);
+  return {
+    x: position ? clamp(round(position.x), 0, 100 - w) : round((100 - w) / 2),
+    y: position ? clamp(round(position.y), 0, 100 - h) : round((100 - h) / 2),
+    w,
+    h,
+  };
+}
+
+function imageAspectRatio(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(image.naturalWidth / image.naturalHeight);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Unable to read image dimensions"));
+    };
+    image.src = url;
+  });
+}
+
 export class DesignEditor {
   constructor(options) {
     this.options = options;
@@ -412,16 +441,18 @@ export class DesignEditor {
 
   async addImage(file, position = null, cellId = null) {
     if (!file) return;
+    const aspect = cellId ? null : await imageAspectRatio(file);
     const path = await this.options.importAsset(file);
     if (!path) return;
-    const id = this.uniqueId(`image-${this.slideIndex() + 1}`);
     const content = `![](${path}){fit=contain focus="50 50"}`;
     if (cellId) {
       this.commit(setCellContent(this.options.getDeck(), this.slideIndex(), cellId, content));
       return;
     }
-    const coordinates = position || { x: 35, y: 25 };
-    this.commit(insertOverlay(this.options.getDeck(), this.slideIndex(), { type: "image", content, id, x: coordinates.x, y: coordinates.y, w: 35, h: 35 }));
+    const id = this.uniqueId(`image-${this.slideIndex() + 1}`);
+    const rect = this.section().getBoundingClientRect();
+    const geometry = initialImageGeometry(aspect, rect.width / rect.height, position);
+    this.commit(insertOverlay(this.options.getDeck(), this.slideIndex(), { type: "image", content, id, ...geometry }));
   }
 
   onDrop(event) {
@@ -436,8 +467,8 @@ export class DesignEditor {
     }
     const rect = this.section().getBoundingClientRect();
     this.addImage(file, {
-      x: clamp(round(100 * (event.clientX - rect.left) / rect.width), 0, 65),
-      y: clamp(round(100 * (event.clientY - rect.top) / rect.height), 0, 65),
+      x: 100 * (event.clientX - rect.left) / rect.width,
+      y: 100 * (event.clientY - rect.top) / rect.height,
     });
   }
 
