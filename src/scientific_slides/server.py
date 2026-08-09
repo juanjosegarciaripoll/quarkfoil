@@ -113,7 +113,8 @@ class SlideHandler(SimpleHTTPRequestHandler):
         super().end_headers()
 
     def log_message(self, format: str, *args: object) -> None:
-        print(f"{self.address_string()} - {format % args}")
+        if getattr(self.server, "verbose", False):
+            print(f"{self.address_string()} - {format % args}")
 
     def _send_json(self, value: object, status: HTTPStatus = HTTPStatus.OK) -> None:
         payload = _json_bytes(value)
@@ -314,11 +315,12 @@ class SlideHandler(SimpleHTTPRequestHandler):
         self._send_json({"ok": True, "path": relative}, HTTPStatus.CREATED)
 
 
-def create_server(deck: Path, host: str, port: int) -> ThreadingHTTPServer:
+def create_server(deck: Path, host: str, port: int, *, verbose: bool = False) -> ThreadingHTTPServer:
     resolved = initialize_deck(deck)
     server = ThreadingHTTPServer((host, port), lambda *args, **kwargs: SlideHandler(*args, directory=APP_ROOT, **kwargs))
     server.project_root = resolved.parent  # type: ignore[attr-defined]
     server.deck_path = resolved  # type: ignore[attr-defined]
+    server.verbose = verbose  # type: ignore[attr-defined]
     return server
 
 
@@ -365,11 +367,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("deck", type=Path, help="Markdown presentation to open")
     parser.add_argument("--host", default="127.0.0.1", help="Address to bind (default: 127.0.0.1)")
     parser.add_argument("--port", type=int, default=8765, help="Port to use; 0 chooses an available port (default: 8765)")
+    parser.add_argument("--verbose", action="store_true", help="Log HTTP requests")
     browser = parser.add_mutually_exclusive_group()
     browser.add_argument("--open", dest="open_browser", action="store_true", default=True, help="Open the editor in a browser (default)")
     browser.add_argument("--no-open", dest="open_browser", action="store_false", help="Start the server without opening a browser")
     args = parser.parse_args(arguments)
-    server = create_server(args.deck, args.host, args.port)
+    server = create_server(args.deck, args.host, args.port, verbose=args.verbose)
     url = f"http://{args.host}:{server.server_port}/"
     print(f"Quarkfoil: {args.deck.resolve()}")
     print(f"Open {url}")

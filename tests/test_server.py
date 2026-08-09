@@ -80,6 +80,7 @@ class ServerTests(unittest.TestCase):
             return response.status, response.headers, response.read()
 
     def test_config_and_deck(self) -> None:
+        self.assertFalse(self.server.verbose)
         status, _, payload = self.request("/api/config")
         self.assertEqual(status, 200)
         self.assertEqual(json.loads(payload)["deck"], "deck.md")

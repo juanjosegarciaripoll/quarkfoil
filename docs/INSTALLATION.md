@@ -53,6 +53,7 @@ Options:
 --port PORT     Port to use; defaults to 8765; use 0 for an available port
 --open          Open the browser automatically; this is the default
 --no-open       Start the server without opening a browser
+--verbose       Log individual HTTP requests; quiet by default
 ```
 
 For example:
