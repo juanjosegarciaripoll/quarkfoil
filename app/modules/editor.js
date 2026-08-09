@@ -13,6 +13,37 @@ import { renderMarkdownPreview } from "./render.js";
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
 const round = value => Math.round(value * 10) / 10;
 
+const IMAGE_EXTENSIONS = {
+  "image/gif": "gif",
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/svg+xml": "svg",
+  "image/webp": "webp",
+};
+
+export function clipboardImageFile(clipboardData, timestamp = Date.now()) {
+  const item = [...(clipboardData?.items || [])]
+    .find(candidate => candidate.kind === "file" && candidate.type.startsWith("image/"));
+  const file = item?.getAsFile() || [...(clipboardData?.files || [])]
+    .find(candidate => candidate.type.startsWith("image/"));
+  if (!file) return null;
+  const extension = IMAGE_EXTENSIONS[file.type];
+  if (!extension || file.name?.includes(".")) return file;
+  return new File([file], `pasted-image-${timestamp}.${extension}`, {
+    type: file.type,
+    lastModified: file.lastModified,
+  });
+}
+
+export function renameClipboardImage(file, requestedName) {
+  const name = requestedName?.trim().replace(/[\\/]/g, "-");
+  if (!name) return null;
+  const extension = IMAGE_EXTENSIONS[file.type];
+  const completeName = extension && !/\.[a-z0-9]+$/i.test(name) ? `${name}.${extension}` : name;
+  if (completeName === file.name) return file;
+  return new File([file], completeName, { type: file.type, lastModified: file.lastModified });
+}
+
 export class DesignEditor {
   constructor(options) {
     this.options = options;
@@ -36,6 +67,7 @@ export class DesignEditor {
     this.stage.addEventListener("dblclick", event => this.onDoubleClick(event));
     this.stage.addEventListener("pointerdown", event => this.onPointerDown(event));
     document.addEventListener("keydown", event => this.onKeyDown(event));
+    document.addEventListener("paste", event => this.onPaste(event));
     document.querySelector("#layout-select").addEventListener("change", event => this.changeLayout(event.target.value));
     document.querySelector("#add-text").addEventListener("click", () => this.addObject("markdown"));
     document.querySelector("#add-equation").addEventListener("click", () => this.addObject("equation"));
@@ -407,6 +439,19 @@ export class DesignEditor {
       x: clamp(round(100 * (event.clientX - rect.left) / rect.width), 0, 65),
       y: clamp(round(100 * (event.clientY - rect.top) / rect.height), 0, 65),
     });
+  }
+
+  onPaste(event) {
+    if (!this.active() || this.dialog.open
+      || ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)
+      || document.activeElement?.isContentEditable) return;
+    const file = clipboardImageFile(event.clipboardData);
+    if (!file) return;
+    event.preventDefault();
+    const requestedName = window.prompt("Filename for pasted image:", file.name);
+    const namedFile = renameClipboardImage(file, requestedName);
+    if (!namedFile) return;
+    this.addImage(namedFile, null, this.selectedCell?.dataset.cellId || null);
   }
 
   duplicate() {

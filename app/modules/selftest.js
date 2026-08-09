@@ -13,6 +13,7 @@ import {
   updateSlideTitle,
 } from "./parser.js";
 import { renderDeck } from "./render.js";
+import { clipboardImageFile, renameClipboardImage } from "./editor.js";
 
 const source = `---
 title: Test deck
@@ -124,6 +125,16 @@ function assertEmptyLayouts() {
 }
 
 try {
+  const clipboardPng = new File([new Uint8Array([137, 80, 78, 71])], "", { type: "image/png" });
+  const pastedPng = clipboardImageFile({
+    items: [{ kind: "file", type: "image/png", getAsFile: () => clipboardPng }],
+  }, 1234);
+  assert(pastedPng.name === "pasted-image-1234.png" && pastedPng.type === "image/png", "clipboard images receive an importable filename");
+  assert(renameClipboardImage(pastedPng, "experiment-result").name === "experiment-result.png", "pasted images accept a chosen filename and infer its extension");
+  assert(renameClipboardImage(pastedPng, "plots/result")?.name === "plots-result.png", "pasted image filenames cannot introduce directories");
+  assert(renameClipboardImage(pastedPng, "  ") === null, "an empty pasted image filename cancels the import");
+  assert(clipboardImageFile({ items: [{ kind: "string", type: "text/plain", getAsFile: () => null }] }) === null, "text-only clipboard data is ignored");
+
   let deck = parseDeck(source);
   assert(deck.metadata.title === "Test deck", "front matter parses");
   assert(deck.metadata.assets.figures === "artwork" && deck.metadata.assets.include[0] === "references", "asset folders parse from front matter");

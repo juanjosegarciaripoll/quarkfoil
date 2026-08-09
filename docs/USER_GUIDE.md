@@ -22,6 +22,13 @@ The image toolbar action is contextual:
 - With a grid region selected, it replaces that region with an image.
 - With no grid region selected, it creates a floating image overlay.
 
+Pasting an image from the system clipboard follows the same rule in Design
+mode. Select a grid region before pasting to replace its contents, or clear the
+grid selection to create a centered floating image. Quarkfoil asks for the
+asset filename before importing it and suggests a unique timestamped name;
+cancelling the prompt cancels the paste. Clipboard text is left untouched, and
+image pasting is disabled while a text field or content dialog is active.
+
 An image embedded alongside text in a Markdown region remains part of that Markdown document block and is not independently selectable.
 
 ### Present
@@ -51,7 +58,9 @@ Image-only regions and image overlays support:
 - Fit: contain, crop/fill, fit width, fit height, or native size.
 - Horizontal and vertical crop focus.
 
-New files are copied to the presentation project's `figures/` directory. Undo restores content replaced during the current editing session.
+New and pasted files are copied to the presentation project's `figures/`
+directory. Repeated clipboard filenames are made unique. Undo restores content
+replaced during the current editing session.
 
 ## Saving and recovery
 
@@ -70,3 +79,4 @@ The browser also keeps recovery snapshots in IndexedDB. These snapshots suppleme
 - `Shift` + arrow keys: nudge by `1%`.
 - `Delete`: delete a selected overlay.
 - `Ctrl+D`: duplicate a selected overlay.
+- `Ctrl+V`: paste a clipboard image in Design mode.
