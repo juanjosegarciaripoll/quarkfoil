@@ -206,6 +206,7 @@
 .slide-overlay > :first-child { margin-top: 0; }
 .slide-overlay > :last-child { margin-bottom: 0; }
 .slide-overlay p { margin: 0; font-size: 0.68em; line-height: 1.25; }
+.slide-overlay p + p { margin-top: 1em; }
 .slide-overlay .katex-display { margin: 0; }
 .slide-overlay[data-align="left"] .katex-display,
 .slide-overlay[data-align="left"] .katex-display > .katex { text-align: left; }
