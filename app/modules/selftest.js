@@ -15,7 +15,7 @@ import {
   updateSlideProperties,
 } from "./parser.js";
 import { renderDeck } from "./render.js";
-import { clipboardImageFile, initialImageGeometry, renameClipboardImage, videoFile } from "./editor.js";
+import { clipboardImageFile, initialImageGeometry, projectAssetPage, renameClipboardImage, videoFile } from "./editor.js";
 import { prepareBibliography } from "./bibliography.js";
 
 const source = `---
@@ -227,6 +227,11 @@ try {
   assert(renameClipboardImage(pastedPng, "plots/result")?.name === "plots-result.png", "pasted image filenames cannot introduce directories");
   assert(renameClipboardImage(pastedPng, "  ") === null, "an empty pasted image filename cancels the import");
   assert(videoFile(new File([], "recording.mkv")) && videoFile(new File([], "recording.avi")), "MKV and AVI drops are recognized without MIME metadata");
+  const projectAssets = Array.from({ length: 30 }, (_, index) => ({ path: `figures/result-${index}.png` }));
+  const firstAssetPage = projectAssetPage(projectAssets, "", 0);
+  assert(firstAssetPage.assets.length === 24 && firstAssetPage.pages === 2, "project asset navigation shows 24 items per page");
+  const assetPage = projectAssetPage(projectAssets, "result-2", 1, 4);
+  assert(assetPage.count === 11 && assetPage.page === 1 && assetPage.assets.length === 4, "project asset search and pagination stay bounded");
   assert(clipboardImageFile({ items: [{ kind: "string", type: "text/plain", getAsFile: () => null }] }) === null, "text-only clipboard data is ignored");
   const landscapeGeometry = initialImageGeometry(2, 16 / 9);
   assert(landscapeGeometry.w === 35 && landscapeGeometry.h === 31.1, "landscape image overlays preserve their pixel aspect ratio");

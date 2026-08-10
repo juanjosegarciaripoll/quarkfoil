@@ -14,6 +14,13 @@ import { renderMarkdownPreview } from "./render.js";
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
 const round = value => Math.round(value * 10) / 10;
 export const videoFile = file => file?.type?.startsWith("video/") || /\.(?:avi|mkv|mp4|webm)$/i.test(file?.name || "");
+export const projectAssetPage = (assets, query, page, pageSize = 24) => {
+  const needle = query.trim().toLocaleLowerCase();
+  const filtered = needle ? assets.filter(asset => asset.path.toLocaleLowerCase().includes(needle)) : assets;
+  const pages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const current = Math.min(Math.max(0, page), pages - 1);
+  return { assets: filtered.slice(current * pageSize, (current + 1) * pageSize), count: filtered.length, page: current, pages };
+};
 
 function colorInputValue(value) {
   const normalized = String(value || "").trim().toLowerCase();
@@ -732,29 +739,30 @@ export class DesignEditor {
     const dialog = document.querySelector("#project-image-dialog");
     const gallery = document.querySelector("#project-image-gallery");
     const status = document.querySelector("#project-image-status");
+    const search = document.querySelector("#project-image-search");
+    const previous = document.querySelector("#project-image-previous");
+    const next = document.querySelector("#project-image-next");
     gallery.replaceChildren();
+    search.value = "";
     status.textContent = "Loading images…";
     dialog.showModal();
     try {
       const assets = await this.options.listProjectImages();
-      for (const asset of assets) {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "project-image-choice";
-        button.title = asset.path;
-        const image = document.createElement("img");
-        image.src = this.options.resolveAsset(asset.path);
-        image.alt = "";
-        const label = document.createElement("span");
-        label.textContent = asset.path;
-        button.append(image, label);
-        button.addEventListener("click", () => {
-          dialog.close();
-          this.replaceImagePath(asset.path);
-        });
-        gallery.append(button);
-      }
-      status.textContent = assets.length ? `${assets.length} image${assets.length === 1 ? "" : "s"}` : "No images found in the presentation figures folder";
+      let page = 0;
+      const render = () => {
+        const result = projectAssetPage(assets, search.value, page);
+        page = result.page;
+        gallery.replaceChildren(...result.assets.map(asset => this.projectAssetChoice(asset, "image", () => this.replaceImagePath(asset.path))));
+        previous.disabled = page === 0;
+        next.disabled = page + 1 >= result.pages;
+        status.textContent = result.count ? `${result.count} image${result.count === 1 ? "" : "s"} · Page ${page + 1} of ${result.pages}` : search.value ? "No images match your search" : "No images found in the presentation figures folder";
+      };
+      search.oninput = () => { page = 0; render(); };
+      search.onkeydown = event => { if (event.key === "Enter") event.preventDefault(); };
+      previous.onclick = () => { page -= 1; render(); };
+      next.onclick = () => { page += 1; render(); };
+      render();
+      search.focus();
     } catch (error) {
       status.textContent = error.message;
     }
@@ -764,33 +772,54 @@ export class DesignEditor {
     const dialog = document.querySelector("#project-video-dialog");
     const gallery = document.querySelector("#project-video-gallery");
     const status = document.querySelector("#project-video-status");
+    const search = document.querySelector("#project-video-search");
+    const previous = document.querySelector("#project-video-previous");
+    const next = document.querySelector("#project-video-next");
     gallery.replaceChildren();
+    search.value = "";
     status.textContent = "Loading videos…";
     dialog.showModal();
     try {
       const assets = await this.options.listProjectVideos();
-      for (const asset of assets) {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "project-image-choice";
-        button.title = asset.path;
-        const video = document.createElement("video");
-        video.src = this.options.resolveAsset(asset.path);
-        video.muted = true;
-        video.preload = "metadata";
-        const label = document.createElement("span");
-        label.textContent = asset.path;
-        button.append(video, label);
-        button.addEventListener("click", () => {
-          dialog.close();
-          this.replaceVideoPath(asset.path);
-        });
-        gallery.append(button);
-      }
-      status.textContent = assets.length ? `${assets.length} video${assets.length === 1 ? "" : "s"}` : "No videos found in the presentation figures folder";
+      let page = 0;
+      const render = () => {
+        const result = projectAssetPage(assets, search.value, page);
+        page = result.page;
+        gallery.replaceChildren(...result.assets.map(asset => this.projectAssetChoice(asset, "video", () => this.replaceVideoPath(asset.path))));
+        previous.disabled = page === 0;
+        next.disabled = page + 1 >= result.pages;
+        status.textContent = result.count ? `${result.count} video${result.count === 1 ? "" : "s"} · Page ${page + 1} of ${result.pages}` : search.value ? "No videos match your search" : "No videos found in the presentation figures folder";
+      };
+      search.oninput = () => { page = 0; render(); };
+      search.onkeydown = event => { if (event.key === "Enter") event.preventDefault(); };
+      previous.onclick = () => { page -= 1; render(); };
+      next.onclick = () => { page += 1; render(); };
+      render();
+      search.focus();
     } catch (error) {
       status.textContent = error.message;
     }
+  }
+
+  projectAssetChoice(asset, kind, select) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "project-image-choice";
+    button.title = asset.path;
+    const preview = document.createElement(kind === "video" ? "video" : "img");
+    preview.src = this.options.resolveAsset(asset.path);
+    if (kind === "video") {
+      preview.muted = true;
+      preview.preload = "metadata";
+    } else preview.alt = "";
+    const label = document.createElement("span");
+    label.textContent = asset.path;
+    button.append(preview, label);
+    button.addEventListener("click", () => {
+      button.closest("dialog").close();
+      select();
+    });
+    return button;
   }
 
   onDrop(event) {

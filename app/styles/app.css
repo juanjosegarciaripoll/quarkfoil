@@ -167,9 +167,11 @@ dialog::backdrop { background: #000a; }
 .video-conversion-dialog__form { display: grid; gap: 0.8rem; padding: 1rem; }
 .video-conversion-dialog__form h2, .video-conversion-dialog__form p { margin: 0; }
 .video-conversion-dialog__form progress { width: 100%; }
-.project-image-dialog__form { display: grid; grid-template-rows: auto minmax(180px, 1fr) auto auto; gap: 0.7rem; width: 100%; min-width: 0; height: min(680px, 84vh); padding: 1rem; overflow: hidden; }
+.project-image-dialog__form { display: grid; grid-template-rows: auto auto minmax(180px, 1fr) auto auto; gap: 0.7rem; width: 100%; min-width: 0; height: min(680px, 84vh); padding: 1rem; overflow: hidden; }
 .project-image-dialog__form h2 { margin: 0; }
-.project-image-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); align-content: start; gap: 0.7rem; min-width: 0; padding: 0.2rem; overflow: auto; }
+.project-asset-tools { display: grid; grid-template-columns: minmax(160px, 1fr) auto auto; gap: 0.5rem; }
+.project-asset-tools input { min-width: 0; padding: 0.45rem; }
+.project-image-gallery { display: grid; grid-template-columns: repeat(auto-fill, 150px); grid-auto-rows: max-content; align-content: start; justify-content: start; gap: 0.7rem; min-width: 0; padding: 0.2rem; overflow: auto; }
 .project-image-choice { display: grid; grid-template-rows: 100px auto; gap: 0.35rem; min-width: 0; padding: 0.45rem; overflow: hidden; }
 .project-image-choice img { width: 100%; height: 100px; object-fit: contain; background: #f6f7f8; }
 .project-image-choice video { width: 100%; height: 100px; object-fit: contain; background: #111; pointer-events: none; }
