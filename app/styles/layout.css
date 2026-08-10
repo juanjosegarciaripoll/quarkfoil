@@ -11,6 +11,13 @@
   font-size: 32px;
 }
 
+/* Reveal keeps non-current sections hidden for accessibility during normal
+   navigation. Overview needs the real slide surfaces, not only its transparent
+   background proxies, so restore them while the overview is active. */
+.reveal.overview .slides section[hidden] {
+  display: block !important;
+}
+
 .reveal .slides section.scientific-slide {
   box-sizing: border-box;
   height: 100%;

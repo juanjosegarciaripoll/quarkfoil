@@ -258,6 +258,9 @@ function onSlideChanged(event) {
 }
 
 function setMode(mode) {
+  if (reveal && state.mode === "present" && mode !== "present" && reveal.isOverview()) {
+    reveal.toggleOverview(false);
+  }
   state.mode = mode;
   document.body.classList.toggle("presenting", mode === "present");
   elements.workspace.className = `workspace mode-${mode}`;

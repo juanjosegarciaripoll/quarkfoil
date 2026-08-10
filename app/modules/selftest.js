@@ -202,6 +202,19 @@ function assertThemes() {
   assert(light.classList.contains("theme-scientific-light"), "slide inherits the deck theme");
   assert(dark.classList.contains("theme-scientific-dark"), "slide selects its own theme");
   assert(dark.style.getPropertyValue("--slide-background") === "#101820" && dark.style.getPropertyValue("--slide-foreground") === "#f0f4f8", "slide colors override theme variables");
+  const overview = document.createElement("div");
+  overview.className = "reveal overview";
+  const overviewSlides = document.createElement("div");
+  overviewSlides.className = "slides";
+  overview.append(overviewSlides);
+  document.body.append(overview);
+  renderDeck(deck, overviewSlides, source => source);
+  const [overviewLight, overviewDark] = overviewSlides.querySelectorAll(".scientific-slide");
+  overviewLight.hidden = true;
+  overviewDark.hidden = true;
+  assert(getComputedStyle(overviewLight).display === "block" && getComputedStyle(overviewDark).display === "block", "overview reveals non-current slide surfaces");
+  assert(getComputedStyle(overviewLight).backgroundColor !== getComputedStyle(overviewDark).backgroundColor, "overview keeps slide themes independent");
+  overview.remove();
   deck = parseDeck(updateSlideProperties(deck, 1, { theme: null, background: null, foreground: null }));
   assert(!deck.slides[1].headingAttrs.values.theme && !deck.slides[1].headingAttrs.values.background, "inherited slide theme values do not occupy source state");
 }
