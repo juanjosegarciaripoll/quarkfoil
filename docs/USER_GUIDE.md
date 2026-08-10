@@ -15,6 +15,13 @@ Design renders one slide and exposes graphical controls:
 - Click a grid region or overlay to select it.
 - Double-click a title, Markdown region, text overlay, or equation overlay to edit its content.
 - Drag floating overlays to move them and use their corner handles to resize them.
+- Shift-click floating overlays to add or remove them from a selection. Drag any
+  selected object or use the arrow keys to move the group while preserving its
+  spacing. The solid primary selection owns the properties and resize handles;
+  resizing affects only that object, never the group.
+- Drag from an empty part of the slide to select every overlay intersecting the
+  selection rectangle. Shift-drag adds the intersecting overlays to the current
+  selection.
 - Use Properties to adjust geometry, layer, fragment, image fit/focus, font scale, text color, and alignment. Resetting an explicit text color returns the object to its slide theme.
 
 The image toolbar action is contextual:
@@ -153,8 +160,8 @@ deck-wide numbering.
 - `Ctrl+Enter`: accept a content-editing dialog.
 - `Escape`: cancel a dialog or leave Present mode.
 - `Page Up` / `Page Down`: select the previous or next slide in Design mode.
-- Arrow keys: nudge a selected overlay by `0.1%`.
-- `Shift` + arrow keys: nudge by `1%`.
+- Arrow keys: nudge the selected overlay or group by `0.1%`.
+- `Shift` + arrow keys: nudge the selected overlay or group by `1%`.
 - `Delete`: delete a selected overlay.
 - `Ctrl+D`: duplicate a selected overlay.
 - `Ctrl+V`: paste a clipboard image in Design mode.

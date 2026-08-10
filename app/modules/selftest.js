@@ -15,7 +15,7 @@ import {
   updateSlideProperties,
 } from "./parser.js";
 import { renderDeck, syncVideoPlayback } from "./render.js";
-import { bindRangeControl, clipboardImageFile, initialImageGeometry, pageSlideIndex, projectAssetPage, renameClipboardImage, videoFile } from "./editor.js";
+import { bindRangeControl, clipboardImageFile, initialImageGeometry, moveGeometryGroup, pageSlideIndex, projectAssetPage, rectanglesIntersect, renameClipboardImage, videoFile } from "./editor.js";
 import { parseBibliography, prepareBibliography } from "./bibliography.js";
 
 const source = `---
@@ -233,6 +233,10 @@ try {
 
   assert(pageSlideIndex(2, 5, "PageUp") === 1 && pageSlideIndex(2, 5, "PageDown") === 3, "page keys navigate to adjacent editor slides");
   assert(pageSlideIndex(0, 5, "PageUp") === 0 && pageSlideIndex(4, 5, "PageDown") === 4, "page-key slide navigation stays within deck bounds");
+  const movedGroup = moveGeometryGroup([{ x: 5, y: 10, w: 20, h: 10 }, { x: 40, y: 30, w: 30, h: 20 }], -10, 60);
+  assert(movedGroup[0].x === 0 && movedGroup[0].y === 60 && movedGroup[1].x === 35 && movedGroup[1].y === 80, "group movement preserves spacing and stays inside the slide");
+  assert(rectanglesIntersect({ left: 0, top: 0, right: 20, bottom: 20 }, { left: 20, top: 10, right: 30, bottom: 30 }), "marquee selection includes objects touching its boundary");
+  assert(!rectanglesIntersect({ left: 0, top: 0, right: 19, bottom: 20 }, { left: 20, top: 10, right: 30, bottom: 30 }), "marquee selection excludes separated objects");
 
   const clipboardPng = new File([new Uint8Array([137, 80, 78, 71])], "", { type: "image/png" });
   const pastedPng = clipboardImageFile({

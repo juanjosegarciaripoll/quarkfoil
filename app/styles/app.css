@@ -133,6 +133,8 @@ body.presenting .toolbar { display: none; }
 .mode-design .slide-overlay { cursor: move; outline: 1px dashed transparent; }
 .mode-design .slide-overlay:hover { outline-color: #22b8cf88; }
 .mode-design .slide-overlay.selected-object { outline: 2px solid #22b8cf; }
+.mode-design .slide-overlay.selected-object:not(:has(.resize-handle)) { outline-style: dashed; }
+.selection-marquee { position: absolute; z-index: 100000; pointer-events: none; background: #22b8cf22; border: 1px solid #22b8cf; }
 .mode-design .slide-overlay[data-locked="true"] { cursor: not-allowed; }
 
 .resize-handle {

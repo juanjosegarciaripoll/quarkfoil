@@ -2,6 +2,7 @@ import {
   deleteOverlay,
   duplicateOverlay,
   insertOverlay,
+  parseDeck,
   setCellContent,
   updateBlockContent,
   updateHeadingLayout,
@@ -25,6 +26,21 @@ export const projectAssetPage = (assets, query, page, pageSize = 24) => {
 export function pageSlideIndex(current, count, key) {
   const direction = key === "PageUp" ? -1 : key === "PageDown" ? 1 : 0;
   return direction ? clamp(current + direction, 0, Math.max(0, count - 1)) : current;
+}
+
+export function moveGeometryGroup(geometries, dx, dy) {
+  if (!geometries.length) return [];
+  const minimumX = Math.min(...geometries.map(item => item.x));
+  const minimumY = Math.min(...geometries.map(item => item.y));
+  const maximumX = Math.max(...geometries.map(item => item.x + item.w));
+  const maximumY = Math.max(...geometries.map(item => item.y + item.h));
+  const boundedX = clamp(round(dx), -minimumX, 100 - maximumX);
+  const boundedY = clamp(round(dy), -minimumY, 100 - maximumY);
+  return geometries.map(item => ({ ...item, x: round(item.x + boundedX), y: round(item.y + boundedY) }));
+}
+
+export function rectanglesIntersect(left, right) {
+  return left.left <= right.right && left.right >= right.left && left.top <= right.bottom && left.bottom >= right.top;
 }
 
 function colorInputValue(value) {
@@ -310,8 +326,9 @@ export class DesignEditor {
 
   onClick(event) {
     if (!this.active() || this.drag) return;
+    if (this.suppressClick) { this.suppressClick = false; return; }
     const overlay = event.target.closest(".slide-overlay");
-    if (overlay) { this.selectOverlay(overlay); return; }
+    if (overlay) { this.selectOverlay(overlay, { additive: event.shiftKey, toggle: event.shiftKey }); return; }
     const cell = event.target.closest(".slide-cell");
     if (cell) { this.selectCell(cell); return; }
     this.clearSelection();
@@ -334,11 +351,23 @@ export class DesignEditor {
     else this.openTitleDialog();
   }
 
-  selectOverlay(element) {
-    this.clearSelection();
+  selectedOverlayElements() {
+    return [...(this.section()?.querySelectorAll(".slide-overlay.selected-object") || [])];
+  }
+
+  selectOverlay(element, { additive = false, toggle = false } = {}) {
+    if (!additive) this.clearSelection();
+    else if (toggle && element.classList.contains("selected-object")) {
+      element.classList.remove("selected-object");
+      element.querySelectorAll(".resize-handle").forEach(handle => handle.remove());
+      const remaining = this.selectedOverlayElements();
+      if (!remaining.length) { this.clearSelection(); return false; }
+      element = remaining.at(-1);
+    }
     this.slideProperties.hidden = true;
     this.selected = element;
     element.classList.add("selected-object");
+    document.querySelectorAll(".resize-handle").forEach(handle => handle.remove());
     for (const corner of ["nw", "ne", "se", "sw"]) {
       const handle = document.createElement("span");
       handle.className = `resize-handle ${corner}`;
@@ -351,6 +380,7 @@ export class DesignEditor {
     this.fillProperties(object, element);
     document.querySelector("#duplicate-object").disabled = false;
     document.querySelector("#delete-object").disabled = false;
+    return true;
   }
 
   selectCell(element) {
@@ -496,38 +526,121 @@ export class DesignEditor {
     if (!this.active() || event.button !== 0) return;
     const handle = event.target.closest(".resize-handle");
     const overlay = event.target.closest(".slide-overlay");
-    if (!overlay) return;
-    const object = this.slide().overlays.find(item => item.id === overlay.dataset.objectId);
-    if (!object || object.locked) return;
+    if (!overlay) {
+      const section = event.target.closest(".scientific-slide");
+      if (section) this.startMarquee(event, section);
+      return;
+    }
     event.preventDefault();
     event.stopPropagation();
-    this.selectOverlay(overlay);
+    this.suppressClick = true;
+    if (event.shiftKey && !handle) {
+      if (!this.selectOverlay(overlay, { additive: true, toggle: true })) return;
+    } else if (overlay.classList.contains("selected-object")) {
+      this.selectOverlay(overlay, { additive: true });
+    } else this.selectOverlay(overlay);
+    const elements = handle ? [overlay] : this.selectedOverlayElements();
+    const items = elements.map(element => ({
+      element,
+      object: this.slide().overlays.find(item => item.id === element.dataset.objectId),
+    })).filter(item => item.object);
+    if (!items.length || items.some(item => item.object.locked)) return;
     const rect = this.section().getBoundingClientRect();
     this.drag = {
       kind: handle ? "resize" : "move",
       corner: handle?.dataset.corner,
       element: overlay,
+      items: items.map(item => ({ ...item, original: { ...item.object.geometry } })),
       pointerId: event.pointerId,
       startX: event.clientX,
       startY: event.clientY,
       rect,
-      original: { ...object.geometry },
     };
     overlay.setPointerCapture(event.pointerId);
     overlay.addEventListener("pointermove", this.boundMove = moveEvent => this.moveOverlay(moveEvent));
     overlay.addEventListener("pointerup", this.boundUp = upEvent => this.finishOverlay(upEvent));
   }
 
+  startMarquee(event, section) {
+    const initialIds = event.shiftKey ? new Set(this.selectedOverlayElements().map(element => element.dataset.objectId)) : new Set();
+    this.marquee = {
+      section,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      initialIds,
+      active: false,
+      signature: null,
+    };
+    section.setPointerCapture(event.pointerId);
+    section.addEventListener("pointermove", this.boundMarqueeMove = moveEvent => this.moveMarquee(moveEvent));
+    section.addEventListener("pointerup", this.boundMarqueeUp = upEvent => this.finishMarquee(upEvent));
+    section.addEventListener("pointercancel", this.boundMarqueeCancel = cancelEvent => this.finishMarquee(cancelEvent));
+  }
+
+  moveMarquee(event) {
+    const drag = this.marquee;
+    if (!drag) return;
+    if (!drag.active && Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) < 4) return;
+    event.preventDefault();
+    if (!drag.active) {
+      drag.active = true;
+      drag.box = document.createElement("div");
+      drag.box.className = "selection-marquee";
+      drag.section.append(drag.box);
+    }
+    const sectionRect = drag.section.getBoundingClientRect();
+    const selection = {
+      left: Math.min(drag.startX, event.clientX),
+      right: Math.max(drag.startX, event.clientX),
+      top: Math.min(drag.startY, event.clientY),
+      bottom: Math.max(drag.startY, event.clientY),
+    };
+    drag.box.style.left = `${100 * (selection.left - sectionRect.left) / sectionRect.width}%`;
+    drag.box.style.top = `${100 * (selection.top - sectionRect.top) / sectionRect.height}%`;
+    drag.box.style.width = `${100 * (selection.right - selection.left) / sectionRect.width}%`;
+    drag.box.style.height = `${100 * (selection.bottom - selection.top) / sectionRect.height}%`;
+    const overlays = [...drag.section.querySelectorAll(".slide-overlay")];
+    const intersecting = overlays.filter(element => rectanglesIntersect(selection, element.getBoundingClientRect()));
+    const selectedIds = new Set([...drag.initialIds, ...intersecting.map(element => element.dataset.objectId)]);
+    const signature = overlays.filter(element => selectedIds.has(element.dataset.objectId)).map(element => element.dataset.objectId).join("\n");
+    if (signature === drag.signature) return;
+    drag.signature = signature;
+    const selected = overlays.filter(element => selectedIds.has(element.dataset.objectId));
+    if (!selected.length) this.clearSelection();
+    else {
+      const previousPrimary = selected.find(element => element.dataset.objectId === this.selected?.dataset.objectId);
+      const primary = intersecting.at(-1) || previousPrimary || selected.at(-1);
+      this.selectOverlay(primary);
+      selected.filter(element => element !== primary).forEach(element => element.classList.add("selected-object"));
+    }
+  }
+
+  finishMarquee(event) {
+    const drag = this.marquee;
+    if (!drag) return;
+    if (drag.section.hasPointerCapture(event.pointerId)) drag.section.releasePointerCapture(event.pointerId);
+    drag.section.removeEventListener("pointermove", this.boundMarqueeMove);
+    drag.section.removeEventListener("pointerup", this.boundMarqueeUp);
+    drag.section.removeEventListener("pointercancel", this.boundMarqueeCancel);
+    drag.box?.remove();
+    if (drag.active) this.suppressClick = true;
+    this.marquee = null;
+  }
+
   moveOverlay(event) {
     if (!this.drag) return;
     const dx = 100 * (event.clientX - this.drag.startX) / this.drag.rect.width;
     const dy = 100 * (event.clientY - this.drag.startY) / this.drag.rect.height;
-    const original = this.drag.original;
-    let next = { ...original };
     if (this.drag.kind === "move") {
-      next.x = clamp(round(original.x + dx), 0, 100 - original.w);
-      next.y = clamp(round(original.y + dy), 0, 100 - original.h);
+      const nextGroup = moveGeometryGroup(this.drag.items.map(item => item.original), dx, dy);
+      this.drag.items.forEach((item, index) => {
+        item.next = nextGroup[index];
+        this.applyGeometryToElement(item.element, item.next);
+      });
     } else {
+      const original = this.drag.items[0].original;
+      const next = { ...original };
       const corner = this.drag.corner;
       if (corner.includes("e")) next.w = clamp(round(original.w + dx), 1, 100 - original.x);
       if (corner.includes("s")) next.h = clamp(round(original.h + dy), 1, 100 - original.y);
@@ -539,9 +652,11 @@ export class DesignEditor {
         next.y = clamp(round(original.y + dy), 0, original.y + original.h - 1);
         next.h = round(original.h + original.y - next.y);
       }
+      this.drag.items[0].next = next;
+      this.applyGeometryToElement(this.drag.element, next);
     }
-    this.applyGeometryToElement(this.drag.element, next);
-    for (const key of ["x", "y", "w", "h"]) document.querySelector(`#prop-${key}`).value = next[key];
+    const primary = this.drag.items.find(item => item.element === this.selected)?.next;
+    if (primary) for (const key of ["x", "y", "w", "h"]) document.querySelector(`#prop-${key}`).value = primary[key];
   }
 
   finishOverlay(event) {
@@ -550,14 +665,15 @@ export class DesignEditor {
     drag.element.releasePointerCapture(event.pointerId);
     drag.element.removeEventListener("pointermove", this.boundMove);
     drag.element.removeEventListener("pointerup", this.boundUp);
-    const changes = {
-      x: Number(document.querySelector("#prop-x").value),
-      y: Number(document.querySelector("#prop-y").value),
-      w: Number(document.querySelector("#prop-w").value),
-      h: Number(document.querySelector("#prop-h").value),
-    };
     this.drag = null;
-    this.commit(updateOverlay(this.options.getDeck(), this.slideIndex(), drag.element.dataset.objectId, changes));
+    if (drag.kind === "move") {
+      this.commitGeometryChanges(drag.items.map(item => ({ id: item.object.id, geometry: item.next || item.original })));
+    } else {
+      const geometry = drag.items[0].next || drag.items[0].original;
+      this.commit(updateOverlay(this.options.getDeck(), this.slideIndex(), drag.element.dataset.objectId, {
+        x: geometry.x, y: geometry.y, w: geometry.w, h: geometry.h,
+      }));
+    }
   }
 
   applyGeometryToElement(element, geometry) {
@@ -565,6 +681,16 @@ export class DesignEditor {
     element.style.top = `${geometry.y}%`;
     element.style.width = `${geometry.w}%`;
     element.style.height = `${geometry.h}%`;
+  }
+
+  commitGeometryChanges(changes) {
+    let deck = this.options.getDeck();
+    let source = deck.source;
+    for (const change of changes) {
+      source = updateOverlay(deck, this.slideIndex(), change.id, { x: change.geometry.x, y: change.geometry.y });
+      deck = parseDeck(source);
+    }
+    this.commit(source);
   }
 
   changeLayout(layout) {
@@ -967,14 +1093,13 @@ export class DesignEditor {
     const directions = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
     if (!directions[event.key]) return;
     event.preventDefault();
-    const object = this.slide().overlays.find(item => item.id === this.selected.dataset.objectId);
-    if (!object || object.locked) return;
+    const elements = this.selectedOverlayElements();
+    const objects = elements.map(element => this.slide().overlays.find(item => item.id === element.dataset.objectId)).filter(Boolean);
+    if (!objects.length || objects.some(object => object.locked)) return;
     const step = event.shiftKey ? 1 : 0.1;
     const [dx, dy] = directions[event.key];
-    this.commit(updateOverlay(this.options.getDeck(), this.slideIndex(), object.id, {
-      x: clamp(round(object.geometry.x + dx * step), 0, 100 - object.geometry.w),
-      y: clamp(round(object.geometry.y + dy * step), 0, 100 - object.geometry.h),
-    }));
+    const moved = moveGeometryGroup(objects.map(object => object.geometry), dx * step, dy * step);
+    this.commitGeometryChanges(objects.map((object, index) => ({ id: object.id, geometry: moved[index] })));
   }
 
   uniqueId(prefix) {
@@ -986,13 +1111,17 @@ export class DesignEditor {
   }
 
   commit(source) {
+    const overlayIds = this.selectedOverlayElements().map(element => element.dataset.objectId);
     const overlayId = this.selected?.dataset.objectId || null;
     const cellId = this.selectedCell?.dataset.cellId || null;
     this.options.commitSource(source);
     if (overlayId) {
-      const overlay = [...(this.section()?.querySelectorAll(".slide-overlay") || [])]
-        .find(item => item.dataset.objectId === overlayId);
-      if (overlay) this.selectOverlay(overlay);
+      const overlays = [...(this.section()?.querySelectorAll(".slide-overlay") || [])];
+      const orderedIds = [...overlayIds.filter(id => id !== overlayId), overlayId];
+      orderedIds.forEach((id, index) => {
+        const overlay = overlays.find(item => item.dataset.objectId === id);
+        if (overlay) this.selectOverlay(overlay, { additive: index > 0 });
+      });
     } else if (cellId) {
       const cell = [...(this.section()?.querySelectorAll(".slide-cell") || [])]
         .find(item => item.dataset.cellId === cellId);
