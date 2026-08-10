@@ -17,6 +17,7 @@ The presentation remains a readable Markdown file accompanied by a `figures/` di
 - Seven layouts: `1`, `1+1`, `1+2`, `2+1`, `0`, Front page, and Free canvas.
 - Markdown and KaTeX equations remain editable rather than becoming screenshots.
 - Image fit, crop focus, overlay position, size, typography, alignment, and fragments are editable graphically.
+- Native MP4/WebM video plus optimized AVI/MKV conversion when FFmpeg is installed.
 - Source, Design, and Present modes use the same Markdown source of truth.
 - Local assets and pinned browser libraries require no runtime CDN or Node/npm toolchain.
 - Presentations export as self-contained static websites, with an optional pinned-CDN mode.

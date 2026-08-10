@@ -237,9 +237,18 @@
     </form>
   </dialog>
 
+  <dialog id="video-conversion-dialog">
+    <form class="video-conversion-dialog__form">
+      <h2>Converting video</h2>
+      <p id="video-conversion-status" role="status">Preparing preview…</p>
+      <progress id="video-conversion-progress" max="100" value="0"></progress>
+      <div class="dialog-actions"><button id="cancel-video-conversion" type="button">Cancel conversion</button></div>
+    </form>
+  </dialog>
+
   <input id="file-input" type="file" accept=".md,.markdown,text/markdown" hidden>
   <input id="image-input" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" hidden>
-  <input id="video-input" type="file" accept="video/mp4,video/webm" hidden>
+  <input id="video-input" type="file" accept="video/mp4,video/webm,.avi,.mkv,video/x-msvideo,video/x-matroska" hidden>
 
   <script src="vendor/reveal/reveal.js"></script>
   <script src="vendor/marked/marked.min.js"></script>

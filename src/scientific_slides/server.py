@@ -3,15 +3,18 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import mimetypes
 import os
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 import threading
 import urllib.parse
 import urllib.request
+import uuid
 import webbrowser
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -23,11 +26,13 @@ SOURCE_APP_ROOT = Path(__file__).resolve().parents[2] / "app"
 APP_ROOT = PACKAGE_APP_ROOT if PACKAGE_APP_ROOT.is_dir() else SOURCE_APP_ROOT
 MAX_WRITE_BYTES = 20 * 1024 * 1024
 MAX_ASSET_BYTES = 100 * 1024 * 1024
+MAX_VIDEO_CONVERSION_BYTES = 2 * 1024 * 1024 * 1024
 MAX_BIBLIOGRAPHY_BYTES = 5 * 1024 * 1024
 MAX_DOI_BYTES = 1024 * 1024
 MAX_LISTED_ASSETS = 1000
 IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"}
 VIDEO_SUFFIXES = {".mp4", ".webm"}
+CONVERTIBLE_VIDEO_SUFFIXES = {".avi", ".mkv"}
 ASSET_SUFFIXES = IMAGE_SUFFIXES | VIDEO_SUFFIXES
 STARTER_DECK = """---
 title: New presentation
@@ -46,6 +51,184 @@ defaults:
 Presentation subtitle
 :::
 """
+
+
+class VideoConversionJob:
+    def __init__(self, source: Path, output: Path, poster: Path, project_root: Path, command: list[str]):
+        self.id = uuid.uuid4().hex
+        self.source = source
+        self.output = output
+        self.poster = poster
+        self.project_root = project_root
+        self.command = command
+        self.status = "queued"
+        self.progress: float | None = 0.0
+        self.error = ""
+        self.process: subprocess.Popen[str] | None = None
+        self.thread: threading.Thread | None = None
+        self.cancelled = threading.Event()
+        self.lock = threading.Lock()
+
+    def snapshot(self) -> dict[str, object]:
+        with self.lock:
+            result: dict[str, object] = {
+                "id": self.id,
+                "status": self.status,
+                "progress": round(self.progress, 1) if self.progress is not None else None,
+                "path": self.output.relative_to(self.project_root).as_posix(),
+                "poster": self.poster.relative_to(self.project_root).as_posix(),
+            }
+            if self.error:
+                result["error"] = self.error
+            return result
+
+    def cancel(self) -> None:
+        self.cancelled.set()
+        with self.lock:
+            process = self.process
+        if process and process.poll() is None:
+            process.terminate()
+
+
+def _video_duration(source: Path) -> float | None:
+    result = subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries", "format=duration:stream=duration", "-of", "json", str(source)],
+        capture_output=True,
+        check=True,
+        text=True,
+        timeout=30,
+    )
+    metadata = json.loads(result.stdout)
+    values = [metadata.get("format", {}).get("duration")]
+    values.extend(stream.get("duration") for stream in metadata.get("streams", []))
+    for value in values:
+        try:
+            duration = float(value)
+        except (TypeError, ValueError):
+            continue
+        if math.isfinite(duration) and duration > 0:
+            return duration
+    return None
+
+
+def _video_codecs(source: Path) -> tuple[str | None, str | None]:
+    result = subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries", "stream=codec_type,codec_name", "-of", "json", str(source)],
+        capture_output=True,
+        check=True,
+        text=True,
+        timeout=30,
+    )
+    streams = json.loads(result.stdout).get("streams", [])
+    video = next((item.get("codec_name") for item in streams if item.get("codec_type") == "video"), None)
+    audio = next((item.get("codec_name") for item in streams if item.get("codec_type") == "audio"), None)
+    return video, audio
+
+
+def _ffmpeg_encoders() -> set[str]:
+    result = subprocess.run(
+        ["ffmpeg", "-v", "error", "-encoders"], capture_output=True, check=True, text=True, timeout=30,
+    )
+    return {match.group(1) for line in result.stdout.splitlines() if (match := re.match(r"^\s*[VAS.].....\s+(\S+)", line))}
+
+
+def _video_conversion_plan(source: Path) -> tuple[str, list[str]]:
+    video, audio = _video_codecs(source)
+    encoders = _ffmpeg_encoders()
+    h264_encoder = next((name for name in ("libx264", "libopenh264") if name in encoders), None)
+    if video == "h264" or h264_encoder:
+        video_args = ["-c:v", "copy"] if video == "h264" else ["-c:v", h264_encoder, "-crf", "23", "-preset", "veryfast"]
+        audio_args = ["-c:a", "copy"] if audio in {None, "aac", "mp3"} else ["-c:a", "aac", "-b:a", "128k"]
+        return ".mp4", [*video_args, *audio_args, "-movflags", "+faststart"]
+    return ".webm", [
+        "-c:v", "libvpx-vp9", "-crf", "32", "-b:v", "0", "-deadline", "good", "-cpu-used", "6", "-row-mt", "1",
+        "-c:a", "libopus", "-b:a", "128k",
+    ]
+
+
+def _video_progress(value: str, duration: float | None) -> float | None:
+    if not duration:
+        return None
+    try:
+        elapsed = float(value)
+    except ValueError:
+        return None
+    if not math.isfinite(elapsed):
+        return None
+    return min(99.0, elapsed / 1_000_000 / duration * 100)
+
+
+def _run_video_conversion(job: VideoConversionJob) -> None:
+    temporary = job.output.with_name(f".{job.output.stem}.{job.id}.tmp{job.output.suffix}")
+    temporary_poster = job.poster.with_name(f".{job.poster.name}.{job.id}.tmp.jpg")
+    try:
+        if job.cancelled.is_set():
+            raise RuntimeError("Conversion cancelled")
+        with job.lock:
+            job.status = "extracting"
+            job.process = subprocess.Popen(
+                [
+                    "ffmpeg", "-v", "error", "-i", str(job.source), "-map", "0:v:0", "-an", "-sn", "-dn",
+                    "-frames:v", "1", "-q:v", "2", "-y", str(temporary_poster),
+                ],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            process = job.process
+        try:
+            _, stderr = process.communicate(timeout=60)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.communicate()
+            raise RuntimeError("FFmpeg took too long to extract a preview frame")
+        if job.cancelled.is_set():
+            raise RuntimeError("Conversion cancelled")
+        if process.returncode:
+            raise RuntimeError(stderr.strip() or "FFmpeg could not extract a preview frame")
+        os.replace(temporary_poster, job.poster)
+        duration = _video_duration(job.source)
+        if job.cancelled.is_set():
+            raise RuntimeError("Conversion cancelled")
+        command = [
+            "ffmpeg", "-v", "error", "-i", str(job.source), "-map", "0:v:0", "-map", "0:a?",
+            *job.command,
+            "-progress", "pipe:1", "-nostats", "-y", str(temporary),
+        ]
+        with job.lock:
+            job.status = "converting"
+            job.progress = 0.0 if duration else None
+            job.process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            process = job.process
+        assert process.stdout is not None
+        for line in process.stdout:
+            key, _, value = line.strip().partition("=")
+            if duration and key in {"out_time_us", "out_time_ms"}:
+                progress = _video_progress(value, duration)
+                if progress is not None:
+                    with job.lock:
+                        job.progress = progress
+        _, stderr = process.communicate()
+        if job.cancelled.is_set():
+            raise RuntimeError("Conversion cancelled")
+        if process.returncode:
+            raise RuntimeError(stderr.strip() or "FFmpeg conversion failed")
+        os.replace(temporary, job.output)
+        with job.lock:
+            job.status = "complete"
+            job.progress = 100.0
+    except (OSError, subprocess.SubprocessError, ValueError, RuntimeError) as error:
+        with job.lock:
+            job.status = "cancelled" if job.cancelled.is_set() else "failed"
+            job.error = str(error)
+    finally:
+        job.source.unlink(missing_ok=True)
+        temporary.unlink(missing_ok=True)
+        temporary_poster.unlink(missing_ok=True)
+        with job.lock:
+            complete = job.status == "complete"
+        if not complete:
+            job.poster.unlink(missing_ok=True)
 
 
 def _inside(root: Path, candidate: Path) -> bool:
@@ -169,6 +352,24 @@ class SlideHandler(SimpleHTTPRequestHandler):
             raise ValueError(f"Request exceeds {limit} bytes")
         return self.rfile.read(length)
 
+    def _write_body(self, destination: Path, limit: int) -> None:
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+        except ValueError as error:
+            raise ValueError("Invalid Content-Length") from error
+        if length < 0 or length > limit:
+            raise ValueError(f"Request exceeds {limit} bytes")
+        remaining = length
+        with destination.open("xb") as stream:
+            while remaining:
+                chunk = self.rfile.read(min(1024 * 1024, remaining))
+                if not chunk:
+                    raise ValueError("Upload ended before Content-Length bytes were received")
+                stream.write(chunk)
+                remaining -= len(chunk)
+            stream.flush()
+            os.fsync(stream.fileno())
+
     def _project_file(self, relative: str) -> Path:
         decoded = urllib.parse.unquote(relative).replace("\\", "/")
         candidate = (self.project_root / decoded).resolve()
@@ -178,6 +379,14 @@ class SlideHandler(SimpleHTTPRequestHandler):
 
     def do_GET(self) -> None:
         parsed = urllib.parse.urlsplit(self.path)
+        if parsed.path.startswith("/api/video-conversion/"):
+            job_id = parsed.path.rsplit("/", 1)[-1]
+            job = self.server.video_jobs.get(job_id)  # type: ignore[attr-defined]
+            if not job:
+                self._send_json({"error": "Unknown video conversion"}, HTTPStatus.NOT_FOUND)
+            else:
+                self._send_json(job.snapshot())
+            return
         if parsed.path == "/api/config":
             self._send_json(
                 {
@@ -377,6 +586,9 @@ class SlideHandler(SimpleHTTPRequestHandler):
 
     def do_POST(self) -> None:
         parsed = urllib.parse.urlsplit(self.path)
+        if parsed.path == "/api/video-conversion":
+            self._start_video_conversion(parsed)
+            return
         if parsed.path != "/api/asset":
             self.send_error(HTTPStatus.NOT_FOUND)
             return
@@ -413,14 +625,85 @@ class SlideHandler(SimpleHTTPRequestHandler):
         relative = candidate.relative_to(self.project_root).as_posix()
         self._send_json({"ok": True, "path": relative}, HTTPStatus.CREATED)
 
+    def _start_video_conversion(self, parsed: urllib.parse.SplitResult) -> None:
+        query = urllib.parse.parse_qs(parsed.query)
+        requested = Path(query.get("name", ["video"])[0]).name
+        folder = query.get("folder", ["figures"])[0]
+        suffix = Path(requested).suffix.lower()
+        if suffix not in CONVERTIBLE_VIDEO_SUFFIXES:
+            self._send_json({"error": "Only AVI and MKV files require conversion"}, HTTPStatus.BAD_REQUEST)
+            return
+        if not shutil.which("ffmpeg") or not shutil.which("ffprobe"):
+            self._send_json({"error": "AVI and MKV import requires ffmpeg and ffprobe on PATH"}, HTTPStatus.SERVICE_UNAVAILABLE)
+            return
+        source: Path | None = None
+        try:
+            asset_dir = self._project_file(folder)
+            if asset_dir == self.project_root:
+                raise PermissionError("Asset folder must not be the project root")
+            asset_dir.mkdir(parents=True, exist_ok=True)
+            if not asset_dir.is_dir():
+                raise ValueError("Asset folder is not a directory")
+            source = asset_dir / f".quarkfoil-{uuid.uuid4().hex}{suffix}"
+            self._write_body(source, MAX_VIDEO_CONVERSION_BYTES)
+        except (OSError, PermissionError, ValueError) as error:
+            if source:
+                source.unlink(missing_ok=True)
+            self._send_json({"error": str(error)}, HTTPStatus.BAD_REQUEST)
+            return
+
+        try:
+            output_suffix, command = _video_conversion_plan(source)
+        except (OSError, subprocess.SubprocessError, ValueError, json.JSONDecodeError) as error:
+            source.unlink(missing_ok=True)
+            self._send_json({"error": f"Cannot inspect video: {error}"}, HTTPStatus.BAD_REQUEST)
+            return
+        stem = Path(requested).stem or "video"
+        output = asset_dir / f"{stem}{output_suffix}"
+        counter = 2
+        while output.exists() or output.with_name(f"{output.stem}-poster.jpg").exists():
+            output = asset_dir / f"{stem}-{counter}{output_suffix}"
+            counter += 1
+        poster = output.with_name(f"{output.stem}-poster.jpg")
+        assert source is not None
+        job = VideoConversionJob(source, output, poster, self.project_root, command)
+        self.server.video_jobs[job.id] = job  # type: ignore[attr-defined]
+        job.thread = threading.Thread(target=_run_video_conversion, args=(job,), daemon=True)
+        job.thread.start()
+        self._send_json(job.snapshot(), HTTPStatus.ACCEPTED)
+
+    def do_DELETE(self) -> None:
+        parsed = urllib.parse.urlsplit(self.path)
+        if not parsed.path.startswith("/api/video-conversion/"):
+            self.send_error(HTTPStatus.NOT_FOUND)
+            return
+        job_id = parsed.path.rsplit("/", 1)[-1]
+        job = self.server.video_jobs.get(job_id)  # type: ignore[attr-defined]
+        if not job:
+            self._send_json({"error": "Unknown video conversion"}, HTTPStatus.NOT_FOUND)
+            return
+        job.cancel()
+        self._send_json({"ok": True})
+
+
+class QuarkfoilServer(ThreadingHTTPServer):
+    def server_close(self) -> None:
+        for job in getattr(self, "video_jobs", {}).values():
+            job.cancel()
+        for job in getattr(self, "video_jobs", {}).values():
+            if job.thread:
+                job.thread.join(timeout=2)
+        super().server_close()
+
 
 def create_server(deck: Path, host: str, port: int, *, verbose: bool = False, reload: bool = True) -> ThreadingHTTPServer:
     resolved = initialize_deck(deck)
-    server = ThreadingHTTPServer((host, port), lambda *args, **kwargs: SlideHandler(*args, directory=APP_ROOT, **kwargs))
+    server = QuarkfoilServer((host, port), lambda *args, **kwargs: SlideHandler(*args, directory=APP_ROOT, **kwargs))
     server.project_root = resolved.parent  # type: ignore[attr-defined]
     server.deck_path = resolved  # type: ignore[attr-defined]
     server.verbose = verbose  # type: ignore[attr-defined]
     server.reload = reload  # type: ignore[attr-defined]
+    server.video_jobs = {}  # type: ignore[attr-defined]
     return server
 
 

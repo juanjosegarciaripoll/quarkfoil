@@ -567,8 +567,15 @@ function figureFolder() {
 }
 
 async function importAsset(file) {
-  if (!file || !["image/", "video/"].some(prefix => file.type.startsWith(prefix))) throw new Error("Only image and video files are supported");
+  const suffix = file?.name?.match(/\.[^.]+$/)?.[0]?.toLowerCase() || "";
+  const convertible = [".avi", ".mkv"].includes(suffix);
+  if (!file || (!convertible && !["image/", "video/"].some(prefix => file.type.startsWith(prefix)))) throw new Error("Only image and video files are supported");
   const assetFolder = figureFolder();
+  if (convertible) {
+    if (!state.local) throw new Error("AVI and MKV conversion requires the local Quarkfoil server");
+    const result = await uploadVideoForConversion(file, assetFolder);
+    return { path: result.path, poster: result.poster, completion: monitorVideoConversion(result.id) };
+  }
   if (state.local) {
     const response = await fetch(`/api/asset?name=${encodeURIComponent(file.name)}&folder=${encodeURIComponent(assetFolder)}`, { method: "POST", headers: { "Content-Type": file.type }, body: file });
     const result = await response.json();
@@ -594,6 +601,106 @@ async function importAsset(file) {
   }
   state.objectUrls.set(path, URL.createObjectURL(file));
   return path;
+}
+
+function uploadVideoForConversion(file, assetFolder) {
+  const dialog = document.querySelector("#video-conversion-dialog");
+  const progress = document.querySelector("#video-conversion-progress");
+  const status = document.querySelector("#video-conversion-status");
+  const cancel = document.querySelector("#cancel-video-conversion");
+  if (dialog.open) dialog.close();
+  progress.value = 0;
+  status.textContent = `Uploading ${file.name}… 0%`;
+  cancel.disabled = false;
+  cancel.textContent = "Cancel conversion";
+  dialog.show();
+  return new Promise((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    request.open("POST", `/api/video-conversion?name=${encodeURIComponent(file.name)}&folder=${encodeURIComponent(assetFolder)}`);
+    request.setRequestHeader("Content-Type", file.type || "application/octet-stream");
+    request.upload.addEventListener("progress", event => {
+      if (!event.lengthComputable) {
+        progress.removeAttribute("value");
+        status.textContent = `Uploading ${file.name}…`;
+        return;
+      }
+      const percentage = Math.round(100 * event.loaded / event.total);
+      progress.value = percentage;
+      status.textContent = `Uploading ${file.name}… ${percentage}%`;
+    });
+    request.upload.addEventListener("load", () => {
+      progress.removeAttribute("value");
+      status.textContent = "Extracting preview frame…";
+    });
+    request.addEventListener("load", () => {
+      let result;
+      try { result = JSON.parse(request.responseText); }
+      catch { reject(new Error("Video upload returned an invalid response")); return; }
+      if (request.status < 200 || request.status >= 300) {
+        reject(new Error(result.error || "Video conversion could not start"));
+        return;
+      }
+      status.textContent = "Preview ready. Starting conversion…";
+      resolve(result);
+    });
+    request.addEventListener("error", () => reject(new Error("Video upload failed")));
+    request.addEventListener("abort", () => reject(new Error("Video upload cancelled")));
+    cancel.onclick = () => request.abort();
+    request.send(file);
+  }).catch(error => {
+    status.textContent = error.message;
+    cancel.textContent = "Close";
+    cancel.onclick = () => dialog.close();
+    throw error;
+  });
+}
+
+async function monitorVideoConversion(jobId) {
+  const dialog = document.querySelector("#video-conversion-dialog");
+  const progress = document.querySelector("#video-conversion-progress");
+  const status = document.querySelector("#video-conversion-status");
+  const cancel = document.querySelector("#cancel-video-conversion");
+  progress.value = 0;
+  status.textContent = "Preview ready. Optimizing for browser playback…";
+  dialog.show();
+  cancel.textContent = "Cancel conversion";
+  let cancelled = false;
+  cancel.onclick = async () => {
+    cancelled = true;
+    cancel.disabled = true;
+    status.textContent = "Cancelling conversion…";
+    await fetch(`/api/video-conversion/${encodeURIComponent(jobId)}`, { method: "DELETE" }).catch(() => {});
+  };
+  let completed = false;
+  try {
+    while (true) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      const response = await fetch(`/api/video-conversion/${encodeURIComponent(jobId)}`);
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Cannot read conversion progress");
+      if (result.progress === null) progress.removeAttribute("value");
+      else progress.value = result.progress;
+      status.textContent = result.status === "queued"
+        ? "Waiting to convert…"
+        : result.status === "extracting"
+          ? "Extracting preview frame…"
+          : result.progress === null ? "Optimizing video…" : `Optimizing video… ${Math.round(result.progress)}%`;
+      if (result.status === "complete") {
+        completed = true;
+        status.textContent = "Video conversion complete";
+        return result;
+      }
+      if (["failed", "cancelled"].includes(result.status)) throw new Error(result.error || (cancelled ? "Conversion cancelled" : "Video conversion failed"));
+    }
+  } catch (error) {
+    status.textContent = error.message;
+    cancel.textContent = "Close";
+    cancel.onclick = () => dialog.close();
+    throw error;
+  } finally {
+    cancel.disabled = false;
+    if (completed) setTimeout(() => { if (dialog.open) dialog.close(); }, 1200);
+  }
 }
 
 function bindUi() {

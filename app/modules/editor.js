@@ -13,6 +13,7 @@ import { renderMarkdownPreview } from "./render.js";
 
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
 const round = value => Math.round(value * 10) / 10;
+export const videoFile = file => file?.type?.startsWith("video/") || /\.(?:avi|mkv|mp4|webm)$/i.test(file?.name || "");
 
 function colorInputValue(value) {
   const normalized = String(value || "").trim().toLowerCase();
@@ -639,8 +640,10 @@ export class DesignEditor {
 
   async addVideo(file, position = null) {
     if (!file) return;
-    const path = await this.options.importAsset(file);
-    if (!path) return;
+    const slideId = this.slide().id;
+    const imported = await this.options.importAsset(file);
+    if (!imported) return;
+    const path = typeof imported === "string" ? imported : imported.path;
     const id = this.uniqueId(`video-${this.slideIndex() + 1}`);
     const w = 40;
     const h = 22.5;
@@ -652,14 +655,44 @@ export class DesignEditor {
       y: position ? clamp(round(position.y), 0, 100 - h) : 30,
       w,
       h,
-      attributes: { src: path },
+      attributes: { src: path, poster: typeof imported === "string" ? null : imported.poster },
     }));
+    if (typeof imported !== "string" && imported.completion) {
+      imported.completion.then(() => {
+        const video = this.section()?.querySelector(`[data-object-id="${CSS.escape(id)}"] video`);
+        if (video) video.load();
+      }).catch(() => {
+        const deck = this.options.getDeck();
+        const slideIndex = deck.slides.findIndex(slide => slide.id === slideId && slide.overlays.some(item => item.id === id && item.video?.source === path));
+        if (slideIndex >= 0) this.commit(deleteOverlay(deck, slideIndex, id));
+      });
+    }
   }
 
   async replaceVideo(file) {
     if (!file || this.selected?.dataset.objectType !== "video") return;
-    const path = await this.options.importAsset(file);
-    if (path) this.replaceVideoPath(path);
+    const objectId = this.selected.dataset.objectId;
+    const original = this.slide().overlays.find(item => item.id === objectId)?.video;
+    const slideId = this.slide().id;
+    const imported = await this.options.importAsset(file);
+    if (!imported) return;
+    const path = typeof imported === "string" ? imported : imported.path;
+    this.commit(updateOverlay(this.options.getDeck(), this.slideIndex(), objectId, {
+      src: path,
+      poster: typeof imported === "string" ? null : imported.poster,
+    }));
+    if (typeof imported !== "string" && imported.completion) {
+      imported.completion.then(() => {
+        const video = this.section()?.querySelector(`[data-object-id="${CSS.escape(objectId)}"] video`);
+        if (video) video.load();
+      }).catch(() => {
+        const deck = this.options.getDeck();
+        const slideIndex = deck.slides.findIndex(slide => slide.id === slideId && slide.overlays.some(item => item.id === objectId && item.video?.source === path));
+        if (slideIndex >= 0 && original) {
+          this.commit(updateOverlay(deck, slideIndex, objectId, { src: original.source, poster: original.poster || null }));
+        }
+      });
+    }
   }
 
   replaceVideoPath(path) {
@@ -763,9 +796,9 @@ export class DesignEditor {
   onDrop(event) {
     if (!this.active()) return;
     event.preventDefault();
-    const file = [...event.dataTransfer.files].find(item => item.type.startsWith("image/") || item.type.startsWith("video/"));
+    const file = [...event.dataTransfer.files].find(item => item.type.startsWith("image/") || videoFile(item));
     if (!file) return;
-    if (file.type.startsWith("video/")) {
+    if (videoFile(file)) {
       const rect = this.section().getBoundingClientRect();
       this.addVideo(file, {
         x: 100 * (event.clientX - rect.left) / rect.width,

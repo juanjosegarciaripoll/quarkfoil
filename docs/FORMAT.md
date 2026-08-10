@@ -223,8 +223,13 @@ Attributes:
 
 ### Videos
 
-Local MP4 and WebM files are first-class media overlays. Their source and
-playback options are stored directly in the overlay annotation:
+Local MP4 and WebM files are first-class media overlays. AVI and MKV imports
+are automatically converted to browser-compatible MP4 (or WebM as a fallback) by the local Quarkfoil server when
+`ffmpeg` and `ffprobe` are available on `PATH`. Quarkfoil extracts the first
+frame as a poster, inserts the video immediately, and shows conversion progress
+in a non-modal dialog, so the preview can still be moved and resized. Browser-only
+directory mode cannot perform this conversion. The source and playback options
+are stored directly in the overlay annotation:
 
 ```markdown
 ::: overlay {#experiment type="video" src="figures/experiment.mp4" poster="figures/experiment-poster.jpg" x="10" y="18" w="80" h="60" controls="true" muted="true"}
@@ -238,6 +243,12 @@ only for muted video. Videos pause when their slide is left. `poster` names an
 optional project-relative image displayed before playback. The editor imports
 video into the configured `assets.figures` directory, and static export copies
 both the video and poster assets.
+
+AVI and MKV source files are temporary import inputs: a successful conversion
+keeps the generated `.mp4` or `.webm` and poster image, not the original container. H.264 video and AAC/MP3 audio are copied directly into MP4 when possible; only incompatible streams are re-encoded. A
+failed or cancelled conversion removes its temporary files and restores or
+removes the provisional overlay. If FFmpeg has no supported H.264 encoder,
+conversion falls back to VP9 video and Opus audio in WebM.
 
 ### Shapes
 

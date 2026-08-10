@@ -183,6 +183,7 @@
   max-height: none;
   margin: 0;
 }
+.slide-video { background: #111; }
 .slide-image[data-fit="contain"], .slide-video[data-fit="contain"] { object-fit: contain; }
 .slide-image[data-fit="cover"], .slide-video[data-fit="cover"] { object-fit: cover; }
 .slide-image[data-fit="width"] { width: 100%; height: auto; object-fit: contain; }

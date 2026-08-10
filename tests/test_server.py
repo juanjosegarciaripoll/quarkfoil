@@ -8,8 +8,10 @@ import unittest
 import urllib.error
 import urllib.request
 from pathlib import Path
+from types import SimpleNamespace
+from unittest import mock
 
-from scientific_slides.server import STARTER_DECK, _python_snapshot, create_server, initialize_deck
+from scientific_slides.server import STARTER_DECK, _python_snapshot, _video_conversion_plan, _video_duration, _video_progress, create_server, initialize_deck
 
 
 class DeckInitializationTests(unittest.TestCase):
@@ -59,6 +61,35 @@ class DeckInitializationTests(unittest.TestCase):
         first = _python_snapshot(package)
         source.write_text("second version", encoding="utf-8")
         self.assertNotEqual(first, _python_snapshot(package))
+
+    def test_unknown_video_duration_is_allowed(self) -> None:
+        probe = SimpleNamespace(stdout='{"streams":[{"duration":"N/A"}],"format":{"duration":"N/A"}}')
+        with mock.patch("scientific_slides.server.subprocess.run", return_value=probe):
+            self.assertIsNone(_video_duration(self.root / "video.mkv"))
+
+    def test_unknown_ffmpeg_progress_is_ignored(self) -> None:
+        self.assertIsNone(_video_progress("N/A", 12.0))
+        self.assertIsNone(_video_progress("nan", 12.0))
+        self.assertEqual(_video_progress("6000000", 12.0), 50.0)
+
+    def test_mp4_plan_reuses_compatible_streams(self) -> None:
+        with (
+            mock.patch("scientific_slides.server._video_codecs", return_value=("h264", "aac")),
+            mock.patch("scientific_slides.server._ffmpeg_encoders", return_value=set()),
+        ):
+            suffix, command = _video_conversion_plan(self.root / "video.mkv")
+        self.assertEqual(suffix, ".mp4")
+        self.assertEqual(command.count("copy"), 2)
+
+    def test_mp4_plan_only_encodes_incompatible_stream(self) -> None:
+        with (
+            mock.patch("scientific_slides.server._video_codecs", return_value=("h264", "opus")),
+            mock.patch("scientific_slides.server._ffmpeg_encoders", return_value={"libx264"}),
+        ):
+            suffix, command = _video_conversion_plan(self.root / "video.mkv")
+        self.assertEqual(suffix, ".mp4")
+        self.assertEqual(command[0:2], ["-c:v", "copy"])
+        self.assertIn("aac", command)
 
 
 class ServerTests(unittest.TestCase):
@@ -174,6 +205,43 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(status, 206)
         self.assertEqual(headers["Content-Range"], "bytes 1-3/5")
         self.assertEqual(payload, b"ide")
+
+    def test_mkv_is_converted_to_mp4_with_preview_and_progress(self) -> None:
+        def fake_conversion(job):
+            job.output.write_bytes(b"mp4")
+            job.poster.write_bytes(b"preview")
+            job.source.unlink()
+            with job.lock:
+                job.status = "complete"
+                job.progress = 100
+
+        with (
+            mock.patch("scientific_slides.server.shutil.which", return_value="/usr/bin/tool"),
+            mock.patch("scientific_slides.server._video_conversion_plan", return_value=(".mp4", ["-c:v", "copy"])),
+            mock.patch("scientific_slides.server._run_video_conversion", side_effect=fake_conversion),
+        ):
+            status, _, payload = self.request(
+                "/api/video-conversion?name=experiment.mkv",
+                method="POST",
+                body=b"matroska",
+                headers={"Content-Type": "video/x-matroska"},
+            )
+        self.assertEqual(status, 202)
+        started = json.loads(payload)
+        self.assertEqual(started["path"], "figures/experiment.mp4")
+        self.assertEqual(started["poster"], "figures/experiment-poster.jpg")
+        status, _, payload = self.request(f"/api/video-conversion/{started['id']}")
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(payload)["status"], "complete")
+        self.assertEqual((self.root / started["path"]).read_bytes(), b"mp4")
+        self.assertEqual((self.root / started["poster"]).read_bytes(), b"preview")
+
+    def test_mkv_conversion_reports_missing_ffmpeg(self) -> None:
+        with mock.patch("scientific_slides.server.shutil.which", return_value=None):
+            with self.assertRaises(urllib.error.HTTPError) as context:
+                self.request("/api/video-conversion?name=experiment.mkv", method="POST", body=b"video")
+        self.assertEqual(context.exception.code, 503)
+        self.assertIn("requires ffmpeg", context.exception.read().decode("utf-8"))
 
     def test_asset_import_uses_requested_project_folder(self) -> None:
         status, _, payload = self.request(

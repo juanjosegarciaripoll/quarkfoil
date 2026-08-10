@@ -15,7 +15,7 @@ import {
   updateSlideProperties,
 } from "./parser.js";
 import { renderDeck } from "./render.js";
-import { clipboardImageFile, initialImageGeometry, renameClipboardImage } from "./editor.js";
+import { clipboardImageFile, initialImageGeometry, renameClipboardImage, videoFile } from "./editor.js";
 import { prepareBibliography } from "./bibliography.js";
 
 const source = `---
@@ -226,6 +226,7 @@ try {
   assert(renameClipboardImage(pastedPng, "experiment-result").name === "experiment-result.png", "pasted images accept a chosen filename and infer its extension");
   assert(renameClipboardImage(pastedPng, "plots/result")?.name === "plots-result.png", "pasted image filenames cannot introduce directories");
   assert(renameClipboardImage(pastedPng, "  ") === null, "an empty pasted image filename cancels the import");
+  assert(videoFile(new File([], "recording.mkv")) && videoFile(new File([], "recording.avi")), "MKV and AVI drops are recognized without MIME metadata");
   assert(clipboardImageFile({ items: [{ kind: "string", type: "text/plain", getAsFile: () => null }] }) === null, "text-only clipboard data is ignored");
   const landscapeGeometry = initialImageGeometry(2, 16 / 9);
   assert(landscapeGeometry.w === 35 && landscapeGeometry.h === 31.1, "landscape image overlays preserve their pixel aspect ratio");
