@@ -59,7 +59,7 @@ The `CI` workflow runs for every push and pull request. It checks:
 
 - Python 3.11 on Linux and Windows;
 - the current Python release on Linux;
-- the browser self-test in Microsoft Edge on Windows;
+- the headless browser self-test in Firefox on Linux and Microsoft Edge on Windows;
 - wheel and source-archive creation after all checks pass.
 
 Distribution archives exist only inside the ephemeral CI runner and are not

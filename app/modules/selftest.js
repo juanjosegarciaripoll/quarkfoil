@@ -2,6 +2,7 @@ import {
   deleteOverlay,
   deleteSlide,
   duplicateSlide,
+  insertOverlay,
   insertSlide,
   moveSlide,
   duplicateOverlay,
@@ -360,5 +361,8 @@ try {
   document.querySelector("#results").textContent = `${checks.join("\n")}\n\n${checks.length} checks passed.`;
 } catch (error) {
   document.body.dataset.status = "failed";
-  document.querySelector("#results").textContent = `${checks.join("\n")}\n\nFAIL ${error.stack || error.message}`;
+  const detail = error.stack?.includes(error.message)
+    ? error.stack
+    : `${error.name}: ${error.message}${error.stack ? `\n${error.stack}` : ""}`;
+  document.querySelector("#results").textContent = `${checks.join("\n")}\n\nFAIL ${detail}`;
 }

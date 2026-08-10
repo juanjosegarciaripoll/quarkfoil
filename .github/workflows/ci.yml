@@ -39,8 +39,18 @@ jobs:
         run: uv run --frozen --no-group docs --python ${{ matrix.python-version }} python -m unittest discover -s tests -v
 
   browser:
-    name: Browser · Windows Edge
-    runs-on: windows-latest
+    name: Browser · ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux Firefox
+            os: ubuntu-latest
+            browser: firefox
+          - name: Windows Edge
+            os: windows-latest
+            browser: edge
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -51,7 +61,7 @@ jobs:
       - name: Install Python
         run: uv python install 3.11
       - name: Run browser self-test
-        run: uv run --frozen --no-group docs --python 3.11 python tests/browser_ci.py
+        run: uv run --frozen --group browser --python 3.11 python tests/browser_ci.py --browser ${{ matrix.browser }}
 
   packages:
     name: Verify distribution build

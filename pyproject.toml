@@ -20,6 +20,9 @@ classifiers = [
 ]
 
 [dependency-groups]
+browser = [
+    "selenium>=4.35,<5",
+]
 docs = [
   "mkdocs-material>=9.6,<10",
 ]
@@ -29,6 +32,7 @@ quarkfoil = "scientific_slides:main"
 
 [tool.uv]
 package = true
+default-groups = []
 
 [build-system]
 requires = ["hatchling"]
