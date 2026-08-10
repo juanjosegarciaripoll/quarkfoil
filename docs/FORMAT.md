@@ -242,8 +242,10 @@ are stored directly in the overlay annotation:
 `fit` is `contain` by default or may be `cover`. Native controls are enabled by
 default; set `controls="false"` to hide them. The optional `autoplay`, `loop`,
 and `muted` flags are enabled with `"true"`. Browsers generally permit autoplay
-only for muted video. Videos pause when their slide is left. `poster` names an
-optional project-relative image displayed before playback. The editor imports
+only for muted video. Videos pause when their slide is left. Source and Design
+modes never start autoplay; videos there play only after an explicit click on
+their controls and pause when the editor changes slides or modes. `poster` names
+an optional project-relative image displayed before playback. The editor imports
 video into the configured `assets.figures` directory, and static export copies
 both the video and poster assets.
 

@@ -224,9 +224,9 @@ export function renderMarkdownPreview(source, target, options = {}) {
   target.innerHTML = markdown(source, null, options);
 }
 
-export function syncVideoPlayback(activeSlide) {
+export function syncVideoPlayback(activeSlide, { autoplay = true, pauseActive = false } = {}) {
   document.querySelectorAll(".scientific-slide .slide-video").forEach(video => {
-    if (!activeSlide?.contains(video)) video.pause();
-    else if (video.dataset.autoplay === "true") video.play().catch(() => {});
+    if (!activeSlide?.contains(video) || pauseActive) video.pause();
+    else if (autoplay && video.dataset.autoplay === "true") video.play().catch(() => {});
   });
 }

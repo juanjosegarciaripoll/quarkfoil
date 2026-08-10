@@ -31,6 +31,10 @@ image pasting is disabled while a text field or content dialog is active.
 
 An image embedded alongside text in a Markdown region remains part of that Markdown document block and is not independently selectable.
 
+Videos remain paused in Source and Design modes unless you explicitly use their
+play control. Changing slides or editor modes pauses playback. Present mode
+continues to honor each video's autoplay setting.
+
 ### Present
 
 Present hides the editor chrome and enables normal Reveal.js navigation. Press `Escape` to return to Design.

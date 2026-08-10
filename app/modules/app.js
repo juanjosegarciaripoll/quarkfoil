@@ -252,7 +252,7 @@ function moveSelectedSlide(direction) {
 
 function onSlideChanged(event) {
   state.currentSlide = event.indexh;
-  syncVideoPlayback(event.currentSlide);
+  syncVideoPlayback(event.currentSlide, { autoplay: state.mode === "present" });
   rebuildSlideList();
   editor?.refresh();
 }
@@ -264,6 +264,7 @@ function setMode(mode) {
   elements.sourcePane.hidden = mode !== "source";
   document.querySelectorAll("[data-mode]").forEach(button => button.classList.toggle("active", button.dataset.mode === mode));
   if (reveal) {
+    syncVideoPlayback(reveal.getCurrentSlide(), { autoplay: mode === "present", pauseActive: mode !== "present" });
     reveal.configure({
       controls: mode === "present",
       progress: mode === "present",
@@ -809,7 +810,7 @@ async function initialize() {
   await reveal.initialize();
   reveal.on("slidechanged", onSlideChanged);
   reveal.slide(state.currentSlide);
-  syncVideoPlayback(reveal.getCurrentSlide());
+  syncVideoPlayback(reveal.getCurrentSlide(), { autoplay: state.mode === "present", pauseActive: state.mode !== "present" });
   editor = new DesignEditor({
     getDeck: () => state.deck,
     getMode: () => state.mode,

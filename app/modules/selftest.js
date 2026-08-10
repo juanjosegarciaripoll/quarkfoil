@@ -14,7 +14,7 @@ import {
   updateSlideTitle,
   updateSlideProperties,
 } from "./parser.js";
-import { renderDeck } from "./render.js";
+import { renderDeck, syncVideoPlayback } from "./render.js";
 import { bindRangeControl, clipboardImageFile, initialImageGeometry, pageSlideIndex, projectAssetPage, renameClipboardImage, videoFile } from "./editor.js";
 import { parseBibliography, prepareBibliography } from "./bibliography.js";
 
@@ -282,6 +282,17 @@ try {
   const videoElement = videoFixture.querySelector(".overlay-video video");
   assert(videoElement.src.endsWith("/test/artwork/demo.mp4") && videoElement.poster.endsWith("/test/artwork/poster.jpg"), "video and poster assets resolve");
   assert(videoElement.controls && videoElement.muted && videoElement.dataset.autoplay === "true", "native video options render");
+  document.body.append(videoFixture);
+  let videoPlays = 0; let videoPauses = 0;
+  videoElement.play = () => { videoPlays += 1; return Promise.resolve(); };
+  videoElement.pause = () => { videoPauses += 1; };
+  syncVideoPlayback(videoFixture.querySelector(".scientific-slide"), { autoplay: false });
+  assert(videoPlays === 0 && videoPauses === 0, "editor playback sync preserves explicit playback without starting autoplay");
+  syncVideoPlayback(videoFixture.querySelector(".scientific-slide"));
+  assert(videoPlays === 1, "presentation playback sync honors autoplay");
+  syncVideoPlayback(videoFixture.querySelector(".scientific-slide"), { autoplay: false, pauseActive: true });
+  assert(videoPauses === 1, "leaving presentation mode pauses the active video");
+  videoFixture.remove();
   assert(deck.slides[1].cells[0]?.range !== null, "ordinary core Markdown retains an editable range");
 
   let defaultShapeSource = insertOverlay(deck, 0, { type: "shape", content: "Label", id: "default-shape", attributes: {} });
