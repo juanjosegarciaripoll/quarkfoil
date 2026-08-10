@@ -1,6 +1,6 @@
 import { escapeHtml, THEMES } from "./parser.js";
 import { makeShapeSvg } from "./shapes.js";
-import { renderCitation } from "./bibliography.js";
+import { attributionKeys, renderCitation } from "./bibliography.js";
 
 function markdown(source, bibliography = null, { breaks = false } = {}) {
   try {
@@ -100,7 +100,10 @@ function fillContent(container, item, assetResolver, bibliography, preserveLines
     label.innerHTML = markdown(item.source, bibliography, { breaks: preserveLines });
     container.append(makeShapeSvg(item.shape), label);
   }
-  else if (item.type === "citation") container.innerHTML = renderCitation(item.attrs.values.key || "", bibliography, { brief: item.attrs.values.display !== "number" });
+  else if (item.type === "citation") {
+    const brief = item.attrs.values.display !== "number";
+    container.innerHTML = attributionKeys(item).map(key => renderCitation(key, bibliography, { brief })).join("; ");
+  }
   else container.innerHTML = markdown(item.source, bibliography, { breaks: preserveLines && item.type === "markdown" });
 }
 

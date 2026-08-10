@@ -176,6 +176,7 @@ export class DesignEditor {
     this.imageProperties = document.querySelector("#image-properties");
     this.videoProperties = document.querySelector("#video-properties");
     this.shapeProperties = document.querySelector("#shape-properties");
+    this.attributionProperties = document.querySelector("#attribution-properties");
     this.fontProperties = document.querySelector("#font-properties");
     this.noSelection = document.querySelector("#no-selection");
     this.dialog = document.querySelector("#content-dialog");
@@ -274,6 +275,7 @@ export class DesignEditor {
     for (const id of ["shape", "shape-fill", "shape-fill-alpha", "shape-stroke", "shape-stroke-alpha", "shape-stroke-width", "shape-shadow"]) {
       document.querySelector(`#prop-${id}`).addEventListener("change", () => this.applyShapeProperties());
     }
+    document.querySelector("#prop-attribution-keys").addEventListener("change", () => this.applyAttributionKeys());
     document.querySelector("#prop-font-size").addEventListener("input", event => this.previewFontSize(event.target.value));
     document.querySelector("#prop-font-size").addEventListener("change", () => this.applyFontSize());
     for (const id of ["prop-text-color", "prop-text-color-alpha"]) {
@@ -324,7 +326,10 @@ export class DesignEditor {
     event.preventDefault();
     event.stopPropagation();
     window.getSelection()?.removeAllRanges();
-    if (overlay) { this.selectOverlay(overlay); this.openContentDialog(); }
+    if (overlay) {
+      this.selectOverlay(overlay);
+      if (overlay.dataset.objectType !== "citation") this.openContentDialog();
+    }
     else if (cell) { this.selectCell(cell); this.openCellDialog(); }
     else this.openTitleDialog();
   }
@@ -375,6 +380,7 @@ export class DesignEditor {
     this.imageProperties.hidden = true;
     this.videoProperties.hidden = true;
     this.shapeProperties.hidden = true;
+    this.attributionProperties.hidden = true;
     this.fontProperties.hidden = true;
     this.noSelection.hidden = true;
     this.slideProperties.hidden = false;
@@ -408,7 +414,7 @@ export class DesignEditor {
     for (const key of ["x", "y", "w", "h", "z"]) document.querySelector(`#prop-${key}`).value = object.geometry[key];
     document.querySelector("#prop-fragment").value = object.fragment ?? "";
     document.querySelector("#prop-locked").checked = object.locked;
-    document.querySelector("#edit-content").hidden = ["image", "video"].includes(object.type);
+    document.querySelector("#edit-content").hidden = ["image", "video", "citation"].includes(object.type);
     if (object.type === "image" && object.image) {
       this.imageProperties.hidden = false;
       document.querySelector("#prop-fit").value = object.image.attrs.values.fit || "contain";
@@ -426,6 +432,9 @@ export class DesignEditor {
         setColorControl("prop-shape-stroke", surfaceStyle.stroke, "#146c7e");
         document.querySelector("#prop-shape-stroke-width").value = object.strokeWidth;
         document.querySelector("#prop-shape-shadow").checked = object.shadow;
+      } else if (object.type === "citation") {
+        this.attributionProperties.hidden = false;
+        document.querySelector("#prop-attribution-keys").value = object.attrs.values.keys || object.attrs.values.key || "";
       }
       this.fontProperties.hidden = false;
       setColorControl("prop-text-color", getComputedStyle(element).color, "#17202a");
@@ -456,6 +465,19 @@ export class DesignEditor {
   applyTextColor(color) {
     if (!this.selected || ["image", "video"].includes(this.selected.dataset.objectType)) return;
     this.commit(updateOverlay(this.options.getDeck(), this.slideIndex(), this.selected.dataset.objectId, { color }));
+  }
+
+  applyAttributionKeys() {
+    if (!this.selected || this.selected.dataset.objectType !== "citation") return;
+    const input = document.querySelector("#prop-attribution-keys");
+    const keys = [...new Set(input.value.split(/[\s,;]+/).filter(Boolean))];
+    const invalid = keys.find(key => !/^[a-zA-Z0-9_:./+-]+$/.test(key));
+    input.setCustomValidity(!keys.length ? "Enter at least one citation key" : invalid ? `Invalid citation key: ${invalid}` : "");
+    if (!input.reportValidity()) return;
+    this.commit(updateOverlay(this.options.getDeck(), this.slideIndex(), this.selected.dataset.objectId, {
+      key: keys.length === 1 ? keys[0] : null,
+      keys: keys.length > 1 ? keys.join(" ") : null,
+    }));
   }
 
   updateAlignmentButtons(alignment) {

@@ -123,14 +123,22 @@ atomic and reject external conflicts.
 
 Enter a DOI and choose **Add DOI** to retrieve BibTeX metadata. Quarkfoil shows
 a preview before appending it to the draft and detects duplicate keys and DOIs.
+Pressing `Enter` in the DOI field performs the same Add DOI action and keeps the
+dialog open. Pressing `Enter` in the reference search field leaves the current
+filter in place and does not submit or close the dialog.
 Imported citation keys use the lowercase first-author family name followed by
 the four-digit year, such as `wallraff2004`. Latin accents are stripped for
 portable ASCII keys, so Peñas becomes `penas`. DOI lookup is the only
 bibliography operation that requires the network.
 
 **Insert [n]** inserts an inline citation at the Source editor caret. **Add
-attribution** creates a positioned, resizable brief reference for crediting a
-copied figure. Both forms share deck-wide numbering.
+attribution** first saves the bibliography draft, then creates a positioned,
+resizable brief reference for crediting a copied figure. If the bibliography
+cannot be saved, no attribution is added and the dialog reports the error.
+Select an attribution in Design mode to edit its reference keys and show one or
+more papers. Its generated reference text is not directly editable.
+Attributions do not display or consume citation numbers; inline citations keep
+deck-wide numbering.
 
 ## Keyboard shortcuts
 

@@ -312,11 +312,14 @@ Escaped citations and citations inside inline or fenced code remain literal.
 A citation overlay provides a positioned figure attribution:
 
 ```markdown
-::: overlay {#figure-source type="citation" key="smith2024" display="brief" x="55" y="82" w="40" h="8" font-size="0.7em"}
+::: overlay {#figure-source type="citation" keys="smith2024 jones2022" display="brief" x="55" y="82" w="40" h="8" font-size="0.7em"}
 
 :::
 ```
 
-`display="number"` shows only the shared number; `display="brief"` adds an
-abbreviated reference. DOI and URL fields become links. Missing keys are shown
-as visible errors.
+`display="number"` shows a citation's shared number. `display="brief"` is an
+attribution: it shows generated abbreviated references without citation
+numbers and does not affect numbering. Its `key` attribute selects one paper;
+`keys` selects multiple space-separated papers. Both are editable from the
+attribution's Design properties. DOI and URL fields become links. Missing keys
+are shown as visible errors.

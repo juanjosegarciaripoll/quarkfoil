@@ -30,6 +30,11 @@ export function briefReference(entry) {
   return [author, details, fields.year ? `(${fields.year})` : ""].filter(Boolean).join(", ");
 }
 
+export function attributionKeys(overlay) {
+  const value = overlay?.attrs?.values?.keys || overlay?.attrs?.values?.key || "";
+  return [...new Set(String(value).split(/[\s,;]+/).filter(Boolean))];
+}
+
 export function prepareBibliography(source, deck) {
   let entries = [];
   let error = null;
@@ -47,7 +52,9 @@ export function prepareBibliography(source, deck) {
     for (const match of prose.matchAll(/(?<!\\)\[@([\w:./+-]+)(?:\s*;\s*@([\w:./+-]+))*\]/g)) {
       for (const key of match[0].matchAll(/@([\w:./+-]+)/g)) register(key[1]);
     }
-    for (const overlay of slide.overlays.filter(item => item.type === "citation")) register(overlay.attrs.values.key || "");
+    for (const overlay of slide.overlays.filter(item => item.type === "citation" && item.attrs.values.display === "number")) {
+      for (const key of attributionKeys(overlay)) register(key);
+    }
   }
   return { source, entries, byKey, numbers, missing, error };
 }
@@ -55,10 +62,10 @@ export function prepareBibliography(source, deck) {
 export function renderCitation(key, bibliography, { brief = false } = {}) {
   const number = bibliography?.numbers.get(key);
   const entry = bibliography?.byKey.get(key);
-  if (!number || !entry) return `<span class="citation-missing">[? ${key}]</span>`;
+  if (!entry || (!brief && !number)) return `<span class="citation-missing">[? ${key}]</span>`;
   const doi = entry.fields.doi;
   const url = doi ? `https://doi.org/${encodeURI(doi)}` : entry.fields.url;
   const marker = `<span class="citation-number">[${number}]</span>`;
-  const content = brief ? `${marker} ${escapeHtml(briefReference(entry))}` : marker;
+  const content = brief ? escapeHtml(briefReference(entry)) : marker;
   return url ? `<a class="citation" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${content}</a>` : `<span class="citation">${content}</span>`;
 }

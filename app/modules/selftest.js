@@ -176,7 +176,7 @@ function assertCitations() {
   fixture.id = "layout-fixture";
   fixture.className = "reveal";
   const slides = document.createElement("div"); slides.className = "slides"; fixture.append(slides); document.body.append(fixture);
-  const parsed = parseDeck(`## References {.layout-1}\n\nInline [@einstein1905], repeated [@einstein1905], and code \`[@ignored]\`.\n\n::: overlay {#source type="citation" key="smith2024" display="brief" x="50" y="80" w="45" h="8"}\n\n:::`);
+  const parsed = parseDeck(`## References {.layout-1}\n\nInline [@einstein1905], repeated [@einstein1905], and code \`[@ignored]\`.\n\n::: overlay {#source type="citation" keys="smith2024 einstein1905" display="brief" x="50" y="80" w="45" h="8"}\n\n:::`);
   const bib = `@article{einstein1905, author={Einstein, Albert}, journal={Annalen der Physik}, volume={17}, pages={891--921}, year={1905}, doi={10.1002/test}}\n@article{smith2024, author={Smith, Alice and Jones, Bob}, journal={Physical Review Letters}, volume={132}, number={123456}, year={2024}}`;
   const bibliography = prepareBibliography(bib, parsed);
   const doiEntry = parseBibliography("@article{wallraff2004, month={Sept}, doi={10.1038/nature02851}}")[0];
@@ -185,9 +185,10 @@ function assertCitations() {
   try { parseBibliography("@article{broken, month=Sept}"); } catch (error) { bibliographyError = error.message; }
   assert(bibliographyError.startsWith("Invalid BibTeX:"), "BibTeX parser failures produce visible error messages");
   renderDeck(parsed, slides, source => source, bibliography);
-  assert(bibliography.numbers.get("einstein1905") === 1 && bibliography.numbers.get("smith2024") === 2, "citations are numbered by first appearance");
-  assert(fixture.querySelectorAll(".citation-number").length === 3, "inline and attribution citations render while code remains literal");
-  assert(fixture.querySelector(".overlay-citation").textContent.includes("Smith et al."), "positioned citation renders a brief reference");
+  assert(bibliography.numbers.get("einstein1905") === 1 && !bibliography.numbers.has("smith2024"), "attributions do not consume citation numbers");
+  assert(fixture.querySelectorAll(".citation-number").length === 2, "only inline citations display numbers while code remains literal");
+  const attribution = fixture.querySelector(".overlay-citation").textContent;
+  assert(attribution.includes("Smith et al.") && attribution.includes("Einstein"), "positioned attribution renders multiple selected references");
   fixture.remove();
 }
 

@@ -487,6 +487,7 @@ function rebuildBibliographyList() {
     cite.addEventListener("click", () => insertInlineCitation(entry.key));
     const attribute = document.createElement("button");
     attribute.type = "button"; attribute.textContent = "Add attribution";
+    attribute.title = "Save the bibliography draft and add an attribution to the current slide";
     attribute.addEventListener("click", () => insertCitationOverlay(entry.key));
     row.append(description, cite, attribute);
     target.append(row);
@@ -510,7 +511,8 @@ function insertInlineCitation(key) {
   editor.focus();
 }
 
-function insertCitationOverlay(key) {
+async function insertCitationOverlay(key) {
+  if (!await saveBibliography({ announce: false })) return;
   const base = `citation-${key.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
   const used = new Set(state.deck.slides[state.currentSlide].overlays.map(item => item.id));
   let id = base; let counter = 2;
@@ -542,20 +544,26 @@ async function fetchDoi() {
   } catch (error) { bibliographyMessage(error.message, true); }
 }
 
-async function saveBibliography() {
+async function saveBibliography({ announce = true } = {}) {
   const source = document.querySelector("#bibliography-source").value;
   try { parseBibliography(source); }
-  catch (error) { bibliographyMessage(error.message, true); return; }
-  if (!state.local) { bibliographyMessage("Saving requires the local Quarkfoil server", true); return; }
-  const response = await fetch(`/api/bibliography?path=${encodeURIComponent(bibliographyPath())}`, { method: "PUT", headers: { "Content-Type": "application/x-bibtex; charset=utf-8", "If-Match": `"${state.bibliographyHash}"` }, body: source });
-  const result = await response.json();
-  if (!response.ok) { bibliographyMessage(result.error || "Save failed", true); return; }
-  state.bibliographySource = source;
-  state.bibliographyHash = result.hash;
-  if (!state.deck.metadata?.bibliography && /^---\r?\n/.test(state.source)) {
-    commitSource(state.source.replace(/^---\r?\n/, `---\nbibliography: ${bibliographyPath()}\n`));
-  } else parseAndRender(state.source);
-  bibliographyMessage("Bibliography saved");
+  catch (error) { bibliographyMessage(error.message, true); return false; }
+  if (!state.local) { bibliographyMessage("Saving requires the local Quarkfoil server", true); return false; }
+  try {
+    const response = await fetch(`/api/bibliography?path=${encodeURIComponent(bibliographyPath())}`, { method: "PUT", headers: { "Content-Type": "application/x-bibtex; charset=utf-8", "If-Match": `"${state.bibliographyHash}"` }, body: source });
+    const result = await response.json();
+    if (!response.ok) { bibliographyMessage(result.error || "Save failed", true); return false; }
+    state.bibliographySource = source;
+    state.bibliographyHash = result.hash;
+    if (!state.deck.metadata?.bibliography && /^---\r?\n/.test(state.source)) {
+      if (!commitSource(state.source.replace(/^---\r?\n/, `---\nbibliography: ${bibliographyPath()}\n`))) return false;
+    } else parseAndRender(state.source);
+    if (announce) bibliographyMessage("Bibliography saved");
+    return true;
+  } catch (error) {
+    bibliographyMessage(error.message || "Save failed", true);
+    return false;
+  }
 }
 
 function figureFolder() {
@@ -729,9 +737,17 @@ function bindUi() {
   });
   document.querySelector("#bibliography-button").addEventListener("click", openBibliography);
   document.querySelector("#bibliography-search").addEventListener("input", rebuildBibliographyList);
+  document.querySelector("#bibliography-search").addEventListener("keydown", event => {
+    if (event.key === "Enter" && !event.isComposing) event.preventDefault();
+  });
   document.querySelector("#bibliography-source").addEventListener("input", rebuildBibliographyList);
   document.querySelector("#doi-fetch").addEventListener("click", fetchDoi);
-  document.querySelector("#bibliography-save").addEventListener("click", saveBibliography);
+  document.querySelector("#doi-input").addEventListener("keydown", event => {
+    if (event.key !== "Enter" || event.isComposing) return;
+    event.preventDefault();
+    fetchDoi();
+  });
+  document.querySelector("#bibliography-save").addEventListener("click", () => saveBibliography());
   document.querySelector("#undo-button").addEventListener("click", undo);
   document.querySelector("#redo-button").addEventListener("click", redo);
   document.querySelector("#add-slide").addEventListener("click", addSlideAfterSelection);
