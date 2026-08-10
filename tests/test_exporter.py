@@ -29,9 +29,19 @@ class ExporterTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.temporary.cleanup()
 
-    def test_video_attribute_assets_are_discovered(self) -> None:
+    def test_video_and_poster_assets_are_exported(self) -> None:
         source = '::: overlay {type="video" src="media/demo.webm" poster="posters/demo.jpg"}\n:::\n'
         self.assertEqual(_asset_references(source), {"media/demo.webm", "posters/demo.jpg"})
+        media = self.project / "media"
+        posters = self.project / "posters"
+        media.mkdir()
+        posters.mkdir()
+        (media / "demo.webm").write_bytes(b"webm-video")
+        (posters / "demo.jpg").write_bytes(b"jpeg-poster")
+        self.deck.write_text("## Video {.layout-free}\n\n" + source, encoding="utf-8")
+        output = export_presentation(self.deck, self.root / "video-site")
+        self.assertEqual((output / "media/demo.webm").read_bytes(), b"webm-video")
+        self.assertEqual((output / "posters/demo.jpg").read_bytes(), b"jpeg-poster")
 
     def test_local_export_is_complete(self) -> None:
         output = export_presentation(self.deck, self.root / "local-site")
@@ -46,6 +56,8 @@ class ExporterTests(unittest.TestCase):
         self.assertTrue((output / "quarkfoil/themes.css").is_file())
         self.assertTrue((output / "quarkfoil/vendor/katex/fonts/KaTeX_Main-Regular.woff2").is_file())
         self.assertIn("Reveal.js", (output / "THIRD_PARTY_LICENSES.txt").read_text(encoding="utf-8"))
+        player = (output / "quarkfoil/player.js").read_text(encoding="utf-8")
+        self.assertNotIn("/api/", player)
 
     def test_cdn_export_uses_pinned_integrity_checked_urls(self) -> None:
         output = export_presentation(self.deck, self.root / "cdn-site", assets="cdn")
