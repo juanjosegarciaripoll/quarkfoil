@@ -466,16 +466,19 @@ function bibliographyMessage(message, error = false) {
   element.classList.toggle("error", error);
 }
 
-function rebuildBibliographyList() {
+function rebuildBibliographyList(revealKey = null) {
   const target = document.querySelector("#bibliography-list");
   const query = document.querySelector("#bibliography-search").value.toLowerCase();
   let entries;
   try { entries = parseBibliography(document.querySelector("#bibliography-source").value); }
   catch (error) { bibliographyMessage(error.message, true); return; }
   target.replaceChildren();
+  let revealedRow = null;
   for (const entry of entries.filter(item => `${item.key} ${Object.values(item.fields).join(" ")}`.toLowerCase().includes(query))) {
     const row = document.createElement("div");
     row.className = "bibliography-entry";
+    row.dataset.citationKey = entry.key;
+    if (entry.key === revealKey) revealedRow = row;
     const description = document.createElement("div");
     const title = document.createElement("strong");
     title.textContent = entry.key;
@@ -493,6 +496,7 @@ function rebuildBibliographyList() {
     target.append(row);
   }
   bibliographyMessage(`${entries.length} reference${entries.length === 1 ? "" : "s"}`);
+  if (revealedRow) requestAnimationFrame(() => revealedRow.scrollIntoView({ block: "nearest" }));
 }
 
 function openBibliography() {
@@ -539,7 +543,8 @@ async function fetchDoi() {
     if (!window.confirm(`Add ${incoming.key}?\n\n${incoming.fields.title || "Untitled"}\n${briefReference(incoming)}`)) { bibliographyMessage("DOI import cancelled"); return; }
     source.value = `${source.value.trimEnd()}${source.value.trim() ? "\n\n" : ""}${result.bibtex.trim()}\n`;
     document.querySelector("#doi-input").value = "";
-    rebuildBibliographyList();
+    document.querySelector("#bibliography-search").value = "";
+    rebuildBibliographyList(incoming.key);
     bibliographyMessage(`Added ${incoming.key} to the draft; save to write the bibliography`);
   } catch (error) { bibliographyMessage(error.message, true); }
 }
@@ -736,11 +741,11 @@ function bindUi() {
     parseAndRender(source, { preserveSlide: false });
   });
   document.querySelector("#bibliography-button").addEventListener("click", openBibliography);
-  document.querySelector("#bibliography-search").addEventListener("input", rebuildBibliographyList);
+  document.querySelector("#bibliography-search").addEventListener("input", () => rebuildBibliographyList());
   document.querySelector("#bibliography-search").addEventListener("keydown", event => {
     if (event.key === "Enter" && !event.isComposing) event.preventDefault();
   });
-  document.querySelector("#bibliography-source").addEventListener("input", rebuildBibliographyList);
+  document.querySelector("#bibliography-source").addEventListener("input", () => rebuildBibliographyList());
   document.querySelector("#doi-fetch").addEventListener("click", fetchDoi);
   document.querySelector("#doi-input").addEventListener("keydown", event => {
     if (event.key !== "Enter" || event.isComposing) return;
