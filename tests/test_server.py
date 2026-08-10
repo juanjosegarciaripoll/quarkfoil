@@ -11,7 +11,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
-from scientific_slides.server import STARTER_DECK, _python_snapshot, _video_conversion_plan, _video_duration, _video_progress, create_server, initialize_deck
+from scientific_slides.server import STARTER_DECK, _normalize_doi_bibtex, _python_snapshot, _video_conversion_plan, _video_duration, _video_progress, create_server, initialize_deck
 
 
 class DeckInitializationTests(unittest.TestCase):
@@ -21,6 +21,16 @@ class DeckInitializationTests(unittest.TestCase):
 
     def tearDown(self) -> None:
         self.temporary.cleanup()
+
+    def test_doi_bibtex_braces_nonstandard_month_names(self) -> None:
+        source = "@article{Wallraff_2004, author={Wallraff, A. and Schuster, D. I.}, month=Sept, year={2004}}"
+        self.assertEqual(_normalize_doi_bibtex(source), "@article{wallraff2004, author={Wallraff, A. and Schuster, D. I.}, month={Sept}, year={2004}}")
+
+    def test_doi_bibtex_key_uses_lowercase_family_name_and_full_year(self) -> None:
+        source = "@article{provider_key, author={Albert Einstein and Boris Podolsky}, year={1935}}"
+        self.assertTrue(_normalize_doi_bibtex(source).startswith("@article{einstein1935,"))
+        accented = "@article{provider_key, author={Peñas, Juan}, year={2023}}"
+        self.assertTrue(_normalize_doi_bibtex(accented).startswith("@article{penas2023,"))
 
     def test_missing_markdown_is_created_from_starter(self) -> None:
         deck = self.root / "new-deck.md"

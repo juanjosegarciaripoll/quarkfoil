@@ -123,7 +123,10 @@ atomic and reject external conflicts.
 
 Enter a DOI and choose **Add DOI** to retrieve BibTeX metadata. Quarkfoil shows
 a preview before appending it to the draft and detects duplicate keys and DOIs.
-DOI lookup is the only bibliography operation that requires the network.
+Imported citation keys use the lowercase first-author family name followed by
+the four-digit year, such as `wallraff2004`. Latin accents are stripped for
+portable ASCII keys, so Peñas becomes `penas`. DOI lookup is the only
+bibliography operation that requires the network.
 
 **Insert [n]** inserts an inline citation at the Source editor caret. **Add
 attribution** creates a positioned, resizable brief reference for crediting a

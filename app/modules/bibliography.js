@@ -6,7 +6,13 @@ function plain(value = "") {
 
 export function parseBibliography(source) {
   if (!source.trim()) return [];
-  const records = window.bibtexParse.toJSON(source);
+  let records;
+  try {
+    records = window.bibtexParse.toJSON(source);
+  } catch (reason) {
+    const message = reason instanceof Error ? reason.message : String(reason);
+    throw new Error(`Invalid BibTeX: ${message}`);
+  }
   return records.map(record => ({
     key: record.citationKey,
     type: record.entryType,

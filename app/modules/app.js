@@ -522,6 +522,7 @@ function insertCitationOverlay(key) {
 async function fetchDoi() {
   if (!state.local) { bibliographyMessage("DOI import requires the local Quarkfoil server", true); return; }
   const doi = document.querySelector("#doi-input").value.trim();
+  if (!doi) { bibliographyMessage("Enter a DOI to import", true); return; }
   bibliographyMessage("Fetching DOI…");
   try {
     const response = await fetch(`/api/doi?doi=${encodeURIComponent(doi)}`);
@@ -531,6 +532,7 @@ async function fetchDoi() {
     const parsed = parseBibliography(result.bibtex);
     const existing = parseBibliography(source.value);
     const incoming = parsed[0];
+    if (!incoming) throw new Error("DOI service returned no bibliography entry");
     if (existing.some(entry => entry.key === incoming.key || (entry.fields.doi && entry.fields.doi.toLowerCase() === incoming.fields.doi?.toLowerCase()))) throw new Error("This DOI or citation key already exists");
     if (!window.confirm(`Add ${incoming.key}?\n\n${incoming.fields.title || "Untitled"}\n${briefReference(incoming)}`)) { bibliographyMessage("DOI import cancelled"); return; }
     source.value = `${source.value.trimEnd()}${source.value.trim() ? "\n\n" : ""}${result.bibtex.trim()}\n`;

@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import unicodedata
 import urllib.parse
 import urllib.request
 import uuid
@@ -707,6 +708,24 @@ def create_server(deck: Path, host: str, port: int, *, verbose: bool = False, re
     return server
 
 
+def _normalize_doi_bibtex(text: str) -> str:
+    # DOI content negotiation sometimes returns nonstandard bare month names
+    # such as ``month=Sept``. Bracing preserves the value and works with
+    # parsers that only recognize the standard jan--dec macros.
+    text = re.sub(r"(?im)(\bmonth\s*=\s*)([a-z]+)(?=\s*[,}])", r"\1{\2}", text)
+    author_match = re.search(r'(?is)\bauthor\s*=\s*(?:\{([^}]*)\}|"([^"]*)")', text)
+    year_match = re.search(r'(?i)\byear\s*=\s*[{"]?(\d{4})', text)
+    if author_match and year_match:
+        first_author = (author_match.group(1) or author_match.group(2)).split(" and ", 1)[0].strip()
+        family_name = first_author.split(",", 1)[0] if "," in first_author else first_author.split()[-1]
+        ascii_name = unicodedata.normalize("NFKD", family_name).encode("ascii", "ignore").decode("ascii").lower()
+        family_key = re.sub(r"[^a-z0-9]", "", ascii_name)
+        if family_key:
+            citation_key = f"{family_key}{year_match.group(1)}"
+            text = re.sub(r"(?is)(@\s*[a-z]+\s*\{)\s*[^,]+", rf"\g<1>{citation_key}", text, count=1)
+    return text
+
+
 def fetch_doi_bibtex(value: str) -> str:
     doi = urllib.parse.unquote(value).strip()
     doi = doi.removeprefix("https://doi.org/").removeprefix("http://doi.org/").removeprefix("doi:").strip()
@@ -723,7 +742,7 @@ def fetch_doi_bibtex(value: str) -> str:
     text = data.decode("utf-8").strip()
     if not text.startswith("@"):
         raise ValueError("DOI service did not return BibTeX")
-    return text + "\n"
+    return _normalize_doi_bibtex(text) + "\n"
 
 
 def main(argv: list[str] | None = None) -> int:

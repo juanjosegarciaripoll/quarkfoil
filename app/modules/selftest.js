@@ -16,7 +16,7 @@ import {
 } from "./parser.js";
 import { renderDeck } from "./render.js";
 import { bindRangeControl, clipboardImageFile, initialImageGeometry, pageSlideIndex, projectAssetPage, renameClipboardImage, videoFile } from "./editor.js";
-import { prepareBibliography } from "./bibliography.js";
+import { parseBibliography, prepareBibliography } from "./bibliography.js";
 
 const source = `---
 title: Test deck
@@ -179,6 +179,11 @@ function assertCitations() {
   const parsed = parseDeck(`## References {.layout-1}\n\nInline [@einstein1905], repeated [@einstein1905], and code \`[@ignored]\`.\n\n::: overlay {#source type="citation" key="smith2024" display="brief" x="50" y="80" w="45" h="8"}\n\n:::`);
   const bib = `@article{einstein1905, author={Einstein, Albert}, journal={Annalen der Physik}, volume={17}, pages={891--921}, year={1905}, doi={10.1002/test}}\n@article{smith2024, author={Smith, Alice and Jones, Bob}, journal={Physical Review Letters}, volume={132}, number={123456}, year={2024}}`;
   const bibliography = prepareBibliography(bib, parsed);
+  const doiEntry = parseBibliography("@article{wallraff2004, month={Sept}, doi={10.1038/nature02851}}")[0];
+  assert(doiEntry.key === "wallraff2004" && doiEntry.fields.month === "Sept" && doiEntry.fields.doi === "10.1038/nature02851", "normalized DOI BibTeX and citation key parse");
+  let bibliographyError = "";
+  try { parseBibliography("@article{broken, month=Sept}"); } catch (error) { bibliographyError = error.message; }
+  assert(bibliographyError.startsWith("Invalid BibTeX:"), "BibTeX parser failures produce visible error messages");
   renderDeck(parsed, slides, source => source, bibliography);
   assert(bibliography.numbers.get("einstein1905") === 1 && bibliography.numbers.get("smith2024") === 2, "citations are numbered by first appearance");
   assert(fixture.querySelectorAll(".citation-number").length === 3, "inline and attribution citations render while code remains literal");
