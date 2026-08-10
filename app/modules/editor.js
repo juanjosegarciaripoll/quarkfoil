@@ -24,11 +24,36 @@ export const projectAssetPage = (assets, query, page, pageSize = 24) => {
 
 function colorInputValue(value) {
   const normalized = String(value || "").trim().toLowerCase();
-  if (/^#[0-9a-f]{6}$/.test(normalized)) return normalized;
+  if (/^#[0-9a-f]{6}(?:[0-9a-f]{2})?$/.test(normalized)) return normalized;
   if (/^#[0-9a-f]{3}$/.test(normalized)) return `#${[...normalized.slice(1)].map(character => character.repeat(2)).join("")}`;
-  const rgb = /^rgba?\(\s*(\d+)\D+(\d+)\D+(\d+)/.exec(normalized);
-  if (!rgb) return null;
-  return `#${rgb.slice(1, 4).map(component => Number(component).toString(16).padStart(2, "0")).join("")}`;
+  if (!normalized.startsWith("rgb")) return null;
+  const components = normalized.match(/[\d.]+%?/g);
+  if (!components || components.length < 3) return null;
+  const hexadecimal = components.slice(0, 3)
+    .map(component => {
+      const value = Number.parseFloat(component) * (component.endsWith("%") ? 2.55 : 1);
+      return Math.round(clamp(value, 0, 255)).toString(16).padStart(2, "0");
+    })
+    .join("");
+  if (components.length < 4) return `#${hexadecimal}`;
+  const alpha = components[3].endsWith("%") ? Number.parseFloat(components[3]) / 100 : Number.parseFloat(components[3]);
+  return `#${hexadecimal}${Math.round(clamp(alpha, 0, 1) * 255).toString(16).padStart(2, "0")}`;
+}
+
+function setColorControl(id, value, fallback) {
+  const normalized = colorInputValue(value) || fallback;
+  document.querySelector(`#${id}`).value = normalized.slice(0, 7);
+  const alpha = normalized.length === 9 ? Number.parseInt(normalized.slice(7), 16) / 255 : 1;
+  const percentage = Math.round(alpha * 100);
+  document.querySelector(`#${id}-alpha`).value = String(percentage);
+  document.querySelector(`#${id}-alpha-value`).value = `${percentage}%`;
+}
+
+function colorControlValue(id) {
+  const color = document.querySelector(`#${id}`).value;
+  const opacity = clamp(Number(document.querySelector(`#${id}-alpha`).value), 0, 100);
+  const alpha = Math.round(opacity * 255 / 100);
+  return alpha === 255 ? color : `${color}${alpha.toString(16).padStart(2, "0")}`;
 }
 
 function resolvedThemeColor(container, variable) {
@@ -137,10 +162,18 @@ export class DesignEditor {
     this.stage.addEventListener("pointerdown", event => this.onPointerDown(event));
     document.addEventListener("keydown", event => this.onKeyDown(event));
     document.addEventListener("paste", event => this.onPaste(event));
+    for (const id of ["prop-slide-background-alpha", "prop-slide-foreground-alpha", "prop-shape-fill-alpha", "prop-shape-stroke-alpha", "prop-text-color-alpha"]) {
+      document.querySelector(`#${id}`).addEventListener("input", event => {
+        document.querySelector(`#${id}-value`).value = `${event.target.value}%`;
+      });
+    }
     document.querySelector("#layout-select").addEventListener("change", event => this.changeLayout(event.target.value));
     document.querySelector("#prop-slide-theme").addEventListener("change", event => this.applySlideProperties({ theme: event.target.value || null }));
-    document.querySelector("#prop-slide-background").addEventListener("change", event => this.applySlideProperties({ background: event.target.value }));
-    document.querySelector("#prop-slide-foreground").addEventListener("change", event => this.applySlideProperties({ foreground: event.target.value }));
+    for (const name of ["background", "foreground"]) {
+      for (const suffix of ["", "-alpha"]) {
+        document.querySelector(`#prop-slide-${name}${suffix}`).addEventListener("change", () => this.applySlideProperties({ [name]: colorControlValue(`prop-slide-${name}`) }));
+      }
+    }
     document.querySelector("#reset-slide-background").addEventListener("click", () => this.applySlideProperties({ background: null }));
     document.querySelector("#reset-slide-foreground").addEventListener("click", () => this.applySlideProperties({ foreground: null }));
     document.querySelector("#add-text").addEventListener("click", () => this.addObject("markdown"));
@@ -212,12 +245,14 @@ export class DesignEditor {
     for (const id of ["video-fit", "video-controls", "video-autoplay", "video-loop", "video-muted", "video-poster"]) {
       document.querySelector(`#prop-${id}`).addEventListener("change", () => this.applyVideoProperties());
     }
-    for (const id of ["shape", "shape-fill", "shape-stroke", "shape-stroke-width", "shape-shadow"]) {
+    for (const id of ["shape", "shape-fill", "shape-fill-alpha", "shape-stroke", "shape-stroke-alpha", "shape-stroke-width", "shape-shadow"]) {
       document.querySelector(`#prop-${id}`).addEventListener("change", () => this.applyShapeProperties());
     }
     document.querySelector("#prop-font-size").addEventListener("input", event => this.previewFontSize(event.target.value));
     document.querySelector("#prop-font-size").addEventListener("change", () => this.applyFontSize());
-    document.querySelector("#prop-text-color").addEventListener("change", event => this.applyTextColor(event.target.value));
+    for (const id of ["prop-text-color", "prop-text-color-alpha"]) {
+      document.querySelector(`#${id}`).addEventListener("change", () => this.applyTextColor(colorControlValue("prop-text-color")));
+    }
     document.querySelector("#reset-text-color").addEventListener("click", () => this.applyTextColor(null));
     document.querySelectorAll(".alignment-buttons [data-align]").forEach(button => {
       button.addEventListener("click", () => this.applyAlignment(button.dataset.align));
@@ -329,8 +364,8 @@ export class DesignEditor {
     if (!slide || !section) return;
     const style = getComputedStyle(section);
     document.querySelector("#prop-slide-theme").value = slide.headingAttrs.values.theme || "";
-    document.querySelector("#prop-slide-background").value = colorInputValue(style.getPropertyValue("--slide-background")) || "#fbfcfd";
-    document.querySelector("#prop-slide-foreground").value = colorInputValue(style.getPropertyValue("--slide-foreground")) || "#17202a";
+    setColorControl("prop-slide-background", style.getPropertyValue("--slide-background"), "#fbfcfd");
+    setColorControl("prop-slide-foreground", style.getPropertyValue("--slide-foreground"), "#17202a");
     const overrides = ["background", "foreground"].filter(name => slide.headingAttrs.values[name]);
     document.querySelector("#slide-color-state").textContent = overrides.length
       ? `Explicit ${overrides.join(" and ")} override${overrides.length === 1 ? "" : "s"}`
@@ -361,13 +396,13 @@ export class DesignEditor {
         this.shapeProperties.hidden = false;
         document.querySelector("#prop-shape").value = object.shape;
         const surfaceStyle = getComputedStyle(element.querySelector(".shape-surface"));
-        document.querySelector("#prop-shape-fill").value = colorInputValue(surfaceStyle.fill) || "#dbeff2";
-        document.querySelector("#prop-shape-stroke").value = colorInputValue(surfaceStyle.stroke) || "#146c7e";
+        setColorControl("prop-shape-fill", surfaceStyle.fill, "#dbeff2");
+        setColorControl("prop-shape-stroke", surfaceStyle.stroke, "#146c7e");
         document.querySelector("#prop-shape-stroke-width").value = object.strokeWidth;
         document.querySelector("#prop-shape-shadow").checked = object.shadow;
       }
       this.fontProperties.hidden = false;
-      document.querySelector("#prop-text-color").value = colorInputValue(getComputedStyle(element).color) || "#17202a";
+      setColorControl("prop-text-color", getComputedStyle(element).color, "#17202a");
       document.querySelector("#prop-font-size").value = object.fontSize;
       this.updateFontSizeOutput(object.fontSize);
       this.updateAlignmentButtons(object.alignment);
@@ -539,8 +574,8 @@ export class DesignEditor {
   applyShapeProperties() {
     if (!this.selected || this.selected.dataset.objectType !== "shape") return;
     const shape = document.querySelector("#prop-shape").value;
-    const fill = document.querySelector("#prop-shape-fill").value;
-    const stroke = document.querySelector("#prop-shape-stroke").value;
+    const fill = colorControlValue("prop-shape-fill");
+    const stroke = colorControlValue("prop-shape-stroke");
     const strokeWidth = Number(document.querySelector("#prop-shape-stroke-width").value);
     const defaultFill = resolvedThemeColor(this.section(), "--shape-default-fill");
     const defaultStroke = resolvedThemeColor(this.section(), "--shape-default-stroke");

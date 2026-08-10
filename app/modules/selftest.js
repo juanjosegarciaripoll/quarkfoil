@@ -140,7 +140,7 @@ function assertShapes() {
   document.body.append(fixture);
   const parsed = parseDeck(`## Shapes {.layout-free}
 
-::: overlay {#cloud type="shape" shape="cloud" x="5" y="5" w="25" h="20" fill="#ffeecc" stroke="#112233" stroke-width="3" shadow="true"}
+::: overlay {#cloud type="shape" shape="cloud" x="5" y="5" w="25" h="20" fill="#ffeecc80" stroke="#112233" stroke-width="3" shadow="true"}
 Thought
 :::
 
@@ -158,7 +158,8 @@ Thought
   renderDeck(parsed, slides, source => source);
   const cloud = fixture.querySelector('[data-object-id="cloud"]');
   assert(parsed.slides[0].overlays[0].shape === "cloud", "shape kind parses");
-  assert(parsed.slides[0].overlays[0].fill === "#ffeecc" && parsed.slides[0].overlays[0].strokeWidth === 3, "shape styles parse");
+  assert(parsed.slides[0].overlays[0].fill === "#ffeecc80" && parsed.slides[0].overlays[0].strokeWidth === 3, "shape styles including alpha parse");
+  assert(getComputedStyle(cloud.querySelector(".shape-surface")).fill.includes("0.5"), "shape color alpha renders");
   assert(parsed.slides[0].overlays[0].shadow && cloud.dataset.shadow === "true", "shape shadow parses and renders");
   assert(cloud.querySelector(".shape-background path") && cloud.querySelector(".shape-label").textContent.includes("Thought"), "cloud renders with a Markdown label");
   assert(fixture.querySelector('[data-object-id="callout"] .katex'), "comic callout renders an equation label");
@@ -315,14 +316,15 @@ try {
   assert(next.includes("E=mc^2"), "overlay patch preserves content");
   deck = parseDeck(next);
 
-  next = updateOverlay(deck, 0, "eq", { color: "#c92a2a" });
+  next = updateOverlay(deck, 0, "eq", { color: "#c92a2a80" });
   let coloredDeck = parseDeck(next);
-  assert(coloredDeck.slides[0].overlays[0].color === "#c92a2a", "floating text color serializes");
+  assert(coloredDeck.slides[0].overlays[0].color === "#c92a2a80", "floating text color with alpha serializes");
   const colorFixture = document.createElement("div");
   renderDeck(coloredDeck, colorFixture, asset => asset);
-  assert(colorFixture.querySelector(".overlay-equation").style.color === "rgb(201, 42, 42)", "floating text color renders");
+  const translucentText = colorFixture.querySelector(".overlay-equation").style.color;
+  assert(translucentText.includes("201, 42, 42") && translucentText.includes("0.5"), "floating text color with alpha renders");
   next = updateOverlay(coloredDeck, 0, "eq", { color: null });
-  assert(!next.includes('color="#c92a2a"'), "reset floating text color returns to the theme default");
+  assert(!next.includes('color="#c92a2a80"'), "reset floating text color returns to the theme default");
   deck = parseDeck(next);
 
   next = updateSlideTitle(deck, 0, "## Edited title");

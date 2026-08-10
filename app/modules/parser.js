@@ -296,7 +296,7 @@ function parseSlide(source, range, index, diagnostics) {
     if (overlay.type === "shape" && !Object.hasOwn(SHAPES, overlay.shape)) diagnostics.push({ level: "error", slide: index + 1, message: `Overlay '${overlay.id}' has unknown shape '${overlay.shape}'` });
     if (overlay.type === "shape" && (!Number.isFinite(overlay.strokeWidth) || overlay.strokeWidth < 0)) diagnostics.push({ level: "error", slide: index + 1, message: `Overlay '${overlay.id}' has invalid stroke width` });
     if (overlay.type === "video" && !overlay.video?.source) diagnostics.push({ level: "error", slide: index + 1, message: `Video overlay '${overlay.id}' has no src` });
-    if (overlay.color && !/^#[0-9a-f]{6}$/i.test(overlay.color)) diagnostics.push({ level: "warning", slide: index + 1, message: `Overlay '${overlay.id}' has invalid text color '${overlay.color}'` });
+    if (overlay.color && !/^#[0-9a-f]{6}(?:[0-9a-f]{2})?$/i.test(overlay.color)) diagnostics.push({ level: "warning", slide: index + 1, message: `Overlay '${overlay.id}' has invalid text color '${overlay.color}'` });
   }
   return {
     index,
@@ -329,7 +329,7 @@ export function parseDeck(source) {
     if (theme && !THEME_SET.has(theme)) diagnostics.push({ level: "warning", slide: slide.index + 1, message: `Unknown theme '${theme}', using the deck theme` });
     for (const name of ["background", "foreground"]) {
       const color = slide.headingAttrs.values[name];
-      if (color && !/^#[0-9a-f]{6}$/i.test(color)) diagnostics.push({ level: "warning", slide: slide.index + 1, message: `Invalid ${name} color '${color}', using the theme color` });
+      if (color && !/^#[0-9a-f]{6}(?:[0-9a-f]{2})?$/i.test(color)) diagnostics.push({ level: "warning", slide: slide.index + 1, message: `Invalid ${name} color '${color}', using the theme color` });
     }
   }
   if (!slides.length) diagnostics.push({ level: "error", message: "The deck contains no slides" });

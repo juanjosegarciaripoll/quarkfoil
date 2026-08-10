@@ -63,7 +63,8 @@ Click an empty part of the slide to show slide-wide Properties. Theme chooses
 the deck default, Scientific light, or Scientific dark for that slide.
 Background and Foreground create explicit color overrides; the reset buttons
 beside them remove those attributes and return to the theme colors. Omitted
-theme and color values do not occupy Markdown state.
+theme and color values do not occupy Markdown state. Color pickers include an
+alpha control for partial or full transparency.
 
 ## Images
 
@@ -103,7 +104,8 @@ the rest of the presentation.
 
 Shapes without explicit background or line colors inherit those colors from
 the active presentation theme. Selecting a specific color creates a fixed
-override in the Markdown source.
+override in the Markdown source. Set the background alpha to zero to remove the
+visible shape surface while retaining its outline and label.
 
 ## Saving and recovery
 

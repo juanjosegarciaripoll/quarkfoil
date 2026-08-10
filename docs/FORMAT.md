@@ -149,7 +149,9 @@ also override its background and foreground colors independently:
 
 Resolution is explicit slide color, then slide theme, then deck theme, then
 `scientific-light`. Removing an override restores inheritance. Theme defaults
-also supply accent, muted, font, citation, and implicit shape colors.
+also supply accent, muted, font, citation, and implicit shape colors. Colors
+use six-digit `#RRGGBB` or eight-digit `#RRGGBBAA` hexadecimal notation; the
+last byte controls alpha.
 
 ## Markdown and equations
 
@@ -218,7 +220,8 @@ Attributes:
 - `locked="true"`: prevent graphical movement.
 - `fragment`: zero-based Reveal fragment index.
 - `font-size`: relative `em` scale for Markdown and equations; the editor exposes `0.25em` through `3em`.
-- `color`: an optional six-digit hexadecimal text color, such as `#c92a2a`.
+- `color`: an optional six- or eight-digit hexadecimal text color, such as
+  `#c92a2a` or the 50%-opaque `#c92a2a80`.
 - `align`: `left`, `center`, or `right`.
 
 ### Videos
@@ -267,7 +270,9 @@ The available shapes are `rectangle`, `rounded-rectangle`, `ellipse`, `circle`,
 `diamond`, `hexagon`, `cloud`, `callout`, `sine`, and `cosine`. The trigonometric
 curves show one complete cycle from 0 to 2π. `fill` controls the
 background, `stroke` controls the outline or curve, and `stroke-width` controls
-its width. Shape geometry and labels have no implicit padding, so an overlay at
+its width. Eight-digit colors can make either surface partly or fully
+transparent; for example, `fill="#fff3bf00"` removes the visible background.
+Shape geometry and labels have no implicit padding, so an overlay at
 a slide boundary reaches that boundary. Set `shadow="true"` to enable a drop shadow. Default-valued shape
 styles are normally omitted: rectangle, theme fill and stroke colors, line
 width `2`, centered label, and no shadow. Consequently, implicit shape colors

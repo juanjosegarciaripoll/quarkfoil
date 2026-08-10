@@ -100,10 +100,10 @@
           </select>
         </label>
         <label>Background
-          <span class="color-with-reset"><input id="prop-slide-background" type="color"><button id="reset-slide-background" type="button" title="Use theme background" aria-label="Use theme background">↺</button></span>
+          <span class="color-with-alpha-reset"><input id="prop-slide-background" type="color"><input id="prop-slide-background-alpha" type="range" min="0" max="100" value="100" title="Background opacity" aria-label="Background opacity"><output id="prop-slide-background-alpha-value" for="prop-slide-background-alpha">100%</output><button id="reset-slide-background" type="button" title="Use theme background" aria-label="Use theme background">↺</button></span>
         </label>
         <label>Foreground
-          <span class="color-with-reset"><input id="prop-slide-foreground" type="color"><button id="reset-slide-foreground" type="button" title="Use theme foreground" aria-label="Use theme foreground">↺</button></span>
+          <span class="color-with-alpha-reset"><input id="prop-slide-foreground" type="color"><input id="prop-slide-foreground-alpha" type="range" min="0" max="100" value="100" title="Foreground opacity" aria-label="Foreground opacity"><output id="prop-slide-foreground-alpha-value" for="prop-slide-foreground-alpha">100%</output><button id="reset-slide-foreground" type="button" title="Use theme foreground" aria-label="Use theme foreground">↺</button></span>
         </label>
         <small id="slide-color-state">Colors inherited from theme</small>
       </form>
@@ -164,14 +164,14 @@
             <option value="cosine">Cosine curve (0–2π)</option>
           </select>
         </label>
-        <label>Background <input id="prop-shape-fill" type="color" value="#dbeff2"></label>
-        <label>Line <input id="prop-shape-stroke" type="color" value="#146c7e"></label>
+        <label>Background <span class="color-with-alpha"><input id="prop-shape-fill" type="color" value="#dbeff2"><input id="prop-shape-fill-alpha" type="range" min="0" max="100" value="100" title="Background opacity" aria-label="Background opacity"><output id="prop-shape-fill-alpha-value" for="prop-shape-fill-alpha">100%</output></span></label>
+        <label>Line <span class="color-with-alpha"><input id="prop-shape-stroke" type="color" value="#146c7e"><input id="prop-shape-stroke-alpha" type="range" min="0" max="100" value="100" title="Line opacity" aria-label="Line opacity"><output id="prop-shape-stroke-alpha-value" for="prop-shape-stroke-alpha">100%</output></span></label>
         <label>Line width <input id="prop-shape-stroke-width" type="number" min="0" max="20" step="0.5" value="2"></label>
         <label class="check"><input id="prop-shape-shadow" type="checkbox"> Shadow</label>
       </form>
       <form id="font-properties" hidden>
         <label>Text color
-          <span class="color-with-reset"><input id="prop-text-color" type="color"><button id="reset-text-color" type="button" title="Use theme text color" aria-label="Use theme text color">↺</button></span>
+          <span class="color-with-alpha-reset"><input id="prop-text-color" type="color"><input id="prop-text-color-alpha" type="range" min="0" max="100" value="100" title="Text opacity" aria-label="Text opacity"><output id="prop-text-color-alpha-value" for="prop-text-color-alpha">100%</output><button id="reset-text-color" type="button" title="Use theme text color" aria-label="Use theme text color">↺</button></span>
         </label>
         <label>Font size
           <span class="range-with-value">

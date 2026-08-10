@@ -131,7 +131,7 @@ function renderSlide(slide, metadata, assetResolver, bibliography) {
   section.style.setProperty("--row-b", `${slide.rows[1]}fr`);
   for (const [attribute, variable] of [["background", "--slide-background"], ["foreground", "--slide-foreground"]]) {
     const color = slide.headingAttrs.values[attribute];
-    if (/^#[0-9a-f]{6}$/i.test(color || "")) section.style.setProperty(variable, color);
+    if (/^#[0-9a-f]{6}(?:[0-9a-f]{2})?$/i.test(color || "")) section.style.setProperty(variable, color);
   }
 
   const frame = document.createElement("div");
@@ -181,7 +181,7 @@ function renderSlide(slide, metadata, assetResolver, bibliography) {
     element.style.width = `${overlay.geometry.w}%`;
     element.style.height = `${overlay.geometry.h}%`;
     element.style.zIndex = String(overlay.geometry.z);
-    if (/^#[0-9a-f]{6}$/i.test(overlay.color || "")) element.style.color = overlay.color;
+    if (/^#[0-9a-f]{6}(?:[0-9a-f]{2})?$/i.test(overlay.color || "")) element.style.color = overlay.color;
     if (!["image", "video"].includes(overlay.type)) {
       element.style.fontSize = `${overlay.fontSize}em`;
       element.style.textAlign = overlay.alignment;
