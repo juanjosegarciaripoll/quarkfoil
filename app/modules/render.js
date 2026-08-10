@@ -178,6 +178,7 @@ function renderSlide(slide, metadata, assetResolver, bibliography) {
     }
     element.dataset.objectId = overlay.id;
     element.dataset.objectType = overlay.type;
+    if (overlay.type === "citation") element.dataset.citationDisplay = overlay.attrs.values.display || "number";
     element.dataset.locked = String(overlay.locked);
     element.style.left = `${overlay.geometry.x}%`;
     element.style.top = `${overlay.geometry.y}%`;

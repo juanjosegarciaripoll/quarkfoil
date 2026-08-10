@@ -321,5 +321,6 @@ A citation overlay provides a positioned figure attribution:
 attribution: it shows generated abbreviated references without citation
 numbers and does not affect numbering. Its `key` attribute selects one paper;
 `keys` selects multiple space-separated papers. Both are editable from the
-attribution's Design properties. DOI and URL fields become links. Missing keys
-are shown as visible errors.
+attribution's Design properties. Attributions have a transparent background,
+without a border or shadow, so they can be placed over other slide content.
+DOI and URL fields become links. Missing keys are shown as visible errors.

@@ -189,6 +189,8 @@ function assertCitations() {
   assert(fixture.querySelectorAll(".citation-number").length === 2, "only inline citations display numbers while code remains literal");
   const attribution = fixture.querySelector(".overlay-citation").textContent;
   assert(attribution.includes("Smith et al.") && attribution.includes("Einstein"), "positioned attribution renders multiple selected references");
+  const attributionStyle = getComputedStyle(fixture.querySelector(".overlay-citation"));
+  assert(attributionStyle.backgroundColor === "rgba(0, 0, 0, 0)" && attributionStyle.boxShadow === "none", "attributions render without a background panel");
   fixture.remove();
 }
 
