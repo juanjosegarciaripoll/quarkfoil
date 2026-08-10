@@ -4,26 +4,18 @@ on:
   push:
     branches: [main]
     paths:
-      - app/**
       - docs/**
       - example/**
       - mkdocs.yml
       - pyproject.toml
-      - src/**
-      - THIRD_PARTY_LICENSES.md
       - uv.lock
-      - .github/workflows/docs.yml
   pull_request:
     paths:
-      - app/**
       - docs/**
       - example/**
       - mkdocs.yml
       - pyproject.toml
-      - src/**
-      - THIRD_PARTY_LICENSES.md
       - uv.lock
-      - .github/workflows/docs.yml
   workflow_dispatch:
 
 permissions:
