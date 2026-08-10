@@ -4,6 +4,7 @@ import hashlib
 import json
 import tempfile
 import threading
+import time
 import unittest
 import urllib.error
 import urllib.request
@@ -218,6 +219,7 @@ class ServerTests(unittest.TestCase):
 
     def test_mkv_is_converted_to_mp4_with_preview_and_progress(self) -> None:
         def fake_conversion(job):
+            time.sleep(0.05)
             job.output.write_bytes(b"mp4")
             job.poster.write_bytes(b"preview")
             job.source.unlink()
@@ -240,7 +242,12 @@ class ServerTests(unittest.TestCase):
         started = json.loads(payload)
         self.assertEqual(started["path"], "figures/experiment.mp4")
         self.assertEqual(started["poster"], "figures/experiment-poster.jpg")
-        status, _, payload = self.request(f"/api/video-conversion/{started['id']}")
+        deadline = time.monotonic() + 2
+        while True:
+            status, _, payload = self.request(f"/api/video-conversion/{started['id']}")
+            if json.loads(payload)["status"] in {"complete", "failed", "cancelled"} or time.monotonic() >= deadline:
+                break
+            time.sleep(0.01)
         self.assertEqual(status, 200)
         self.assertEqual(json.loads(payload)["status"], "complete")
         self.assertEqual((self.root / started["path"]).read_bytes(), b"mp4")
