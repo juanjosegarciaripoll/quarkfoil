@@ -64,7 +64,8 @@ the deck default, Scientific light, or Scientific dark for that slide.
 Background and Foreground create explicit color overrides; the reset buttons
 beside them remove those attributes and return to the theme colors. Omitted
 theme and color values do not occupy Markdown state. Color pickers include an
-alpha control for partial or full transparency.
+alpha control for partial or full transparency. Numeric values beside sliders
+are editable and validated against the same limits as their sliders.
 
 ## Images
 

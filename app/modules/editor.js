@@ -44,16 +44,41 @@ function setColorControl(id, value, fallback) {
   const normalized = colorInputValue(value) || fallback;
   document.querySelector(`#${id}`).value = normalized.slice(0, 7);
   const alpha = normalized.length === 9 ? Number.parseInt(normalized.slice(7), 16) / 255 : 1;
-  const percentage = Math.round(alpha * 100);
-  document.querySelector(`#${id}-alpha`).value = String(percentage);
-  document.querySelector(`#${id}-alpha-value`).value = `${percentage}%`;
+  document.querySelector(`#${id}-alpha`).value = String(Math.round(alpha * 100));
 }
 
 function colorControlValue(id) {
   const color = document.querySelector(`#${id}`).value;
-  const opacity = clamp(Number(document.querySelector(`#${id}-alpha`).value), 0, 100);
+  const alphaInput = document.querySelector(`#${id}-alpha`);
+  const requestedOpacity = alphaInput.value.trim() === "" ? 100 : Number(alphaInput.value);
+  const opacity = clamp(Number.isFinite(requestedOpacity) ? requestedOpacity : 100, 0, 100);
+  alphaInput.value = String(opacity);
   const alpha = Math.round(opacity * 255 / 100);
   return alpha === 255 ? color : `${color}${alpha.toString(16).padStart(2, "0")}`;
+}
+
+export function setRangeControl(id, requestedValue) {
+  const range = document.querySelector(`#${id}`);
+  const minimum = Number(range.min);
+  const maximum = Number(range.max);
+  const step = Number(range.step) || 1;
+  const numeric = String(requestedValue).trim() === "" ? Number.NaN : Number(requestedValue);
+  const bounded = clamp(Number.isFinite(numeric) ? numeric : Number(range.value), minimum, maximum);
+  const value = Number((minimum + Math.round((bounded - minimum) / step) * step).toFixed(10));
+  range.value = String(value);
+  document.querySelector(`#${id}-value`).value = String(value);
+  return value;
+}
+
+export function bindRangeControl(id) {
+  const range = document.querySelector(`#${id}`);
+  const number = document.querySelector(`#${id}-value`);
+  range.addEventListener("input", () => setRangeControl(id, range.value));
+  number.addEventListener("change", () => {
+    setRangeControl(id, number.value);
+    range.dispatchEvent(new Event("input"));
+    range.dispatchEvent(new Event("change"));
+  });
 }
 
 function resolvedThemeColor(container, variable) {
@@ -162,11 +187,7 @@ export class DesignEditor {
     this.stage.addEventListener("pointerdown", event => this.onPointerDown(event));
     document.addEventListener("keydown", event => this.onKeyDown(event));
     document.addEventListener("paste", event => this.onPaste(event));
-    for (const id of ["prop-slide-background-alpha", "prop-slide-foreground-alpha", "prop-shape-fill-alpha", "prop-shape-stroke-alpha", "prop-text-color-alpha"]) {
-      document.querySelector(`#${id}`).addEventListener("input", event => {
-        document.querySelector(`#${id}-value`).value = `${event.target.value}%`;
-      });
-    }
+    for (const id of ["prop-focus-x", "prop-focus-y", "prop-font-size"]) bindRangeControl(id);
     document.querySelector("#layout-select").addEventListener("change", event => this.changeLayout(event.target.value));
     document.querySelector("#prop-slide-theme").addEventListener("change", event => this.applySlideProperties({ theme: event.target.value || null }));
     for (const name of ["background", "foreground"]) {
@@ -333,8 +354,8 @@ export class DesignEditor {
       this.imageProperties.hidden = false;
       document.querySelector("#prop-fit").value = cell.image.attrs.values.fit || "contain";
       const focus = (cell.image.attrs.values.focus || "50 50").split(/[\s,]+/);
-      document.querySelector("#prop-focus-x").value = focus[0] || 50;
-      document.querySelector("#prop-focus-y").value = focus[1] || 50;
+      setRangeControl("prop-focus-x", focus[0] || 50);
+      setRangeControl("prop-focus-y", focus[1] || 50);
     } else if (cell?.type === "video") {
       this.noSelection.textContent = "Video cell properties must currently be edited in Source mode.";
     }
@@ -387,8 +408,8 @@ export class DesignEditor {
       this.imageProperties.hidden = false;
       document.querySelector("#prop-fit").value = object.image.attrs.values.fit || "contain";
       const focus = (object.image.attrs.values.focus || "50 50").split(/[\s,]+/);
-      document.querySelector("#prop-focus-x").value = focus[0] || 50;
-      document.querySelector("#prop-focus-y").value = focus[1] || 50;
+      setRangeControl("prop-focus-x", focus[0] || 50);
+      setRangeControl("prop-focus-y", focus[1] || 50);
     } else if (object.type === "video" && object.video) {
       this.fillVideoProperties(object.video);
     } else {
@@ -410,7 +431,7 @@ export class DesignEditor {
   }
 
   updateFontSizeOutput(value) {
-    document.querySelector("#prop-font-size-value").value = `${Number(value).toFixed(2)} em`;
+    setRangeControl("prop-font-size", value);
   }
 
   previewFontSize(value) {

@@ -100,10 +100,10 @@
           </select>
         </label>
         <label>Background
-          <span class="color-with-alpha-reset"><input id="prop-slide-background" type="color"><input id="prop-slide-background-alpha" type="range" min="0" max="100" value="100" title="Background opacity" aria-label="Background opacity"><output id="prop-slide-background-alpha-value" for="prop-slide-background-alpha">100%</output><button id="reset-slide-background" type="button" title="Use theme background" aria-label="Use theme background">↺</button></span>
+          <span class="color-with-alpha-reset"><input id="prop-slide-background" type="color"><span class="alpha-symbol" aria-hidden="true">α</span><input id="prop-slide-background-alpha" type="number" min="0" max="100" value="100" title="Background opacity percent" aria-label="Background opacity percent"><button id="reset-slide-background" type="button" title="Use theme background" aria-label="Use theme background">↺</button></span>
         </label>
         <label>Foreground
-          <span class="color-with-alpha-reset"><input id="prop-slide-foreground" type="color"><input id="prop-slide-foreground-alpha" type="range" min="0" max="100" value="100" title="Foreground opacity" aria-label="Foreground opacity"><output id="prop-slide-foreground-alpha-value" for="prop-slide-foreground-alpha">100%</output><button id="reset-slide-foreground" type="button" title="Use theme foreground" aria-label="Use theme foreground">↺</button></span>
+          <span class="color-with-alpha-reset"><input id="prop-slide-foreground" type="color"><span class="alpha-symbol" aria-hidden="true">α</span><input id="prop-slide-foreground-alpha" type="number" min="0" max="100" value="100" title="Foreground opacity percent" aria-label="Foreground opacity percent"><button id="reset-slide-foreground" type="button" title="Use theme foreground" aria-label="Use theme foreground">↺</button></span>
         </label>
         <small id="slide-color-state">Colors inherited from theme</small>
       </form>
@@ -128,8 +128,8 @@
             <option value="native">Native</option>
           </select>
         </label>
-        <label>Focus X <input id="prop-focus-x" type="range" min="0" max="100"></label>
-        <label>Focus Y <input id="prop-focus-y" type="range" min="0" max="100"></label>
+        <label>Focus X <span class="range-with-value"><input id="prop-focus-x" type="range" min="0" max="100"><input id="prop-focus-x-value" type="number" min="0" max="100" aria-label="Focus X value"></span></label>
+        <label>Focus Y <span class="range-with-value"><input id="prop-focus-y" type="range" min="0" max="100"><input id="prop-focus-y-value" type="number" min="0" max="100" aria-label="Focus Y value"></span></label>
         <div class="image-source-actions">
           <button id="replace-image" type="button" title="Upload replacement image" aria-label="Upload replacement image"><svg class="action-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"></path></svg></button>
           <button id="choose-project-image" type="button" title="Choose image from presentation" aria-label="Choose image from presentation"><svg class="action-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18.5V6a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v1H7l-4 9.5Z"></path><path d="M7 9h14l-3 10H3"></path><circle cx="11" cy="13" r="1"></circle><path d="m7 18 3-3 2 2 2-2 3 3"></path></svg></button>
@@ -164,19 +164,19 @@
             <option value="cosine">Cosine curve (0–2π)</option>
           </select>
         </label>
-        <label>Background <span class="color-with-alpha"><input id="prop-shape-fill" type="color" value="#dbeff2"><input id="prop-shape-fill-alpha" type="range" min="0" max="100" value="100" title="Background opacity" aria-label="Background opacity"><output id="prop-shape-fill-alpha-value" for="prop-shape-fill-alpha">100%</output></span></label>
-        <label>Line <span class="color-with-alpha"><input id="prop-shape-stroke" type="color" value="#146c7e"><input id="prop-shape-stroke-alpha" type="range" min="0" max="100" value="100" title="Line opacity" aria-label="Line opacity"><output id="prop-shape-stroke-alpha-value" for="prop-shape-stroke-alpha">100%</output></span></label>
+        <label>Background <span class="color-with-alpha"><input id="prop-shape-fill" type="color" value="#dbeff2"><span class="alpha-symbol" aria-hidden="true">α</span><input id="prop-shape-fill-alpha" type="number" min="0" max="100" value="100" title="Background opacity percent" aria-label="Background opacity percent"></span></label>
+        <label>Line <span class="color-with-alpha"><input id="prop-shape-stroke" type="color" value="#146c7e"><span class="alpha-symbol" aria-hidden="true">α</span><input id="prop-shape-stroke-alpha" type="number" min="0" max="100" value="100" title="Line opacity percent" aria-label="Line opacity percent"></span></label>
         <label>Line width <input id="prop-shape-stroke-width" type="number" min="0" max="20" step="0.5" value="2"></label>
         <label class="check"><input id="prop-shape-shadow" type="checkbox"> Shadow</label>
       </form>
       <form id="font-properties" hidden>
         <label>Text color
-          <span class="color-with-alpha-reset"><input id="prop-text-color" type="color"><input id="prop-text-color-alpha" type="range" min="0" max="100" value="100" title="Text opacity" aria-label="Text opacity"><output id="prop-text-color-alpha-value" for="prop-text-color-alpha">100%</output><button id="reset-text-color" type="button" title="Use theme text color" aria-label="Use theme text color">↺</button></span>
+          <span class="color-with-alpha-reset"><input id="prop-text-color" type="color"><span class="alpha-symbol" aria-hidden="true">α</span><input id="prop-text-color-alpha" type="number" min="0" max="100" value="100" title="Text opacity percent" aria-label="Text opacity percent"><button id="reset-text-color" type="button" title="Use theme text color" aria-label="Use theme text color">↺</button></span>
         </label>
         <label>Font size
           <span class="range-with-value">
             <input id="prop-font-size" type="range" min="0.25" max="3" step="0.05" value="1">
-            <output id="prop-font-size-value" for="prop-font-size">1.00 em</output>
+            <input id="prop-font-size-value" type="number" min="0.25" max="3" step="0.05" value="1" aria-label="Font size in em">
           </span>
         </label>
         <label>Alignment

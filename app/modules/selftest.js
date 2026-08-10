@@ -15,7 +15,7 @@ import {
   updateSlideProperties,
 } from "./parser.js";
 import { renderDeck } from "./render.js";
-import { clipboardImageFile, initialImageGeometry, projectAssetPage, renameClipboardImage, videoFile } from "./editor.js";
+import { bindRangeControl, clipboardImageFile, initialImageGeometry, projectAssetPage, renameClipboardImage, videoFile } from "./editor.js";
 import { prepareBibliography } from "./bibliography.js";
 
 const source = `---
@@ -211,6 +211,18 @@ function assertTables() {
 }
 
 try {
+  const rangeFixture = document.createElement("div");
+  rangeFixture.innerHTML = '<input id="test-range" type="range" min="0.25" max="3" step="0.05" value="1"><input id="test-range-value" type="number">';
+  document.body.append(rangeFixture);
+  bindRangeControl("test-range");
+  rangeFixture.querySelector("#test-range").value = "1.7";
+  rangeFixture.querySelector("#test-range").dispatchEvent(new Event("input"));
+  assert(rangeFixture.querySelector("#test-range-value").value === "1.7", "slider changes update the editable numeric value");
+  rangeFixture.querySelector("#test-range-value").value = "9";
+  rangeFixture.querySelector("#test-range-value").dispatchEvent(new Event("change"));
+  assert(rangeFixture.querySelector("#test-range").value === "3" && rangeFixture.querySelector("#test-range-value").value === "3", "editable slider values clamp to their declared bounds");
+  rangeFixture.remove();
+
   const clipboardPng = new File([new Uint8Array([137, 80, 78, 71])], "", { type: "image/png" });
   const pastedPng = clipboardImageFile({
     items: [{ kind: "file", type: "image/png", getAsFile: () => clipboardPng }],
