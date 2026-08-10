@@ -22,6 +22,11 @@ export const projectAssetPage = (assets, query, page, pageSize = 24) => {
   return { assets: filtered.slice(current * pageSize, (current + 1) * pageSize), count: filtered.length, page: current, pages };
 };
 
+export function pageSlideIndex(current, count, key) {
+  const direction = key === "PageUp" ? -1 : key === "PageDown" ? 1 : 0;
+  return direction ? clamp(current + direction, 0, Math.max(0, count - 1)) : current;
+}
+
 function colorInputValue(value) {
   const normalized = String(value || "").trim().toLowerCase();
   if (/^#[0-9a-f]{6}(?:[0-9a-f]{2})?$/.test(normalized)) return normalized;

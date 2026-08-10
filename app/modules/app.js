@@ -1,6 +1,6 @@
 import { deleteSlide, duplicateSlide, insertOverlay, insertSlide, moveSlide, parseDeck } from "./parser.js";
 import { renderDeck, syncVideoPlayback } from "./render.js";
-import { DesignEditor } from "./editor.js";
+import { DesignEditor, pageSlideIndex } from "./editor.js";
 import { saveSnapshot } from "./storage.js";
 import { briefReference, parseBibliography, prepareBibliography } from "./bibliography.js";
 
@@ -742,6 +742,12 @@ function bindUi() {
     if ((event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "z") { event.preventDefault(); undo(); }
     if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "z") { event.preventDefault(); redo(); }
     if (event.key === "Escape" && state.mode === "present") setMode("design");
+    const target = event.target;
+    const editing = target instanceof HTMLElement && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
+    if (state.mode === "design" && reveal && state.deck && !editing && !document.querySelector("dialog[open]") && !event.ctrlKey && !event.metaKey && !event.altKey && ["PageUp", "PageDown"].includes(event.key)) {
+      event.preventDefault();
+      reveal.slide(pageSlideIndex(state.currentSlide, state.deck.slides.length, event.key));
+    }
   });
   window.addEventListener("beforeunload", event => {
     if (state.source !== state.savedSource) { event.preventDefault(); event.returnValue = ""; }

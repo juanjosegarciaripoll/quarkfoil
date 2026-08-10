@@ -136,6 +136,7 @@ copied figure. Both forms share deck-wide numbering.
 - `Ctrl+Shift+Z`: redo.
 - `Ctrl+Enter`: accept a content-editing dialog.
 - `Escape`: cancel a dialog or leave Present mode.
+- `Page Up` / `Page Down`: select the previous or next slide in Design mode.
 - Arrow keys: nudge a selected overlay by `0.1%`.
 - `Shift` + arrow keys: nudge by `1%`.
 - `Delete`: delete a selected overlay.

@@ -15,7 +15,7 @@ import {
   updateSlideProperties,
 } from "./parser.js";
 import { renderDeck } from "./render.js";
-import { bindRangeControl, clipboardImageFile, initialImageGeometry, projectAssetPage, renameClipboardImage, videoFile } from "./editor.js";
+import { bindRangeControl, clipboardImageFile, initialImageGeometry, pageSlideIndex, projectAssetPage, renameClipboardImage, videoFile } from "./editor.js";
 import { prepareBibliography } from "./bibliography.js";
 
 const source = `---
@@ -222,6 +222,9 @@ try {
   rangeFixture.querySelector("#test-range-value").dispatchEvent(new Event("change"));
   assert(rangeFixture.querySelector("#test-range").value === "3" && rangeFixture.querySelector("#test-range-value").value === "3", "editable slider values clamp to their declared bounds");
   rangeFixture.remove();
+
+  assert(pageSlideIndex(2, 5, "PageUp") === 1 && pageSlideIndex(2, 5, "PageDown") === 3, "page keys navigate to adjacent editor slides");
+  assert(pageSlideIndex(0, 5, "PageUp") === 0 && pageSlideIndex(4, 5, "PageDown") === 4, "page-key slide navigation stays within deck bounds");
 
   const clipboardPng = new File([new Uint8Array([137, 80, 78, 71])], "", { type: "image/png" });
   const pastedPng = clipboardImageFile({
