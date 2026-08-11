@@ -233,9 +233,34 @@
 .slide-image[data-fit="contain"], .slide-video[data-fit="contain"] { object-fit: contain; }
 .slide-image[data-fit="cover"], .slide-video[data-fit="cover"] { object-fit: cover; }
 .slide-image[data-fit="stretch"] { overflow: hidden; }
-.slide-image[data-fit="width"] { width: 100%; height: auto; object-fit: contain; }
-.slide-image[data-fit="height"] { width: auto; height: 100%; object-fit: contain; }
-.slide-image[data-fit="native"] { width: auto; height: auto; max-width: 100%; max-height: 100%; }
+.slide-image[data-fit="width"] {
+  position: absolute;
+  top: var(--image-focus-y);
+  left: 0;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  transform: translateY(var(--image-focus-y-offset));
+}
+.slide-image[data-fit="height"] {
+  position: absolute;
+  top: 0;
+  left: var(--image-focus-x);
+  width: auto;
+  height: 100%;
+  object-fit: contain;
+  transform: translateX(var(--image-focus-x-offset));
+}
+.slide-image[data-fit="native"] {
+  position: absolute;
+  top: var(--image-focus-y);
+  left: var(--image-focus-x);
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  transform: translate(var(--image-focus-x-offset), var(--image-focus-y-offset));
+}
 .arrow-svg { position: absolute; display: block; overflow: visible; pointer-events: none; }
 .overlay-arrow { pointer-events: none; }
 

@@ -383,6 +383,26 @@ try {
   const stretchedResource = stretchWrapper?.querySelector("image");
   assert(stretchWrapper?.getAttribute("preserveAspectRatio") === "none" && stretchedResource?.getAttribute("preserveAspectRatio") === "none", "stretch fit reshapes image resources without modifying their files");
   assert(stretchedResource?.getAttribute("href") === "/test/figures/stretch.svg", "stretched SVG resources remain external images");
+  const focusedDeck = parseDeck(`## Focused {.layout-1-1}
+
+::: left
+![](figures/tall.png){fit=height focus="0 80"}
+:::
+
+::: right
+![](figures/wide.png){fit=width focus="20 80"}
+:::
+`);
+  const focusedFixture = document.createElement("div");
+  focusedFixture.className = "reveal";
+  document.body.append(focusedFixture);
+  renderDeck(focusedDeck, focusedFixture, asset => asset);
+  const heightFit = focusedFixture.querySelector('[data-fit="height"]');
+  const widthFit = focusedFixture.querySelector('[data-fit="width"]');
+  assert(heightFit.style.objectPosition === "0% 80%" && heightFit.style.getPropertyValue("--image-focus-x") === "0%", "zero is retained as a valid image focus coordinate");
+  assert(getComputedStyle(heightFit).position === "absolute" && getComputedStyle(heightFit).transform !== "none", "Focus X positions a height-fitted image within its viewport");
+  assert(getComputedStyle(widthFit).position === "absolute" && getComputedStyle(widthFit).transform !== "none", "Focus Y positions a width-fitted image within its viewport");
+  focusedFixture.remove();
   assert(deck.slides[0].overlays[0].id === "eq", "overlay ID parses");
   assert(deck.slides[0].overlays[0].fontSize === 1.4, "relative overlay font size parses");
   assert(deck.slides[0].overlays[0].alignment === "right", "overlay alignment parses");

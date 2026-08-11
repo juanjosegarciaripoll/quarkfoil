@@ -94,7 +94,17 @@ function makeImage(image, assetResolver) {
   if (image.title) img.title = image.title;
   img.dataset.fit = fit;
   const [focusX = "50", focusY = "50"] = (image.attrs.values.focus || "50 50").split(/[\s,]+/);
-  img.style.objectPosition = `${Number(focusX) || 50}% ${Number(focusY) || 50}%`;
+  const normalizedFocus = value => {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? Math.min(100, Math.max(0, numeric)) : 50;
+  };
+  const x = normalizedFocus(focusX);
+  const y = normalizedFocus(focusY);
+  img.style.objectPosition = `${x}% ${y}%`;
+  img.style.setProperty("--image-focus-x", `${x}%`);
+  img.style.setProperty("--image-focus-y", `${y}%`);
+  img.style.setProperty("--image-focus-x-offset", `${-x}%`);
+  img.style.setProperty("--image-focus-y-offset", `${-y}%`);
   return img;
 }
 
