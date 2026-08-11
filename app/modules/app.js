@@ -556,7 +556,7 @@ async function createProjectPresentation(name, source, overwrite = false) {
   return result.path;
 }
 
-function chooseImportDestination(proposedName, { title = "Import file", extensions = [] } = {}) {
+function chooseImportDestination(proposedName, { title = "File already exists", extensions = [], message = "Choose another filename or enable overwrite." } = {}) {
   const dialog = document.querySelector("#import-dialog");
   const filename = document.querySelector("#import-filename");
   const overwrite = document.querySelector("#import-overwrite");
@@ -564,7 +564,7 @@ function chooseImportDestination(proposedName, { title = "Import file", extensio
   document.querySelector("#import-dialog-title").textContent = title;
   filename.value = proposedName;
   overwrite.checked = false;
-  status.textContent = "";
+  status.textContent = message;
   dialog.returnValue = "";
   dialog.showModal();
   filename.focus();
@@ -586,6 +586,18 @@ function chooseImportDestination(proposedName, { title = "Import file", extensio
     };
     dialog.addEventListener("close", () => finish(null), { once: true });
   });
+}
+
+async function projectPathExists(path) {
+  if (state.local) {
+    const response = await fetch(assetResolver(path), { method: "HEAD", cache: "no-store" });
+    return response.ok;
+  }
+  if (state.directoryHandle) {
+    try { await nestedFileHandle(state.directoryHandle, path); return true; }
+    catch { return false; }
+  }
+  return state.objectUrls.has(path);
 }
 
 async function browseProjectFiles(kind, select, upload, { newFile: showNew = true, upload: showUpload = true } = {}) {
@@ -870,12 +882,18 @@ function figureFolder() {
 
 async function importAsset(file, destination = null) {
   const originalSuffix = file?.name?.match(/\.[^.]+$/)?.[0]?.toLowerCase() || "";
-  destination ||= await chooseImportDestination(file.name, { title: "Import asset", extensions: originalSuffix ? [originalSuffix] : [] });
+  const assetFolder = figureFolder();
+  if (!destination) {
+    const proposed = { name: file.name, overwrite: false };
+    const proposedPath = `${assetFolder}/${proposed.name}`;
+    destination = await projectPathExists(proposedPath)
+      ? chooseImportDestination(proposed.name, { extensions: originalSuffix ? [originalSuffix] : [], message: `${proposedPath} already exists. Choose another filename or enable overwrite.` })
+      : proposed;
+  }
   if (!destination) return null;
   const suffix = destination.name.match(/\.[^.]+$/)?.[0]?.toLowerCase() || "";
   const convertible = [".avi", ".mkv"].includes(suffix);
   if (!file || (!convertible && !["image/", "video/"].some(prefix => file.type.startsWith(prefix)))) throw new Error("Only image and video files are supported");
-  const assetFolder = figureFolder();
   if (convertible) {
     if (!state.local) throw new Error("AVI and MKV conversion requires the local Quarkfoil server");
     const result = await uploadVideoForConversion(file, assetFolder, destination);
@@ -1026,7 +1044,9 @@ function bindUi() {
     const file = event.target.files?.[0];
     if (!file) return;
     if (state.local) {
-      const destination = await chooseImportDestination(file.name, { title: "Import presentation", extensions: [".md", ".markdown"] });
+      const destination = await projectPathExists(file.name)
+        ? chooseImportDestination(file.name, { extensions: [".md", ".markdown"], message: `${file.name} already exists. Choose another filename or enable overwrite.` })
+        : { name: file.name, overwrite: false };
       if (!destination) { event.target.value = ""; return; }
       let opened;
       try { opened = reserveProjectWindow(); }
