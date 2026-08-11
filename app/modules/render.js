@@ -193,10 +193,13 @@ function makeArrow(overlay) {
   const markerId = `quarkfoil-arrowhead-${++arrowMarkerSequence}`;
   const definitions = document.createElementNS(namespace, "defs");
   const marker = document.createElementNS(namespace, "marker");
-  for (const [name, value] of [["id", markerId], ["viewBox", "0 0 10 10"], ["refX", "9"], ["refY", "5"], ["markerWidth", "6"], ["markerHeight", "6"], ["orient", "auto-start-reverse"], ["markerUnits", "strokeWidth"]]) marker.setAttribute(name, value);
+  marker.classList.add("arrow-marker");
+  for (const [name, value] of [["id", markerId], ["viewBox", "0 0 10 10"], ["refX", "8"], ["refY", "5"], ["markerWidth", "6"], ["markerHeight", "6"], ["orient", "auto-start-reverse"], ["markerUnits", "strokeWidth"]]) marker.setAttribute(name, value);
   const head = document.createElementNS(namespace, "path");
+  head.classList.add("arrow-head");
   head.setAttribute("d", "M0 0 L10 5 L0 10 Z");
   head.setAttribute("fill", overlay.stroke || "var(--shape-default-stroke)");
+  head.setAttribute("stroke", "none");
   marker.append(head);
   definitions.append(marker);
   const line = document.createElementNS(namespace, "line");
@@ -211,6 +214,8 @@ function makeArrow(overlay) {
   for (const [name, value] of Object.entries(coordinates)) line.setAttribute(name, String(value));
   line.setAttribute("stroke", overlay.stroke || "var(--shape-default-stroke)");
   line.setAttribute("stroke-width", String(overlay.strokeWidth));
+  line.setAttribute("stroke-linecap", "butt");
+  line.setAttribute("paint-order", "stroke markers");
   line.setAttribute("vector-effect", "non-scaling-stroke");
   if (["start", "both"].includes(arrow.heads)) line.setAttribute("marker-start", `url(#${markerId})`);
   if (["end", "both"].includes(arrow.heads)) line.setAttribute("marker-end", `url(#${markerId})`);

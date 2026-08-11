@@ -196,8 +196,13 @@ function assertArrows() {
   document.body.append(fixture);
   renderDeck(deck, slides, source => source);
   const line = fixture.querySelector(".arrow-svg .arrow-line");
+  const marker = fixture.querySelector(".arrow-svg .arrow-marker");
   assert(line && line.getAttribute("marker-start") && line.getAttribute("marker-end"), "two-headed arrow renders trusted SVG markers");
   assert(line.getAttribute("stroke") === "#c92a2a" && line.getAttribute("stroke-width") === "4", "arrow line styling renders");
+  assert(marker.getAttribute("refX") === "8" && marker.querySelector(".arrow-head").getAttribute("stroke") === "none",
+    "arrow markers cover thick shafts before tapering to their tips");
+  assert(line.getAttribute("stroke-linecap") === "butt" && line.getAttribute("paint-order") === "stroke markers",
+    "arrow shafts stop cleanly beneath SVG markers painted on top");
   assert(line.getAttribute("x1") === "12" && line.getAttribute("y2") === "64", "arrow SVG retains full-slide coordinates instead of squashing its endpoints");
   assert(getComputedStyle(fixture.querySelector(".arrow-hit")).pointerEvents === "stroke", "arrow editing hit target follows the line rather than its bounding box");
   fixture.remove();
