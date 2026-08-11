@@ -346,7 +346,10 @@ export class DesignEditor {
     const source = this.dialogTarget?.kind === "title"
       ? this.contentEditor.value.replace(/\r?\n/g, "  \n")
       : this.contentEditor.value;
-    renderMarkdownPreview(source, this.preview, { breaks: this.dialogTarget?.kind === "overlay" });
+    renderMarkdownPreview(source, this.preview, {
+      breaks: this.dialogTarget?.kind === "overlay",
+      preserveBlankLines: this.dialogTarget?.kind !== "title",
+    });
   }
 
   refresh() {
@@ -906,7 +909,7 @@ export class DesignEditor {
     this.dialogTarget = { kind: "overlay", id: object.id };
     document.querySelector("#content-dialog-title").textContent = object.type === "equation" ? "Edit LaTeX" : object.type === "shape" ? "Edit shape label" : "Edit Markdown";
     this.contentEditor.value = object.source;
-    renderMarkdownPreview(object.source, this.preview, { breaks: true });
+    renderMarkdownPreview(object.source, this.preview, { breaks: true, preserveBlankLines: true });
     this.dialog.showModal();
   }
 
@@ -925,7 +928,7 @@ export class DesignEditor {
     this.dialogTarget = { kind: "cell", id };
     document.querySelector("#content-dialog-title").textContent = `Edit ${id} Markdown`;
     this.contentEditor.value = cell?.source || "";
-    renderMarkdownPreview(cell?.source || "", this.preview);
+    renderMarkdownPreview(cell?.source || "", this.preview, { preserveBlankLines: true });
     this.dialog.showModal();
   }
 

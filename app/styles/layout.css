@@ -194,6 +194,12 @@
 .slide-cell :where(p, ul, ol, blockquote, pre, table) + :where(p, ul, ol, blockquote, pre, table) { margin-top: var(--content-block-gap); }
 .slide-cell :where(h1, h2, h3, h4, h5, h6) + :where(p, ul, ol, blockquote, pre, table) { margin-top: 0.32em; }
 .slide-cell :where(p, ul, ol, blockquote, pre, table) + :where(h1, h2, h3, h4, h5, h6) { margin-top: 0.72em; }
+.slide-cell > .slide-content-spacer,
+.overlay-markdown > .slide-content-spacer,
+.shape-label > .slide-content-spacer { height: 1.4em; }
+.slide-cell > :where(p, ul, ol, blockquote, pre, table) + .slide-content-spacer,
+.overlay-markdown > :where(p, ul, ol, blockquote, pre) + .slide-content-spacer,
+.shape-label > :where(p, ul, ol, blockquote, pre) + .slide-content-spacer { margin-top: var(--content-block-gap); }
 
 .scientific-slide table {
   width: 100%;

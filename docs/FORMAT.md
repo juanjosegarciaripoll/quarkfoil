@@ -131,6 +131,11 @@ Markdown for the left region.
 ```
 
 Valid region names are `core`, `left`, `right`, `top-left`, `bottom-left`, `top-right`, and `bottom-right`, according to the selected layout.
+Within a grid region, one empty line has its usual Markdown meaning and
+separates blocks such as paragraphs or lists. Each additional consecutive
+empty line adds one line of visible vertical space. Empty lines inside fenced
+code blocks remain part of the code and are not converted into spacing. The
+same spacing rule applies to positioned Markdown and shape labels.
 Image `fit` values are `contain`, `cover`, `stretch`, `width`, `height`, and
 `native`. `stretch` reshapes the external image resource to the exact region or
 overlay dimensions without changing the source file.

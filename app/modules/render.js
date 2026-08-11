@@ -2,7 +2,23 @@ import { escapeHtml, THEMES } from "./parser.js";
 import { makeShapeSvg } from "./shapes.js";
 import { attributionKeys, renderCitation } from "./bibliography.js";
 
-function markdown(source, bibliography = null, { breaks = false } = {}) {
+function preserveAdditionalBlankLines(source, spacers) {
+  return source.split(/(```[\s\S]*?```|~~~[\s\S]*?~~~)/g).map((part, index) => {
+    if (index % 2) return part;
+    return part.replace(/(?:\r?\n[ \t]*){2,}/g, run => {
+      const extra = (run.match(/\r?\n/g) || []).length - 2;
+      if (extra <= 0) return run;
+      const tokens = Array.from({ length: extra }, () => {
+        const token = `SCIBLANKLINEPLACEHOLDER${spacers.length}X`;
+        spacers.push(token);
+        return token;
+      });
+      return `\n\n${tokens.join("\n\n")}\n\n`;
+    });
+  }).join("");
+}
+
+function markdown(source, bibliography = null, { breaks = false, preserveBlankLines = false } = {}) {
   try {
     const equations = [];
     let protectedSource = String(source || "").replace(
@@ -24,6 +40,8 @@ function markdown(source, bibliography = null, { breaks = false } = {}) {
         return token;
       });
     }).join("");
+    const spacers = [];
+    if (preserveBlankLines) protectedSource = preserveAdditionalBlankLines(protectedSource, spacers);
     const renderer = new window.marked.Renderer();
     renderer.html = token => {
       const text = typeof token === "string" ? token : token?.text || token?.raw || "";
@@ -40,6 +58,7 @@ function markdown(source, bibliography = null, { breaks = false } = {}) {
       html = html.replaceAll(equation.token, rendered);
     }
     for (const citation of citations) html = html.replaceAll(citation.token, citation.keys.map(key => renderCitation(key, bibliography)).join(", "));
+    for (const token of spacers) html = html.replace(new RegExp(`<p>\\s*${token}\\s*</p>`), '<div class="slide-content-spacer" aria-hidden="true"></div>');
     return html;
   } catch (error) {
     return `<pre class="render-error">${escapeHtml(error.message)}</pre>`;
@@ -171,7 +190,7 @@ function makeArrow(overlay) {
   return svg;
 }
 
-function fillContent(container, item, assetResolver, bibliography, preserveLines = false) {
+function fillContent(container, item, assetResolver, bibliography, preserveLines = false, preserveBlankLines = false) {
   if (item.type === "image" && item.image) container.append(makeImage(item.image, assetResolver));
   else if (item.type === "video" && item.video) container.append(makeVideo(item.video, assetResolver));
   else if (item.type === "arrow" && item.arrow) container.append(makeArrow(item));
@@ -183,14 +202,14 @@ function fillContent(container, item, assetResolver, bibliography, preserveLines
     container.style.setProperty("--shape-stroke-width", String(item.strokeWidth));
     const label = document.createElement("div");
     label.className = "shape-label";
-    label.innerHTML = markdown(item.source, bibliography, { breaks: preserveLines });
+    label.innerHTML = markdown(item.source, bibliography, { breaks: preserveLines, preserveBlankLines });
     container.append(makeShapeSvg(item.shape), label);
   }
   else if (item.type === "citation") {
     const brief = item.attrs.values.display !== "number";
     container.innerHTML = attributionKeys(item).map(key => renderCitation(key, bibliography, { brief })).join("; ");
   }
-  else container.innerHTML = markdown(item.source, bibliography, { breaks: preserveLines && item.type === "markdown" });
+  else container.innerHTML = markdown(item.source, bibliography, { breaks: preserveLines && item.type === "markdown", preserveBlankLines });
 }
 
 function cellMap(layout) {
@@ -244,7 +263,7 @@ function renderSlide(slide, metadata, assetResolver, bibliography) {
     const item = findCell(slide, name);
     if (item) {
       cell.dataset.contentType = item.type;
-      fillContent(cell, item, assetResolver, bibliography);
+      fillContent(cell, item, assetResolver, bibliography, false, true);
     } else {
       cell.dataset.empty = "true";
       cell.innerHTML = `<span class="empty-cell-label">${escapeHtml(name)}</span>`;
@@ -277,7 +296,7 @@ function renderSlide(slide, metadata, assetResolver, bibliography) {
       element.style.textAlign = overlay.alignment;
       element.dataset.align = overlay.alignment;
     }
-    fillContent(element, overlay, assetResolver, bibliography, true);
+    fillContent(element, overlay, assetResolver, bibliography, true, true);
     overlayLayer.append(element);
   }
   frame.append(core);

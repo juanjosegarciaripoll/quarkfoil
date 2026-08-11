@@ -68,6 +68,10 @@ for a complete source example.
 - `Front page`: title in the upper half and details in the lower half.
 - `Free (nothing)`: no title, footer, or grid; only positioned overlays.
 
+Inside a layout region, one empty line separates Markdown blocks normally.
+Additional consecutive empty lines add visible vertical space. This also works
+in positioned Markdown and shape labels without altering fenced code blocks.
+
 ## Slide appearance
 
 Click an empty part of the slide to show slide-wide Properties. Theme chooses

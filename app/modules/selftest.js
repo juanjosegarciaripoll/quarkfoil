@@ -270,16 +270,29 @@ function assertTypography() {
 
 First paragraph with enough text to establish its line height.
 
+
 Second paragraph.
+
+Third paragraph.
 
 - First item
   - Nested item
 - Second item
+
+\`\`\`
+code line one
+
+
+code line two
+\`\`\`
 :::
 
 ::: overlay {#list type="markdown" x="55" y="55" w="35" h="25"}
 - Overlay item
   - Nested overlay item
+
+
+After an additional blank line.
 :::
 `);
   renderDeck(deck, fixture, source => source);
@@ -294,10 +307,13 @@ Second paragraph.
   const paragraph = cell.querySelector("p");
   assert(Math.abs(parseFloat(getComputedStyle(paragraph).lineHeight) / cellSize - 1.4) < 0.02, "layout paragraphs use the normalized line height");
   const paragraphs = cell.querySelectorAll("p");
-  assert(parseFloat(getComputedStyle(paragraphs[1]).marginTop) > 0, "adjacent layout paragraphs use explicit block spacing");
+  assert(parseFloat(getComputedStyle(paragraphs[2]).marginTop) > 0, "adjacent layout paragraphs use explicit block spacing");
+  assert(cell.querySelectorAll(":scope > .slide-content-spacer").length === 1, "additional blank layout lines render as proportional vertical space");
+  assert(cell.querySelector("pre").textContent.includes("code line one\n\n\ncode line two"), "blank lines inside fenced code remain code content");
   const overlayItems = fixture.querySelectorAll(".overlay-markdown li");
   assert(Math.abs(parseFloat(getComputedStyle(overlayItems[0]).fontSize) - parseFloat(getComputedStyle(overlayItems[1]).fontSize)) < 0.1,
     "nested overlay lists retain the overlay body font size");
+  assert(fixture.querySelectorAll(".overlay-markdown > .slide-content-spacer").length === 1, "additional blank overlay lines use the same spacer rendering");
   fixture.remove();
 }
 
