@@ -21,7 +21,7 @@ import {
   updateSlideProperties,
 } from "./parser.js";
 import { renderDeck, syncVideoPlayback } from "./render.js";
-import { arrowGeometry, bindRangeControl, canvasStartsMarquee, clipboardImageFile, deleteKey, initialImageGeometry, moveGeometryGroup, pageSlideIndex, projectAssetPage, rectanglesIntersect, renameClipboardImage, repeatedActivation, resolveImportDestination, videoFile } from "./editor.js";
+import { arrowGeometry, bindRangeControl, buildShapePalette, canvasStartsMarquee, clipboardImageFile, deleteKey, initialImageGeometry, moveGeometryGroup, pageSlideIndex, projectAssetPage, rectanglesIntersect, renameClipboardImage, repeatedActivation, resolveImportDestination, videoFile } from "./editor.js";
 import { parseBibliography, prepareBibliography } from "./bibliography.js";
 import { compileExpression, createPlotSvg } from "./plot.js";
 
@@ -138,6 +138,15 @@ function assertEmptyLayouts() {
 }
 
 function assertShapes() {
+  const palette = document.createElement("div");
+  let chosenShape = null;
+  const shapeButtons = buildShapePalette(palette, shape => { chosenShape = shape; });
+  assert(shapeButtons.length === 8 && shapeButtons.every(button => button.querySelector(".shape-background .shape-surface")),
+    "shape palette uses every insertable shape SVG as an icon");
+  assert(shapeButtons.every(button => button.getAttribute("aria-label")?.startsWith("Add ")), "shape palette icons have accessible names");
+  shapeButtons.find(button => button.dataset.shape === "diamond").click();
+  assert(chosenShape === "diamond", "shape palette icons choose their matching insertion template");
+
   const fixture = document.createElement("div");
   fixture.id = "layout-fixture";
   fixture.className = "reveal";

@@ -131,12 +131,13 @@ Markdown source as `.section` headings.
 
 ## Shapes
 
-Choose a template from the Shape palette in Design mode, then use the adjacent
-button to add it to the current slide. The palette includes rectangles,
-ellipses, a circle, diamond, hexagon, thought cloud, comic callout, and arrow.
-Arrows use the same toolbar but are endpoint-based objects: drag either endpoint
-handle to change their direction or length, and drag the line to move the whole
-arrow. Their Properties select the line color and width and whether the start,
+Hover over, focus, or click the shape button in Design mode to open its palette,
+then choose a shape icon to insert it. The palette includes rectangles,
+ellipses, a circle, diamond, hexagon, thought cloud, and comic callout. Its
+monochrome previews use the same geometry as the inserted shapes. The arrow has
+its own adjacent toolbar button because it is an endpoint-based object. Drag
+either endpoint handle to change its direction or length, and drag the line to
+move the whole arrow. Its Properties select the line color and width and whether the start,
 end, both, or neither endpoint has an arrowhead. Use the
 plot tool to create spline-interpolated SVG graphs from mathematical expressions.
 

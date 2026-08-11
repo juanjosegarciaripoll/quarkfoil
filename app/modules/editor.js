@@ -13,6 +13,7 @@ import {
 } from "./parser.js";
 import { renderMarkdownPreview } from "./render.js";
 import { createPlotSvg } from "./plot.js";
+import { makeShapeSvg, SHAPES } from "./shapes.js";
 
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
 const round = value => Math.round(value * 10) / 10;
@@ -22,6 +23,22 @@ export const repeatedActivation = (previous, key, time, interval = 450) => Boole
 );
 export const deleteKey = key => key === "Delete" || key === "Del";
 export const canvasStartsMarquee = ({ overlay, cell, title }) => !overlay && !cell && !title;
+export function buildShapePalette(target, choose) {
+  const buttons = Object.entries(SHAPES).map(([shape, label]) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "shape-option";
+    button.dataset.shape = shape;
+    button.title = label;
+    button.setAttribute("aria-label", `Add ${label}`);
+    button.setAttribute("role", "menuitem");
+    button.append(makeShapeSvg(shape));
+    button.addEventListener("click", () => choose(shape));
+    return button;
+  });
+  target.replaceChildren(...buttons);
+  return buttons;
+}
 export async function resolveImportDestination(exists, proposed, choose) {
   return await exists ? await choose() : proposed;
 }
@@ -222,6 +239,9 @@ export class DesignEditor {
     this.contentEditor = document.querySelector("#content-editor");
     this.preview = document.querySelector("#content-preview");
     this.plotDialog = document.querySelector("#plot-dialog");
+    this.shapePicker = document.querySelector("#shape-picker");
+    this.shapePaletteButton = document.querySelector("#shape-palette-button");
+    this.shapePalette = document.querySelector("#shape-palette");
     this.imageInputPurpose = "add";
     this.videoInputPurpose = "add";
     this.lastCanvasActivation = null;
@@ -249,7 +269,35 @@ export class DesignEditor {
     document.querySelector("#add-image").addEventListener("click", () => this.openProjectImageDialog("add"));
     document.querySelector("#add-video").addEventListener("click", () => this.openProjectVideoDialog("add"));
     document.querySelector("#add-plot").addEventListener("click", () => this.openPlotDialog());
-    document.querySelector("#add-shape").addEventListener("click", () => this.addShape(document.querySelector("#shape-select").value));
+    const shapeButtons = buildShapePalette(this.shapePalette, shape => {
+      this.addShape(shape);
+      this.closeShapePalette({ restoreFocus: true });
+    });
+    this.shapePicker.addEventListener("pointerenter", () => this.openShapePalette());
+    this.shapePicker.addEventListener("pointerleave", () => {
+      if (!this.shapePicker.matches(":focus-within")) this.closeShapePalette();
+    });
+    this.shapePicker.addEventListener("focusin", () => this.openShapePalette());
+    this.shapePicker.addEventListener("focusout", () => queueMicrotask(() => {
+      if (!this.shapePicker.matches(":focus-within")) this.closeShapePalette();
+    }));
+    this.shapePaletteButton.addEventListener("click", () => this.openShapePalette());
+    this.shapePaletteButton.addEventListener("keydown", event => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        this.closeShapePalette({ restoreFocus: true });
+        return;
+      }
+      if (!["ArrowDown", "ArrowUp"].includes(event.key)) return;
+      event.preventDefault();
+      this.openShapePalette();
+      shapeButtons[event.key === "ArrowDown" ? 0 : shapeButtons.length - 1].focus();
+    });
+    this.shapePalette.addEventListener("keydown", event => this.onShapePaletteKeyDown(event, shapeButtons));
+    document.addEventListener("pointerdown", event => {
+      if (!this.shapePicker.contains(event.target)) this.closeShapePalette();
+    });
+    document.querySelector("#add-arrow").addEventListener("click", () => this.addShape("arrow"));
     for (const id of ["plot-expression", "plot-start", "plot-end", "plot-axes"]) {
       document.querySelector(`#${id}`).addEventListener("input", () => this.updatePlotPreview());
     }
@@ -341,6 +389,39 @@ export class DesignEditor {
   slideIndex() { return this.options.getSlideIndex(); }
   slide() { return this.options.getDeck().slides[this.slideIndex()]; }
   section() { return document.querySelector(`.scientific-slide[data-slide-index="${this.slideIndex()}"]`); }
+
+  openShapePalette() {
+    if (this.suppressShapePaletteFocus) return;
+    this.shapePicker.classList.add("palette-open");
+    this.shapePaletteButton.setAttribute("aria-expanded", "true");
+  }
+
+  closeShapePalette({ restoreFocus = false } = {}) {
+    this.shapePicker.classList.remove("palette-open");
+    this.shapePaletteButton.setAttribute("aria-expanded", "false");
+    if (!restoreFocus) return;
+    this.suppressShapePaletteFocus = true;
+    this.shapePaletteButton.focus({ preventScroll: true });
+    queueMicrotask(() => { this.suppressShapePaletteFocus = false; });
+  }
+
+  onShapePaletteKeyDown(event, buttons) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      this.closeShapePalette({ restoreFocus: true });
+      return;
+    }
+    const steps = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -4, ArrowDown: 4 };
+    if (event.key === "Home" || event.key === "End") {
+      event.preventDefault();
+      buttons[event.key === "Home" ? 0 : buttons.length - 1].focus();
+      return;
+    }
+    if (!Object.hasOwn(steps, event.key)) return;
+    event.preventDefault();
+    const current = Math.max(0, buttons.indexOf(document.activeElement));
+    buttons[(current + steps[event.key] + buttons.length) % buttons.length].focus();
+  }
 
   updateContentPreview() {
     const source = this.dialogTarget?.kind === "title"

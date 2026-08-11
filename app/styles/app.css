@@ -36,6 +36,60 @@ button.active { background: #146c7e; border-color: #56cfe1; }
 .toolbar-icon-button .roman-t { font-family: Georgia, "Times New Roman", serif; font-weight: 700; }
 .action-svg { display: block; width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .toolbar-icon-button.destructive-icon:hover:not(:disabled) { color: #fff; background: #a61e4d; }
+.shape-picker { position: relative; }
+.shape-palette {
+  position: absolute;
+  z-index: 1100;
+  top: calc(100% + 7px);
+  left: 50%;
+  display: grid;
+  grid-template-columns: repeat(4, 42px);
+  gap: 5px;
+  width: max-content;
+  padding: 7px;
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  background: #20252b;
+  border: 1px solid #56616d;
+  border-radius: 6px;
+  box-shadow: 0 8px 24px #0008;
+  transform: translate(-50%, -4px);
+  transition: opacity 90ms ease, transform 90ms ease, visibility 90ms;
+}
+.shape-picker.palette-open .shape-palette {
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, 0);
+}
+.shape-palette::before {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 100%;
+  left: 0;
+  height: 8px;
+}
+.shape-palette .shape-option {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 38px;
+  padding: 5px;
+}
+.shape-palette .shape-background {
+  position: static;
+  width: 30px;
+  height: 26px;
+  overflow: visible;
+}
+.shape-palette .shape-surface {
+  fill: currentColor;
+  fill-opacity: 0.18;
+  stroke: currentColor;
+  stroke-width: 5;
+}
 .save-state { min-width: 5rem; color: #aab4bd; font-size: 0.82rem; }
 
 .workspace {
