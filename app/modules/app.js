@@ -2,7 +2,7 @@ import { deleteSection, deleteSlide, duplicateSlide, importSlide, insertOverlay,
 import { renderDeck, syncVideoPlayback } from "./render.js";
 import { DesignEditor, pageSlideIndex, projectAssetPage, resolveImportDestination } from "./editor.js";
 import { saveSnapshot } from "./storage.js";
-import { briefReference, parseBibliography, prepareBibliography } from "./bibliography.js";
+import { briefReference, formatBibliography, parseBibliography, prepareBibliography, renameBibliographyEntry, uniqueCitationKey } from "./bibliography.js";
 
 const STARTER = `---
 title: Quarkfoil
@@ -930,15 +930,33 @@ async function fetchDoi() {
     const source = document.querySelector("#bibliography-source");
     const parsed = parseBibliography(result.bibtex);
     const existing = parseBibliography(source.value);
-    const incoming = parsed[0];
+    let incoming = parsed[0];
     if (!incoming) throw new Error("DOI service returned no bibliography entry");
-    if (existing.some(entry => entry.key === incoming.key || (entry.fields.doi && entry.fields.doi.toLowerCase() === incoming.fields.doi?.toLowerCase()))) throw new Error("This DOI or citation key already exists");
+    if (existing.some(entry => entry.fields.doi && entry.fields.doi.toLowerCase() === incoming.fields.doi?.toLowerCase())) throw new Error("This DOI already exists");
+    const key = uniqueCitationKey(incoming.key, existing.map(entry => entry.key));
+    const bibtex = key === incoming.key ? result.bibtex : renameBibliographyEntry(result.bibtex, key);
+    if (key !== incoming.key) incoming = parseBibliography(bibtex)[0];
     if (!window.confirm(`Add ${incoming.key}?\n\n${incoming.fields.title || "Untitled"}\n${briefReference(incoming)}`)) { bibliographyMessage("DOI import cancelled"); return; }
-    source.value = `${source.value.trimEnd()}${source.value.trim() ? "\n\n" : ""}${result.bibtex.trim()}\n`;
+    const combined = `${source.value.trimEnd()}${source.value.trim() ? "\n\n" : ""}${bibtex.trim()}\n`;
+    source.value = formatBibliography(combined);
     document.querySelector("#doi-input").value = "";
     document.querySelector("#bibliography-search").value = "";
     rebuildBibliographyList(incoming.key);
     bibliographyMessage(`Added ${incoming.key} to the draft; save to write the bibliography`);
+  } catch (error) { bibliographyMessage(error.message, true); }
+}
+
+function reformatBibliographyDraft() {
+  const source = document.querySelector("#bibliography-source");
+  if (!source.value.trim()) { bibliographyMessage("The bibliography is empty"); return; }
+  if (!window.confirm("Reformat and alphabetize the complete bibliography draft?")) {
+    bibliographyMessage("Reformat cancelled");
+    return;
+  }
+  try {
+    source.value = formatBibliography(source.value);
+    rebuildBibliographyList();
+    bibliographyMessage("Bibliography draft reformatted and alphabetized; save to write it");
   } catch (error) { bibliographyMessage(error.message, true); }
 }
 
@@ -1169,6 +1187,7 @@ function bindUi() {
   });
   document.querySelector("#bibliography-source").addEventListener("input", () => rebuildBibliographyList());
   document.querySelector("#doi-fetch").addEventListener("click", fetchDoi);
+  document.querySelector("#bibliography-reformat").addEventListener("click", reformatBibliographyDraft);
   document.querySelector("#doi-input").addEventListener("keydown", event => {
     if (event.key !== "Enter" || event.isComposing) return;
     event.preventDefault();

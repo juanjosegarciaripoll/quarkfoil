@@ -23,7 +23,7 @@ import {
 } from "./parser.js";
 import { renderDeck, syncVideoPlayback } from "./render.js";
 import { arrowGeometry, bindRangeControl, buildShapePalette, canvasStartsMarquee, clipboardImageFile, deleteKey, DesignEditor, initialImageGeometry, moveGeometryGroup, pageSlideIndex, projectAssetPage, rectanglesIntersect, renameClipboardImage, repeatedActivation, resolveImportDestination, videoFile } from "./editor.js";
-import { parseBibliography, prepareBibliography } from "./bibliography.js";
+import { formatBibliography, parseBibliography, prepareBibliography, renameBibliographyEntry, uniqueCitationKey } from "./bibliography.js";
 import { compileExpression, createPlotSvg } from "./plot.js";
 
 const source = `---
@@ -219,6 +219,16 @@ function assertCitations() {
   const bibliography = prepareBibliography(bib, parsed);
   const doiEntry = parseBibliography("@article{wallraff2004, month={Sept}, doi={10.1038/nature02851}}")[0];
   assert(doiEntry.key === "wallraff2004" && doiEntry.fields.month === "Sept" && doiEntry.fields.doi === "10.1038/nature02851", "normalized DOI BibTeX and citation key parse");
+  const disambiguatedKey = uniqueCitationKey("wallraff2004", ["wallraff2004", "wallraff2004a"]);
+  const disambiguatedEntry = parseBibliography(renameBibliographyEntry("@article{wallraff2004, doi={10.1000/different}}", disambiguatedKey))[0];
+  assert(disambiguatedEntry.key === "wallraff2004b" && disambiguatedEntry.fields.doi === "10.1000/different",
+    "different DOI entries with colliding generated keys receive a unique suffix");
+  const formattedBibliography = formatBibliography(`@article{zeta2025, year={2025}, title={A {Protected} Title}, author={Zulu, Zoe}}
+@book{alpha2020, title={First}, author={Alpha, Alice}, publisher={Press}, year={2020}}`);
+  assert(formattedBibliography.startsWith("@book{alpha2020,") && formattedBibliography.indexOf("@article{zeta2025,") > 0,
+    "bibliography reformatting sorts entries alphabetically by citation key");
+  assert(formattedBibliography.includes("  author    = {Alpha, Alice},\n  title     = {First},")
+    && formattedBibliography.includes("title  = {A {Protected} Title},"), "bibliography reformatting orders and aligns fields while retaining protected braces");
   let bibliographyError = "";
   try { parseBibliography("@article{broken, month=Sept}"); } catch (error) { bibliographyError = error.message; }
   assert(bibliographyError.startsWith("Invalid BibTeX:"), "BibTeX parser failures produce visible error messages");

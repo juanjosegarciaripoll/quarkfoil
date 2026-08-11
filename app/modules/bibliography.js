@@ -4,20 +4,80 @@ function plain(value = "") {
   return String(value).replace(/[{}]/g, "").replace(/--/g, "–").replace(/\\&/g, "&").trim();
 }
 
-export function parseBibliography(source) {
-  if (!source.trim()) return [];
-  let records;
-  try {
-    records = window.bibtexParse.toJSON(source);
-  } catch (reason) {
+const BIBLIOGRAPHY_FIELD_ORDER = [
+  "author", "editor", "title", "journal", "booktitle", "publisher", "school", "institution",
+  "series", "edition", "volume", "number", "pages", "address", "month", "year", "doi", "url", "note",
+];
+const BIBLIOGRAPHY_FIELD_POSITION = new Map(BIBLIOGRAPHY_FIELD_ORDER.map((field, index) => [field, index]));
+
+function bibliographyRecords(source) {
+  try { return window.bibtexParse.toJSON(source); }
+  catch (reason) {
     const message = reason instanceof Error ? reason.message : String(reason);
     throw new Error(`Invalid BibTeX: ${message}`);
   }
+}
+
+export function parseBibliography(source) {
+  if (!source.trim()) return [];
+  const records = bibliographyRecords(source);
   return records.map(record => ({
     key: record.citationKey,
     type: record.entryType,
     fields: Object.fromEntries(Object.entries(record.entryTags || {}).map(([key, value]) => [key.toLowerCase(), plain(value)])),
   }));
+}
+
+export function formatBibliography(source) {
+  if (!source.trim()) return "";
+  if (/^\s*%/m.test(source)) throw new Error("Remove or convert % comments before reformatting the bibliography");
+  if (/@(?:comment|preamble|string)\s*\{/i.test(source)) {
+    throw new Error("Reformat supports ordinary bibliography entries, not @comment, @preamble, or @string directives");
+  }
+  const records = bibliographyRecords(source);
+  if (records.some(record => !record.citationKey || !record.entryTags)) {
+    throw new Error("Reformat supports ordinary bibliography entries, not @comment, @preamble, or @string directives");
+  }
+  records.sort((left, right) => {
+    const a = left.citationKey.toLocaleLowerCase();
+    const b = right.citationKey.toLocaleLowerCase();
+    return a < b ? -1 : a > b ? 1 : left.citationKey < right.citationKey ? -1 : left.citationKey > right.citationKey ? 1 : 0;
+  });
+  return `${records.map(record => {
+    const fields = Object.entries(record.entryTags).map(([key, value]) => [key.toLocaleLowerCase(), String(value).trim()]);
+    fields.sort(([left], [right]) => {
+      const a = BIBLIOGRAPHY_FIELD_POSITION.get(left) ?? BIBLIOGRAPHY_FIELD_ORDER.length;
+      const b = BIBLIOGRAPHY_FIELD_POSITION.get(right) ?? BIBLIOGRAPHY_FIELD_ORDER.length;
+      return a - b || left.localeCompare(right);
+    });
+    const width = Math.max(...fields.map(([key]) => key.length));
+    const body = fields.map(([key, value]) => `  ${key.padEnd(width)} = {${value}},`).join("\n");
+    return `@${record.entryType.toLocaleLowerCase()}{${record.citationKey},\n${body}\n}`;
+  }).join("\n\n")}\n`;
+}
+
+export function uniqueCitationKey(proposed, existingKeys) {
+  const base = String(proposed || "reference");
+  const used = new Set([...existingKeys].map(key => String(key).toLocaleLowerCase()));
+  if (!used.has(base.toLocaleLowerCase())) return base;
+  for (const suffix of "abcdefghijklmnopqrstuvwxyz") {
+    const candidate = `${base}${suffix}`;
+    if (!used.has(candidate.toLocaleLowerCase())) return candidate;
+  }
+  let counter = 2;
+  while (used.has(`${base}${counter}`.toLocaleLowerCase())) counter += 1;
+  return `${base}${counter}`;
+}
+
+export function renameBibliographyEntry(source, key) {
+  if (!/^[\w:./+-]+$/.test(key)) throw new Error(`Invalid citation key '${key}'`);
+  let replaced = false;
+  const renamed = String(source).replace(/^(\s*@[a-z]+\s*\{\s*)[^,\s]+/i, (whole, prefix) => {
+    replaced = true;
+    return `${prefix}${key}`;
+  });
+  if (!replaced) throw new Error("DOI service returned no bibliography entry");
+  return renamed;
 }
 
 export function briefReference(entry) {

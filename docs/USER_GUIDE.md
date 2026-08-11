@@ -184,7 +184,15 @@ BibTeX source. The source is saved losslessly to the file selected by
 atomic and reject external conflicts.
 
 Enter a DOI and choose **Add DOI** to retrieve BibTeX metadata. Quarkfoil shows
-a preview before appending it to the draft and detects duplicate keys and DOIs.
+a preview before appending it to the draft and rejects duplicate DOIs. If a
+different entry would use an existing citation key, Quarkfoil adds a conventional
+alphabetic suffix such as `smith2024a` before showing the preview.
+After confirmation, DOI imports are formatted and the complete draft is sorted
+alphabetically by citation key. **Reformat** applies the same canonical multiline
+format and sorting to entries edited or pasted by hand. Because rewriting cannot
+safely preserve every BibTeX extension, Reformat refuses `%` comments and
+`@comment`, `@preamble`, or `@string` directives instead of silently discarding
+them. Save remains a separate action.
 Pressing `Enter` in the DOI field performs the same Add DOI action and keeps the
 dialog open. Pressing `Enter` in the reference search field leaves the current
 filter in place and does not submit or close the dialog. After a DOI is added,
