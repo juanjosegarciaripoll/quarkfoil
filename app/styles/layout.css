@@ -5,6 +5,10 @@
   --slide-padding-top: 3.2%;
   --slide-padding-bottom: 2.4%;
   --grid-gap: 2.2%;
+  --content-font-size: 0.72em;
+  --content-line-height: 1.4;
+  --content-block-gap: 0.52em;
+  --list-indent: 1.28em;
 }
 
 .reveal {
@@ -26,6 +30,30 @@
   background: var(--slide-background);
   font-family: var(--font-sans);
   text-align: left;
+}
+
+/* Reveal's core stylesheet intentionally leaves document typography mostly
+   untouched. Reset browser margins and padding inside slides so presentation
+   spacing does not depend on the browser's user-agent stylesheet. */
+.scientific-slide :where(h1, h2, h3, h4, h5, h6, p, ul, ol, li, blockquote, pre, figure) {
+  margin: 0;
+  padding: 0;
+}
+.scientific-slide a { color: var(--accent); text-decoration-thickness: 0.06em; text-underline-offset: 0.12em; }
+.scientific-slide :where(strong, b) { font-weight: 700; }
+.scientific-slide :where(em, i) { font-style: italic; }
+.scientific-slide code { font-family: var(--font-mono); font-size: 0.9em; }
+.scientific-slide pre {
+  padding: 0.45em 0.6em;
+  overflow: auto;
+  background: color-mix(in srgb, var(--slide-foreground), transparent 95%);
+  border-radius: 0.16em;
+}
+.scientific-slide pre code { font-size: inherit; }
+.scientific-slide blockquote {
+  padding-inline-start: 0.72em;
+  color: var(--muted);
+  border-inline-start: 0.12em solid var(--accent);
 }
 
 .scientific-slide .slide-frame {
@@ -147,18 +175,29 @@
   position: relative;
   min-width: 0;
   min-height: 0;
+  font-size: var(--content-font-size);
+  line-height: var(--content-line-height);
   overflow: hidden;
 }
 
-.slide-cell > :first-child { margin-top: 0; }
-.slide-cell > :last-child { margin-bottom: 0; }
-.slide-cell h3 { color: var(--accent); font-size: 0.83em; text-transform: none; }
-.slide-cell p, .slide-cell li { font-size: 0.72em; line-height: 1.35; }
-.slide-cell ul, .slide-cell ol { margin-left: 1.1em; }
+.slide-cell :where(p, li, ul, ol, blockquote, pre) { font-size: inherit; line-height: inherit; }
+.slide-cell :where(h1, h2, h3, h4, h5, h6) { line-height: 1.15; text-transform: none; }
+.slide-cell h1 { font-size: 1.6em; }
+.slide-cell h2 { font-size: 1.35em; }
+.slide-cell h3 { color: var(--accent); font-size: 1.15em; }
+.slide-cell h4 { font-size: 1em; }
+.slide-cell h5 { font-size: 0.9em; }
+.slide-cell h6 { color: var(--muted); font-size: 0.82em; }
+.slide-cell :where(ul, ol) { padding-inline-start: var(--list-indent); list-style-position: outside; }
+.slide-cell li + li { margin-top: 0.18em; }
+.slide-cell li > :where(ul, ol) { margin-top: 0.18em; }
+.slide-cell :where(p, ul, ol, blockquote, pre, table) + :where(p, ul, ol, blockquote, pre, table) { margin-top: var(--content-block-gap); }
+.slide-cell :where(h1, h2, h3, h4, h5, h6) + :where(p, ul, ol, blockquote, pre, table) { margin-top: 0.32em; }
+.slide-cell :where(p, ul, ol, blockquote, pre, table) + :where(h1, h2, h3, h4, h5, h6) { margin-top: 0.72em; }
 
 .scientific-slide table {
   width: 100%;
-  margin: 0.55em 0;
+  margin: 0;
   overflow: hidden;
   color: inherit;
   background: var(--slide-background);
@@ -214,10 +253,14 @@
   pointer-events: auto;
   overflow: visible;
 }
-.slide-overlay > :first-child { margin-top: 0; }
-.slide-overlay > :last-child { margin-bottom: 0; }
-.slide-overlay p { margin: 0; font-size: 0.68em; line-height: 1.25; }
-.slide-overlay p + p { margin-top: 1em; }
+.overlay-markdown > :where(p, ul, ol, blockquote, pre),
+.shape-label > :where(p, ul, ol, blockquote, pre) { font-size: 0.68em; line-height: 1.38; }
+.slide-overlay :where(ul, ol) { padding-inline-start: var(--list-indent); list-style-position: outside; }
+.slide-overlay li { font-size: inherit; line-height: inherit; }
+.slide-overlay li + li { margin-top: 0.18em; }
+.slide-overlay li > :where(ul, ol) { margin-top: 0.18em; }
+.overlay-markdown > :where(p, ul, ol, blockquote, pre) + :where(p, ul, ol, blockquote, pre),
+.shape-label > :where(p, ul, ol, blockquote, pre) + :where(p, ul, ol, blockquote, pre) { margin-top: 0.52em; }
 .slide-overlay .katex-display { margin: 0; }
 .slide-overlay[data-align="left"] .katex-display,
 .slide-overlay[data-align="left"] .katex-display > .katex { text-align: left; }

@@ -259,6 +259,48 @@ function assertTables() {
   fixture.remove();
 }
 
+function assertTypography() {
+  const fixture = document.createElement("div");
+  fixture.className = "reveal";
+  document.body.append(fixture);
+  const deck = parseDeck(`## Typography {.layout-1}
+
+::: core
+### A compact heading
+
+First paragraph with enough text to establish its line height.
+
+Second paragraph.
+
+- First item
+  - Nested item
+- Second item
+:::
+
+::: overlay {#list type="markdown" x="55" y="55" w="35" h="25"}
+- Overlay item
+  - Nested overlay item
+:::
+`);
+  renderDeck(deck, fixture, source => source);
+  const cell = fixture.querySelector(".slide-cell");
+  const [topItem, nestedItem] = cell.querySelectorAll("li");
+  const cellSize = parseFloat(getComputedStyle(cell).fontSize);
+  assert(Math.abs(parseFloat(getComputedStyle(topItem).fontSize) - cellSize) < 0.1
+    && Math.abs(parseFloat(getComputedStyle(nestedItem).fontSize) - cellSize) < 0.1,
+  "nested layout lists retain the body font size");
+  const listIndent = parseFloat(getComputedStyle(cell.querySelector("ul")).paddingLeft);
+  assert(listIndent > cellSize && listIndent < cellSize * 1.5, "layout list indentation is explicit and compact");
+  const paragraph = cell.querySelector("p");
+  assert(Math.abs(parseFloat(getComputedStyle(paragraph).lineHeight) / cellSize - 1.4) < 0.02, "layout paragraphs use the normalized line height");
+  const paragraphs = cell.querySelectorAll("p");
+  assert(parseFloat(getComputedStyle(paragraphs[1]).marginTop) > 0, "adjacent layout paragraphs use explicit block spacing");
+  const overlayItems = fixture.querySelectorAll(".overlay-markdown li");
+  assert(Math.abs(parseFloat(getComputedStyle(overlayItems[0]).fontSize) - parseFloat(getComputedStyle(overlayItems[1]).fontSize)) < 0.1,
+    "nested overlay lists retain the overlay body font size");
+  fixture.remove();
+}
+
 try {
   const rangeFixture = document.createElement("div");
   rangeFixture.innerHTML = '<input id="test-range" type="range" min="0.25" max="3" step="0.05" value="1"><input id="test-range-value" type="number">';
@@ -425,6 +467,7 @@ try {
   assertCitations();
   assertThemes();
   assertTables();
+  assertTypography();
 
   const multilineFixture = document.createElement("div");
   document.body.append(multilineFixture);
