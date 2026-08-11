@@ -136,6 +136,23 @@ separates blocks such as paragraphs or lists. Each additional consecutive
 empty line adds one line of visible vertical space. Empty lines inside fenced
 code blocks remain part of the code and are not converted into spacing. The
 same spacing rule applies to positioned Markdown and shape labels.
+
+Markdown headings, paragraphs, and list items can participate in Reveal.js
+fragment sequencing by ending the relevant source line with `{fragment=N}`,
+where `N` is a zero-based index:
+
+```markdown
+### Staged explanation {fragment=0}
+
+The first detail appears next. {fragment=1}
+
+- Then this item {fragment=2}
+- And finally this one {fragment=3}
+```
+
+The annotation is not displayed. Elements with the same index appear together.
+Fragment annotations inside inline or fenced code remain literal code.
+
 Image `fit` values are `contain`, `cover`, `stretch`, `width`, `height`, and
 `native`. `stretch` reshapes the external image resource to the exact region or
 overlay dimensions without changing the source file.

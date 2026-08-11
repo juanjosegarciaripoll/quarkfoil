@@ -266,24 +266,24 @@ function assertTypography() {
   const deck = parseDeck(`## Typography {.layout-1}
 
 ::: core
-### A compact heading
+### A compact heading {fragment=0}
 
-First paragraph with enough text to establish its line height.
+First paragraph with enough text to establish its line height. {fragment=1}
 
 
 Second paragraph.
 
 Third paragraph.
 
-- First item
-  - Nested item
+- First item {fragment=2}
+  - Nested item {fragment=3}
 - Second item
 
 \`\`\`
 code line one
 
 
-code line two
+code line two {fragment=9}
 \`\`\`
 :::
 
@@ -292,7 +292,7 @@ code line two
   - Nested overlay item
 
 
-After an additional blank line.
+After an additional blank line. {fragment=4}
 :::
 `);
   renderDeck(deck, fixture, source => source);
@@ -309,11 +309,18 @@ After an additional blank line.
   const paragraphs = cell.querySelectorAll("p");
   assert(parseFloat(getComputedStyle(paragraphs[2]).marginTop) > 0, "adjacent layout paragraphs use explicit block spacing");
   assert(cell.querySelectorAll(":scope > .slide-content-spacer").length === 1, "additional blank layout lines render as proportional vertical space");
-  assert(cell.querySelector("pre").textContent.includes("code line one\n\n\ncode line two"), "blank lines inside fenced code remain code content");
+  assert(cell.querySelector("pre").textContent.includes("code line one\n\n\ncode line two {fragment=9}"), "annotations and blank lines inside fenced code remain code content");
+  assert(cell.querySelector("h3").matches(".fragment[data-fragment-index='0']"), "Markdown headings can be fragments");
+  assert(paragraph.matches(".fragment[data-fragment-index='1']"), "Markdown paragraphs can be fragments");
+  assert(topItem.matches(".fragment[data-fragment-index='2']")
+    && nestedItem.matches(".fragment[data-fragment-index='3']"), "nested Markdown list items can be independent fragments");
+  assert([cell.querySelector("h3"), paragraph, topItem, nestedItem].every(element => !element.textContent.includes("{fragment=")),
+    "Markdown fragment annotations are hidden from rendered content");
   const overlayItems = fixture.querySelectorAll(".overlay-markdown li");
   assert(Math.abs(parseFloat(getComputedStyle(overlayItems[0]).fontSize) - parseFloat(getComputedStyle(overlayItems[1]).fontSize)) < 0.1,
     "nested overlay lists retain the overlay body font size");
   assert(fixture.querySelectorAll(".overlay-markdown > .slide-content-spacer").length === 1, "additional blank overlay lines use the same spacer rendering");
+  assert(fixture.querySelector(".overlay-markdown p").matches(".fragment[data-fragment-index='4']"), "positioned Markdown uses block fragments");
   fixture.remove();
 }
 

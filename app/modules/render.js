@@ -18,6 +18,39 @@ function preserveAdditionalBlankLines(source, spacers) {
   }).join("");
 }
 
+function preserveMarkdownFragments(source, fragments) {
+  return source.split(/(```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]*`)/g).map((part, index) => {
+    if (index % 2) return part;
+    return part.replace(/[ \t]*\{fragment\s*=\s*(\d+)\}[ \t]*(?=\r?$)/gm, (whole, value) => {
+      const fragmentIndex = Number(value);
+      if (!Number.isSafeInteger(fragmentIndex)) return whole;
+      const token = `SCIFRAGMENTPLACEHOLDER${fragments.length}X`;
+      fragments.push({ token, index: fragmentIndex });
+      return token;
+    });
+  }).join("");
+}
+
+function applyMarkdownFragments(html, fragments) {
+  if (!fragments.length) return html;
+  const template = document.createElement("template");
+  template.innerHTML = html;
+  const walker = document.createTreeWalker(template.content, NodeFilter.SHOW_TEXT);
+  const textNodes = [];
+  while (walker.nextNode()) textNodes.push(walker.currentNode);
+  for (const fragment of fragments) {
+    const node = textNodes.find(candidate => candidate.data.includes(fragment.token));
+    if (!node) continue;
+    node.data = node.data.replace(fragment.token, "");
+    const parent = node.parentElement;
+    const block = parent?.closest("li") || parent?.closest("p, h1, h2, h3, h4, h5, h6");
+    if (!block) continue;
+    block.classList.add("fragment");
+    block.dataset.fragmentIndex = String(fragment.index);
+  }
+  return template.innerHTML;
+}
+
 function markdown(source, bibliography = null, { breaks = false, preserveBlankLines = false } = {}) {
   try {
     const equations = [];
@@ -40,6 +73,8 @@ function markdown(source, bibliography = null, { breaks = false, preserveBlankLi
         return token;
       });
     }).join("");
+    const fragments = [];
+    protectedSource = preserveMarkdownFragments(protectedSource, fragments);
     const spacers = [];
     if (preserveBlankLines) protectedSource = preserveAdditionalBlankLines(protectedSource, spacers);
     const renderer = new window.marked.Renderer();
@@ -48,6 +83,7 @@ function markdown(source, bibliography = null, { breaks = false, preserveBlankLi
       return escapeHtml(text);
     };
     let html = window.marked.parse(protectedSource, { gfm: true, breaks, async: false, renderer });
+    html = applyMarkdownFragments(html, fragments);
     for (const equation of equations) {
       const rendered = window.katex.renderToString(equation.expression, {
         displayMode: equation.display,

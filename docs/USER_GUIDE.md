@@ -72,6 +72,16 @@ Inside a layout region, one empty line separates Markdown blocks normally.
 Additional consecutive empty lines add visible vertical space. This also works
 in positioned Markdown and shape labels without altering fenced code blocks.
 
+To reveal parts of Markdown progressively in Present mode, end a heading,
+paragraph, or list-item line with `{fragment=N}`. Indices start at zero, and
+elements sharing an index appear together. For example:
+
+```markdown
+- First result {fragment=0}
+- Supporting evidence {fragment=1}
+- Conclusion {fragment=2}
+```
+
 ## Slide appearance
 
 Click an empty part of the slide to show slide-wide Properties. Theme chooses
