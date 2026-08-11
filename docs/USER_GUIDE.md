@@ -82,7 +82,8 @@ are editable and validated against the same limits as their sliders.
 
 Image-only regions and image overlays support:
 
-- Fit: contain, crop/fill, fit width, fit height, or native size.
+- Fit: contain, crop/fill, stretch, fit width, fit height, or native size. Stretch
+  reshapes raster images and SVG resources to the overlay's exact dimensions.
 - Horizontal and vertical crop focus.
 - Upload replacement: import a new file from the browser's computer.
 - Choose project image: select an existing image from the configured figures

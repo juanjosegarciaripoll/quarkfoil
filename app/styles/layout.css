@@ -193,6 +193,7 @@
 .slide-video { background: #111; }
 .slide-image[data-fit="contain"], .slide-video[data-fit="contain"] { object-fit: contain; }
 .slide-image[data-fit="cover"], .slide-video[data-fit="cover"] { object-fit: cover; }
+.slide-image[data-fit="stretch"] { overflow: hidden; }
 .slide-image[data-fit="width"] { width: 100%; height: auto; object-fit: contain; }
 .slide-image[data-fit="height"] { width: auto; height: 100%; object-fit: contain; }
 .slide-image[data-fit="native"] { width: auto; height: auto; max-width: 100%; max-height: 100%; }

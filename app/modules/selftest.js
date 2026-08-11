@@ -291,6 +291,13 @@ try {
   assert(deck.slides[0].layout === "1-2", "layout parses");
   assert(Math.round(deck.slides[0].columns[0]) === 40, "column ratios parse");
   assert(deck.slides[0].cells.find(cell => cell.id === "top-right").image.attrs.values.fit === "cover", "image attributes parse");
+  const stretchDeck = parseDeck('## Stretch {.layout-1}\n\n::: core\n![](figures/stretch.svg){fit=stretch}\n:::\n');
+  const stretchFixture = document.createElement("div");
+  renderDeck(stretchDeck, stretchFixture, asset => `/test/${asset}`);
+  const stretchWrapper = stretchFixture.querySelector('svg.slide-image[data-fit="stretch"]');
+  const stretchedResource = stretchWrapper?.querySelector("image");
+  assert(stretchWrapper?.getAttribute("preserveAspectRatio") === "none" && stretchedResource?.getAttribute("preserveAspectRatio") === "none", "stretch fit reshapes image resources without modifying their files");
+  assert(stretchedResource?.getAttribute("href") === "/test/figures/stretch.svg", "stretched SVG resources remain external images");
   assert(deck.slides[0].overlays[0].id === "eq", "overlay ID parses");
   assert(deck.slides[0].overlays[0].fontSize === 1.4, "relative overlay font size parses");
   assert(deck.slides[0].overlays[0].alignment === "right", "overlay alignment parses");

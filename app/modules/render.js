@@ -58,13 +58,38 @@ function titleMarkdown(source) {
 }
 
 function makeImage(image, assetResolver) {
+  const resolved = assetResolver(image.source);
+  const fit = image.attrs.values.fit || "contain";
+  const source = resolved || safeAssetPath(image.source);
+  if (fit === "stretch") {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.classList.add("slide-image");
+    svg.dataset.fit = fit;
+    svg.setAttribute("viewBox", "0 0 1 1");
+    svg.setAttribute("preserveAspectRatio", "none");
+    svg.setAttribute("role", "img");
+    if (image.alt) svg.setAttribute("aria-label", image.alt);
+    else svg.setAttribute("aria-hidden", "true");
+    if (image.title) {
+      const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
+      title.textContent = image.title;
+      svg.append(title);
+    }
+    const resource = document.createElementNS("http://www.w3.org/2000/svg", "image");
+    resource.setAttribute("href", source);
+    resource.setAttribute("x", "0");
+    resource.setAttribute("y", "0");
+    resource.setAttribute("width", "1");
+    resource.setAttribute("height", "1");
+    resource.setAttribute("preserveAspectRatio", "none");
+    svg.append(resource);
+    return svg;
+  }
   const img = document.createElement("img");
   img.className = "slide-image";
   img.alt = image.alt || "";
-  const resolved = assetResolver(image.source);
-  img.src = resolved || safeAssetPath(image.source);
+  img.src = source;
   if (image.title) img.title = image.title;
-  const fit = image.attrs.values.fit || "contain";
   img.dataset.fit = fit;
   const [focusX = "50", focusY = "50"] = (image.attrs.values.focus || "50 50").split(/[\s,]+/);
   img.style.objectPosition = `${Number(focusX) || 50}% ${Number(focusY) || 50}%`;

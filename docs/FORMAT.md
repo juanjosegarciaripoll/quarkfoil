@@ -131,6 +131,9 @@ Markdown for the left region.
 ```
 
 Valid region names are `core`, `left`, `right`, `top-left`, `bottom-left`, `top-right`, and `bottom-right`, according to the selected layout.
+Image `fit` values are `contain`, `cover`, `stretch`, `width`, `height`, and
+`native`. `stretch` reshapes the external image resource to the exact region or
+overlay dimensions without changing the source file.
 
 ### Per-slide themes and colors
 
