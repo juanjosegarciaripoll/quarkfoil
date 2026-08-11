@@ -22,6 +22,9 @@ export const repeatedActivation = (previous, key, time, interval = 450) => Boole
 );
 export const deleteKey = key => key === "Delete" || key === "Del";
 export const canvasStartsMarquee = ({ overlay, cell, title }) => !overlay && !cell && !title;
+export async function resolveImportDestination(exists, proposed, choose) {
+  return await exists ? await choose() : proposed;
+}
 export const projectAssetPage = (assets, query, page, pageSize = 24) => {
   const needle = query.trim().toLocaleLowerCase();
   const filtered = needle ? assets.filter(asset => asset.path.toLocaleLowerCase().includes(needle)) : assets;

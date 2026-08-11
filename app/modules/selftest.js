@@ -21,7 +21,7 @@ import {
   updateSlideProperties,
 } from "./parser.js";
 import { renderDeck, syncVideoPlayback } from "./render.js";
-import { arrowGeometry, bindRangeControl, canvasStartsMarquee, clipboardImageFile, deleteKey, initialImageGeometry, moveGeometryGroup, pageSlideIndex, projectAssetPage, rectanglesIntersect, renameClipboardImage, repeatedActivation, videoFile } from "./editor.js";
+import { arrowGeometry, bindRangeControl, canvasStartsMarquee, clipboardImageFile, deleteKey, initialImageGeometry, moveGeometryGroup, pageSlideIndex, projectAssetPage, rectanglesIntersect, renameClipboardImage, repeatedActivation, resolveImportDestination, videoFile } from "./editor.js";
 import { parseBibliography, prepareBibliography } from "./bibliography.js";
 import { compileExpression, createPlotSvg } from "./plot.js";
 
@@ -344,6 +344,9 @@ try {
   assert(!canvasStartsMarquee({ overlay: null, cell: {}, title: null }), "single clicks on layout cells are left for cell selection");
   assert(!canvasStartsMarquee({ overlay: null, cell: null, title: {} }), "single clicks on slide titles are left for title selection");
   assert(canvasStartsMarquee({ overlay: null, cell: null, title: null }), "empty slide canvas still starts marquee selection");
+  const overwriteDestination = await resolveImportDestination(Promise.resolve(true), { name: "figure.svg", overwrite: false },
+    () => Promise.resolve({ name: "figure.svg", overwrite: true }));
+  assert(overwriteDestination.name === "figure.svg" && overwriteDestination.overwrite === true, "collision imports await the editable overwrite destination");
   assert(deleteKey("Delete") && deleteKey("Del"), "Delete and Del keys remove selected images and overlays");
   const expression = compileExpression("Math.sin(x) + x ** 2");
   assert(Math.abs(expression(2) - (Math.sin(2) + 4)) < 1e-10, "plot expressions support JavaScript-style Math functions and operators");

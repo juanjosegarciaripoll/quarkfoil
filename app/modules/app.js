@@ -1,6 +1,6 @@
 import { deleteSection, deleteSlide, duplicateSlide, importSlide, insertOverlay, insertSection, insertSlide, moveSection, moveSlide, parseDeck, updateSectionTitle } from "./parser.js";
 import { renderDeck, syncVideoPlayback } from "./render.js";
-import { DesignEditor, pageSlideIndex, projectAssetPage } from "./editor.js";
+import { DesignEditor, pageSlideIndex, projectAssetPage, resolveImportDestination } from "./editor.js";
 import { saveSnapshot } from "./storage.js";
 import { briefReference, parseBibliography, prepareBibliography } from "./bibliography.js";
 
@@ -109,7 +109,7 @@ function assetResolver(source) {
 }
 
 function refreshAsset(path) {
-  state.assetVersions.set(path, Date.now());
+  state.assetVersions.set(path, Math.max(Date.now(), (state.assetVersions.get(path) || 0) + 1));
   const resolved = assetResolver(path);
   document.querySelectorAll(".slide-image").forEach(element => {
     if (element.dataset.source !== path) return;
@@ -669,21 +669,16 @@ function chooseImportDestination(proposedName, { title = "File already exists", 
   filename.focus();
   filename.select();
   return new Promise(resolve => {
-    let settled = false;
-    const finish = value => {
-      if (settled) return;
-      settled = true;
-      resolve(value);
-    };
+    let selection = null;
     document.querySelector("#import-confirm").onclick = () => {
       const name = filename.value.trim();
       const suffix = name.match(/\.[^.]+$/)?.[0]?.toLowerCase() || "";
       if (!name || /[\\/]/.test(name)) { status.textContent = "Enter a filename without a directory"; return; }
       if (extensions.length && !extensions.includes(suffix)) { status.textContent = `Filename must end in ${extensions.join(" or ")}`; return; }
-      finish({ name, overwrite: overwrite.checked });
+      selection = { name, overwrite: overwrite.checked };
       dialog.close("confirm");
     };
-    dialog.addEventListener("close", () => finish(null), { once: true });
+    dialog.addEventListener("close", () => resolve(dialog.returnValue === "confirm" ? selection : null), { once: true });
   });
 }
 
@@ -985,9 +980,8 @@ async function importAsset(file, destination = null) {
   if (!destination) {
     const proposed = { name: file.name, overwrite: false };
     const proposedPath = `${assetFolder}/${proposed.name}`;
-    destination = await projectPathExists(proposedPath)
-      ? chooseImportDestination(proposed.name, { extensions: originalSuffix ? [originalSuffix] : [], message: `${proposedPath} already exists. Choose another filename or enable overwrite.` })
-      : proposed;
+    destination = await resolveImportDestination(projectPathExists(proposedPath), proposed,
+      () => chooseImportDestination(proposed.name, { extensions: originalSuffix ? [originalSuffix] : [], message: `${proposedPath} already exists. Choose another filename or enable overwrite.` }));
   }
   if (!destination) return null;
   const suffix = destination.name.match(/\.[^.]+$/)?.[0]?.toLowerCase() || "";
@@ -1002,6 +996,7 @@ async function importAsset(file, destination = null) {
     const response = await fetch(`/api/asset?name=${encodeURIComponent(destination.name)}&folder=${encodeURIComponent(assetFolder)}&overwrite=${destination.overwrite}`, { method: "POST", headers: { "Content-Type": file.type }, body: file });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || "Asset import failed");
+    if (destination.overwrite) refreshAsset(result.path);
     return result.path;
   }
   const safe = destination.name.replace(/[^a-zA-Z0-9._-]/g, "-");
@@ -1143,9 +1138,9 @@ function bindUi() {
     const file = event.target.files?.[0];
     if (!file) return;
     if (state.local) {
-      const destination = await projectPathExists(file.name)
-        ? chooseImportDestination(file.name, { extensions: [".md", ".markdown"], message: `${file.name} already exists. Choose another filename or enable overwrite.` })
-        : { name: file.name, overwrite: false };
+      const proposed = { name: file.name, overwrite: false };
+      const destination = await resolveImportDestination(projectPathExists(file.name), proposed,
+        () => chooseImportDestination(file.name, { extensions: [".md", ".markdown"], message: `${file.name} already exists. Choose another filename or enable overwrite.` }));
       if (!destination) { event.target.value = ""; return; }
       let opened;
       try { opened = reserveProjectWindow(); }
