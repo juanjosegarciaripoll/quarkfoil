@@ -3,6 +3,7 @@ import { renderDeck, syncVideoPlayback } from "./render.js";
 import { DesignEditor, pageSlideIndex, projectAssetPage, resolveImportDestination } from "./editor.js";
 import { saveSnapshot } from "./storage.js";
 import { briefReference, formatBibliography, parseBibliography, prepareBibliography, renameBibliographyEntry, uniqueCitationKey } from "./bibliography.js";
+import { externalDeckAction, responseRevision } from "./external.js";
 
 const STARTER = `---
 title: Quarkfoil
@@ -76,6 +77,7 @@ const state = {
   bibliographySource: "",
   bibliographyHash: null,
   bibliography: null,
+  externalChange: null,
 };
 
 const elements = {
@@ -95,6 +97,8 @@ let snapshotTimer;
 let reloadToken = null;
 let reloadCheckPending = false;
 let lastReloadCheck = 0;
+let deckCheckPending = false;
+let lastDeckCheck = 0;
 let deckChannel = null;
 let deckClaim = null;
 
@@ -152,8 +156,141 @@ async function hashText(text) {
   return [...new Uint8Array(digest)].map(value => value.toString(16).padStart(2, "0")).join("");
 }
 
+function currentBrowserSource() {
+  return state.mode === "source" && elements.source.value !== state.source ? elements.source.value : state.source;
+}
+
+function browserHasUnsavedChanges() {
+  return currentBrowserSource() !== state.savedSource;
+}
+
+function deckValidationError(source) {
+  try {
+    const deck = parseDeck(source);
+    const fatal = deck.diagnostics.find(item => item.level === "error");
+    if (!fatal) return "";
+    const location = fatal.slide ? `Slide ${fatal.slide}: ` : "";
+    return `${location}${fatal.message}`;
+  } catch (error) { return error.message; }
+}
+
+function clearExternalChange() {
+  state.externalChange = null;
+  document.querySelector("#external-change-banner").hidden = true;
+  updateDirtyState();
+}
+
+function showExternalChange(source, hash, error = "") {
+  state.externalChange = { source, hash, error };
+  const message = error
+    ? `The presentation changed on disk but is invalid: ${error}`
+    : "The presentation changed on disk while the browser had unsaved or active edits.";
+  document.querySelector("#external-change-message").textContent = message;
+  document.querySelector("#external-change-banner").hidden = false;
+  updateDirtyState();
+  const dialog = document.querySelector("#external-change-dialog");
+  if (dialog.open) {
+    document.querySelector("#external-disk-source").value = source;
+    document.querySelector("#external-change-detail").textContent = error
+      ? `The disk version cannot be loaded until its Markdown is repaired: ${error}`
+      : "A newer disk version arrived while this comparison was open. Review it before applying a merge.";
+    document.querySelector("#external-use-disk").disabled = Boolean(error);
+  }
+}
+
+function resetHistory() {
+  state.undo.length = 0;
+  state.redo.length = 0;
+  updateHistoryButtons();
+}
+
+function applyExternalDeck(source, hash, message) {
+  const error = deckValidationError(source);
+  if (error) throw new Error(error);
+  state.serverHash = hash;
+  state.savedSource = source;
+  state.externalChange = null;
+  resetHistory();
+  parseAndRender(source, { preserveSlide: true });
+  document.querySelector("#external-change-banner").hidden = true;
+  if (message) showStatus(message);
+}
+
+function openExternalChangeDialog() {
+  const change = state.externalChange;
+  if (!change) return;
+  const browserSource = currentBrowserSource();
+  document.querySelector("#external-browser-source").value = browserSource;
+  document.querySelector("#external-disk-source").value = change.source;
+  document.querySelector("#external-merged-source").value = browserSource;
+  document.querySelector("#external-change-detail").textContent = change.error
+    ? `The disk version is invalid and cannot be loaded directly: ${change.error}`
+    : "Compare both revisions, use the disk version, or edit a reconciled result below.";
+  document.querySelector("#external-use-disk").disabled = Boolean(change.error);
+  const status = document.querySelector("#external-merge-status");
+  status.textContent = "Saving remains blocked until the external change is reconciled.";
+  status.classList.remove("error");
+  const dialog = document.querySelector("#external-change-dialog");
+  if (!dialog.open) dialog.showModal();
+}
+
+async function pollForExternalDeck({ force = false } = {}) {
+  if (!state.local || document.hidden || deckCheckPending) return false;
+  if (document.querySelector("#content-dialog[open]") || editor?.drag || editor?.marquee) return false;
+  const now = Date.now();
+  if (!force && now - lastDeckCheck < 900) return false;
+  lastDeckCheck = now;
+  deckCheckPending = true;
+  try {
+    const observedHash = state.externalChange?.hash || state.serverHash;
+    const response = await fetch(`/api/deck?path=${encodeURIComponent(state.config.deck)}`, {
+      cache: "no-store",
+      headers: observedHash ? { "If-None-Match": `"${observedHash}"` } : {},
+    });
+    if (response.status === 304) return false;
+    if (!response.ok) {
+      if (response.status === 400) {
+        const result = await response.json().catch(() => ({}));
+        if (result.hash && result.hash !== observedHash) {
+          showExternalChange("", result.hash, result.error || "The disk version cannot be read");
+          return true;
+        }
+      }
+      return false;
+    }
+    const source = await response.text();
+    const hash = responseRevision(response) || await hashText(source);
+    const error = deckValidationError(source);
+    const action = externalDeckAction({
+      knownHash: observedHash,
+      diskHash: hash,
+      dirty: browserHasUnsavedChanges() || Boolean(state.externalChange),
+      valid: !error,
+    });
+    if (action === "unchanged") return false;
+    if (action === "reload") applyExternalDeck(source, hash, "Reloaded external changes");
+    else showExternalChange(source, hash, error);
+    return true;
+  } catch {
+    return false;
+  } finally {
+    deckCheckPending = false;
+  }
+}
+
+function bindExternalDeckChecks() {
+  window.addEventListener("focus", () => pollForExternalDeck());
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) pollForExternalDeck({ force: true });
+  });
+  document.addEventListener("pointerdown", () => pollForExternalDeck(), { capture: true });
+  document.addEventListener("keydown", () => pollForExternalDeck(), { capture: true });
+  setInterval(() => pollForExternalDeck(), 1200);
+}
+
 function parseAndRender(source, { preserveSlide = true } = {}) {
   const previous = preserveSlide ? state.currentSlide : 0;
+  const previousId = preserveSlide ? state.deck?.slides[state.currentSlide]?.id : null;
   const deck = parseDeck(source);
   const fatal = deck.diagnostics.find(item => item.level === "error");
   if (fatal) {
@@ -162,7 +299,8 @@ function parseAndRender(source, { preserveSlide = true } = {}) {
   }
   state.source = source;
   state.deck = deck;
-  state.currentSlide = Math.min(previous, Math.max(0, deck.slides.length - 1));
+  const matchingSlide = previousId ? deck.slides.findIndex(slide => slide.id === previousId) : -1;
+  state.currentSlide = matchingSlide >= 0 ? matchingSlide : Math.min(previous, Math.max(0, deck.slides.length - 1));
   if (!deck.sections.some(section => section.id === state.selectedSection)) state.selectedSection = null;
   state.collapsedSections = new Set([...state.collapsedSections].filter(id => deck.sections.some(section => section.id === id)));
   elements.source.value = source;
@@ -467,10 +605,10 @@ function focusSourceOnCurrentSlide() {
 function updateDirtyState() {
   const sourceDraft = state.mode === "source" && elements.source.value !== state.source;
   const dirty = state.source !== state.savedSource || sourceDraft;
-  elements.save.disabled = !state.deck || !dirty;
+  elements.save.disabled = !state.deck || !dirty || Boolean(state.externalChange);
   elements.download.disabled = !state.deck;
-  elements.saveState.textContent = sourceDraft ? "Source edited" : dirty ? "Unsaved" : "Saved";
-  elements.saveState.classList.toggle("dirty", dirty);
+  elements.saveState.textContent = state.externalChange ? "Changed on disk" : sourceDraft ? "Source edited" : dirty ? "Unsaved" : "Saved";
+  elements.saveState.classList.toggle("dirty", dirty || Boolean(state.externalChange));
 }
 
 function showStatus(message, error = false) {
@@ -805,6 +943,11 @@ async function preloadPortableAssets(source) {
 
 async function saveDeck() {
   try {
+    if (state.local) {
+      while (deckCheckPending) await new Promise(resolve => setTimeout(resolve, 20));
+      await pollForExternalDeck({ force: true });
+      if (state.externalChange) { openExternalChangeDialog(); return; }
+    }
     if (elements.source.value !== state.source && !commitSource(elements.source.value)) return;
     if (state.local) {
       const response = await fetch(`/api/deck?path=${encodeURIComponent(state.config.deck)}`, {
@@ -813,7 +956,13 @@ async function saveDeck() {
         body: state.source,
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Save failed");
+      if (!response.ok) {
+        if (response.status === 409) {
+          await pollForExternalDeck({ force: true });
+          if (state.externalChange) { openExternalChangeDialog(); return; }
+        }
+        throw new Error(result.error || "Save failed");
+      }
       state.serverHash = result.hash;
     } else if (state.fileHandle) {
       const writable = await state.fileHandle.createWritable();
@@ -830,13 +979,57 @@ async function saveDeck() {
 }
 
 function downloadSource() {
-  const blob = new Blob([state.source], { type: "text/markdown;charset=utf-8" });
+  downloadMarkdown(currentBrowserSource(), state.filename);
+}
+
+function downloadMarkdown(source, filename) {
+  const blob = new Blob([source], { type: "text/markdown;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = state.filename.split(/[\\/]/).pop() || "presentation.md";
+  anchor.download = filename.split(/[\\/]/).pop() || "presentation.md";
   anchor.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function downloadBrowserDraft() {
+  const name = state.filename.split(/[\\/]/).pop() || "presentation.md";
+  const dot = name.lastIndexOf(".");
+  const filename = dot > 0 ? `${name.slice(0, dot)}-browser-draft${name.slice(dot)}` : `${name}-browser-draft.md`;
+  downloadMarkdown(currentBrowserSource(), filename);
+}
+
+function useExternalDiskVersion() {
+  const change = state.externalChange;
+  if (!change || change.error) return;
+  try {
+    applyExternalDeck(change.source, change.hash, "Loaded disk version");
+    document.querySelector("#external-change-dialog").close();
+  } catch (error) {
+    const status = document.querySelector("#external-merge-status");
+    status.textContent = error.message;
+    status.classList.add("error");
+  }
+}
+
+function applyExternalMerge() {
+  const change = state.externalChange;
+  if (!change) return;
+  const source = document.querySelector("#external-merged-source").value;
+  const error = deckValidationError(source);
+  const status = document.querySelector("#external-merge-status");
+  if (error) {
+    status.textContent = error;
+    status.classList.add("error");
+    return;
+  }
+  state.serverHash = change.hash;
+  state.savedSource = change.source;
+  clearExternalChange();
+  resetHistory();
+  parseAndRender(source, { preserveSlide: true });
+  document.querySelector("#external-change-dialog").close();
+  showStatus(source === change.source ? "Loaded disk version" : "Merged draft ready to save");
 }
 
 function bibliographyPath() {
@@ -1146,12 +1339,11 @@ function bindUi() {
   }));
   elements.save.addEventListener("click", saveDeck);
   elements.download.addEventListener("click", downloadSource);
-  elements.source.addEventListener("input", () => {
-    if (elements.source.value === state.source) { updateDirtyState(); return; }
-    elements.save.disabled = false;
-    elements.saveState.textContent = "Source edited";
-    elements.saveState.classList.add("dirty");
-  });
+  document.querySelector("#external-change-review").addEventListener("click", openExternalChangeDialog);
+  document.querySelector("#external-download-browser").addEventListener("click", downloadBrowserDraft);
+  document.querySelector("#external-use-disk").addEventListener("click", useExternalDiskVersion);
+  document.querySelector("#external-apply-merge").addEventListener("click", applyExternalMerge);
+  elements.source.addEventListener("input", updateDirtyState);
   document.querySelector("#file-input").addEventListener("change", async event => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -1228,6 +1420,7 @@ async function initialize() {
     await pollForReload();
     bindReloadChecks();
   }
+  if (state.local) bindExternalDeckChecks();
   if (!loaded) {
     state.savedSource = "";
     parseAndRender(STARTER, { preserveSlide: true });

@@ -477,9 +477,23 @@ class SlideHandler(SimpleHTTPRequestHandler):
             except (OSError, PermissionError, ValueError) as error:
                 self._send_json({"error": str(error)}, HTTPStatus.BAD_REQUEST)
                 return
+            digest = hashlib.sha256(data).hexdigest()
+            try:
+                data.decode("utf-8")
+            except UnicodeDecodeError:
+                self._send_json({"error": "Presentation is not valid UTF-8", "hash": digest}, HTTPStatus.BAD_REQUEST)
+                return
+            if self.headers.get("If-None-Match", "").strip('"') == digest:
+                self.send_response(HTTPStatus.NOT_MODIFIED)
+                self.send_header("ETag", f'"{digest}"')
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                return
             self.send_response(HTTPStatus.OK)
             self.send_header("Content-Type", "text/markdown; charset=utf-8")
             self.send_header("Content-Length", str(len(data)))
+            self.send_header("ETag", f'"{digest}"')
+            self.send_header("Cache-Control", "no-store")
             self.end_headers()
             self.wfile.write(data)
             return
@@ -597,6 +611,9 @@ class SlideHandler(SimpleHTTPRequestHandler):
             return
 
         expected = self.headers.get("If-Match")
+        if not expected:
+            self._send_json({"error": "Deck saves require an If-Match revision"}, HTTPStatus.PRECONDITION_REQUIRED)
+            return
         try:
             relative = urllib.parse.parse_qs(parsed.query).get("path", [""])[0]
             deck_path = self._project_file(relative) if relative else self.deck_path
@@ -605,25 +622,26 @@ class SlideHandler(SimpleHTTPRequestHandler):
         except (OSError, PermissionError, ValueError) as error:
             self._send_json({"error": str(error)}, HTTPStatus.BAD_REQUEST)
             return
-        current = deck_path.read_bytes()
-        current_hash = hashlib.sha256(current).hexdigest()
-        if expected and expected.strip('"') != current_hash:
-            self._send_json(
-                {"error": "Deck changed on disk", "currentHash": current_hash},
-                HTTPStatus.CONFLICT,
-            )
-            return
+        with self.server.deck_write_lock:  # type: ignore[attr-defined]
+            current = deck_path.read_bytes()
+            current_hash = hashlib.sha256(current).hexdigest()
+            if expected.strip('"') != current_hash:
+                self._send_json(
+                    {"error": "Deck changed on disk", "currentHash": current_hash},
+                    HTTPStatus.CONFLICT,
+                )
+                return
 
-        fd, temporary = tempfile.mkstemp(prefix=".slides-", suffix=".tmp", dir=deck_path.parent)
-        try:
-            with os.fdopen(fd, "wb") as stream:
-                stream.write(body)
-                stream.flush()
-                os.fsync(stream.fileno())
-            os.replace(temporary, deck_path)
-        finally:
-            if os.path.exists(temporary):
-                os.unlink(temporary)
+            fd, temporary = tempfile.mkstemp(prefix=".slides-", suffix=".tmp", dir=deck_path.parent)
+            try:
+                with os.fdopen(fd, "wb") as stream:
+                    stream.write(body)
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                os.replace(temporary, deck_path)
+            finally:
+                if os.path.exists(temporary):
+                    os.unlink(temporary)
         self._send_json({"ok": True, "hash": hashlib.sha256(body).hexdigest()})
 
     def do_POST(self) -> None:
@@ -795,6 +813,7 @@ def create_server(deck: Path, host: str, port: int, *, verbose: bool = False, re
     server.verbose = verbose  # type: ignore[attr-defined]
     server.reload = reload  # type: ignore[attr-defined]
     server.video_jobs = {}  # type: ignore[attr-defined]
+    server.deck_write_lock = threading.Lock()  # type: ignore[attr-defined]
     return server
 
 

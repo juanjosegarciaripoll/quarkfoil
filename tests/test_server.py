@@ -145,6 +145,10 @@ class ServerTests(unittest.TestCase):
         _, headers, payload = self.request("/api/deck")
         self.assertIn("text/markdown", headers["Content-Type"])
         self.assertEqual(payload, self.deck.read_bytes())
+        self.assertEqual(headers["ETag"].strip('"'), hashlib.sha256(payload).hexdigest())
+        with self.assertRaises(urllib.error.HTTPError) as context:
+            self.request("/api/deck", headers={"If-None-Match": headers["ETag"]})
+        self.assertEqual(context.exception.code, 304)
         status, _, payload = self.request("/api/reload")
         self.assertEqual(status, 200)
         self.assertRegex(json.loads(payload)["token"], r"^[0-9a-f]{64}$")
@@ -153,6 +157,10 @@ class ServerTests(unittest.TestCase):
         previous = self.deck.read_bytes()
         digest = hashlib.sha256(previous).hexdigest()
         next_source = b"---\ntitle: Changed\n---\n\n# Slide\n"
+        with self.assertRaises(urllib.error.HTTPError) as context:
+            self.request("/api/deck", method="PUT", body=next_source)
+        self.assertEqual(context.exception.code, 428)
+        self.assertEqual(self.deck.read_bytes(), previous)
         status, _, payload = self.request(
             "/api/deck",
             method="PUT",
@@ -166,6 +174,16 @@ class ServerTests(unittest.TestCase):
             self.request("/api/deck", method="PUT", body=b"stale", headers={"If-Match": f'"{digest}"'})
         self.assertEqual(context.exception.code, 409)
         self.assertEqual(self.deck.read_bytes(), next_source)
+
+    def test_invalid_external_utf8_is_reported_with_its_revision(self) -> None:
+        invalid = b"## Invalid\n\xff\n"
+        self.deck.write_bytes(invalid)
+        with self.assertRaises(urllib.error.HTTPError) as context:
+            self.request("/api/deck")
+        self.assertEqual(context.exception.code, 400)
+        result = json.loads(context.exception.read())
+        self.assertEqual(result["error"], "Presentation is not valid UTF-8")
+        self.assertEqual(result["hash"], hashlib.sha256(invalid).hexdigest())
 
     def test_bibliography_load_save_and_conflict(self) -> None:
         status, _, payload = self.request("/api/bibliography?path=references.bib")

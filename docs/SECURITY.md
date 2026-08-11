@@ -12,6 +12,8 @@ Quarkfoil is a local editing tool, not a hardened multi-user web service.
 - SVG is loaded through `<img>` elements and is not injected into the application DOM.
 - YAML is parsed as data and is not used to construct code.
 - Deck saves are UTF-8 validated, size-limited, conflict-checked, and atomic.
+- Local-server deck saves require a matching revision and are serialized so two
+  API writers cannot both save against the same base revision.
 - Asset uploads are size-limited and restricted to supported image and video extensions.
 
 ## User responsibilities
@@ -20,6 +22,9 @@ Quarkfoil is a local editing tool, not a hardened multi-user web service.
 - Review SVG files before redistributing a project.
 - Do not bind Quarkfoil to a public or untrusted network interface.
 - Keep backups or use version control; browser recovery snapshots are not archival storage.
+- External editors and coding agents operate with their own filesystem
+  permissions, outside Quarkfoil's project-directory boundary. Restrict their
+  working directory and review their changes before saving or distributing a deck.
 - Obtain permission for images, fonts, papers, and other material included in presentations.
 
 ## Reporting a vulnerability

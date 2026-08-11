@@ -91,6 +91,24 @@ button.active { background: #146c7e; border-color: #56cfe1; }
   stroke-width: 5;
 }
 .save-state { min-width: 5rem; color: #aab4bd; font-size: 0.82rem; }
+.external-change-banner {
+  position: fixed;
+  z-index: 950;
+  top: 57px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  max-width: min(720px, 90vw);
+  padding: 0.55rem 0.7rem;
+  color: #fff3bf;
+  background: #5f3d00;
+  border: 1px solid #f59f00;
+  border-radius: 6px;
+  box-shadow: 0 6px 20px #0008;
+  transform: translateX(-50%);
+}
+.external-change-banner button { flex: 0 0 auto; }
 
 .workspace {
   position: fixed;
@@ -218,6 +236,29 @@ body.presenting .toolbar { display: none; }
 
 dialog { width: min(900px, 88vw); max-width: 88vw; padding: 0; color: #edf2f4; background: #20252b; border: 1px solid #697681; border-radius: 8px; }
 dialog::backdrop { background: #000a; }
+#external-change-dialog { width: min(1100px, 94vw); max-width: 94vw; }
+.external-change-dialog__form { display: grid; gap: 0.7rem; width: 100%; height: min(820px, 90vh); padding: 1rem; overflow: hidden; }
+.external-change-dialog__form h2,
+.external-change-dialog__form p { margin: 0; }
+.external-change-versions { display: grid; grid-template-columns: 1fr 1fr; gap: 0.7rem; min-height: 0; }
+.external-change-versions label,
+.external-merge-label { display: grid; grid-template-rows: auto 1fr; gap: 0.3rem; min-width: 0; min-height: 0; }
+.external-change-versions textarea,
+#external-merged-source {
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  resize: none;
+  padding: 0.65rem;
+  color: #edf2f4;
+  background: #111418;
+  border: 1px solid #56616d;
+  font: 12px/1.4 "Cascadia Mono", Consolas, monospace;
+}
+.external-change-versions { min-height: 180px; }
+.external-merge-label { min-height: 220px; }
+#external-merge-status { min-height: 1.2em; color: #b9c2ca; }
+#external-merge-status.error { color: #ff8787; }
 #bibliography-dialog { width: min(1050px, 92vw); max-width: 92vw; }
 .bibliography-dialog__form { display: grid; grid-template-rows: auto auto minmax(100px, 0.7fr) minmax(220px, 1.3fr) auto auto; gap: 0.7rem; width: 100%; min-width: 0; height: min(780px, 88vh); padding: 1rem; overflow: hidden; }
 .bibliography-dialog__form h2 { margin: 0; }
@@ -284,6 +325,7 @@ dialog::backdrop { background: #000a; }
 }
 
 @media (max-width: 680px) {
+  .external-change-versions { grid-template-columns: 1fr; }
   .bibliography-tools { grid-template-columns: 1fr auto; }
   #bibliography-search { grid-column: 1 / -1; }
   .bibliography-entry { grid-template-columns: minmax(0, 1fr) auto; }

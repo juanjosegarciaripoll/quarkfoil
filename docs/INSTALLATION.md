@@ -63,8 +63,12 @@ With reloading enabled, changes to Quarkfoil's Python files restart the local
 server with the same arguments. Changes to editor HTML, JavaScript, or CSS also
 refresh an editor page when it next gains focus, becomes visible, or receives
 keyboard or pointer input. Idle editor pages do not poll the server.
-Presentation Markdown and figure changes remain under the editor's normal save
-and conflict controls.
+Presentation Markdown is monitored independently of application reloading.
+Valid external edits load automatically while the browser is clean. If the
+browser has unsaved edits, or the external Markdown is invalid, Quarkfoil blocks
+saving and opens an explicit comparison and reconciliation workflow. Existing
+figure files are not watched; reload the page after replacing an asset without
+also changing its Markdown reference.
 
 For example:
 

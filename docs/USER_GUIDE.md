@@ -172,7 +172,30 @@ visible shape surface while retaining its outline and label.
 
 ## Saving and recovery
 
-The Save button and `Ctrl+S` write the Markdown file. Unsaved changes are identified in the toolbar. Local-server saves use a content hash to detect external modifications and an atomic replacement to avoid partial files.
+The Save button and `Ctrl+S` write the Markdown file. Unsaved changes are
+identified in the toolbar. Local-server saves require the revision hash loaded
+by the browser and use an atomic replacement to avoid partial files.
+
+### External editors and coding agents
+
+In local-server mode, Quarkfoil monitors the open presentation for external
+Markdown edits. A valid external change reloads automatically when the browser
+has no unsaved work. Quarkfoil preserves the current slide by its stable ID when
+possible, so inserted or reordered slides do not unnecessarily move the view.
+
+If both revisions contain work, saving is blocked and a persistent **Changed on
+disk** warning appears. **Review** shows the browser draft, the current disk
+version, and an editable merged result. You can download the browser draft,
+discard it in favor of a valid disk version, or apply valid merged Markdown and
+then save it against the external revision. Closing the comparison does not
+dismiss the conflict or enable saving.
+
+Invalid external Markdown never replaces the last valid presentation. It is
+shown in the comparison for repair, while direct loading of that disk version
+remains disabled. External tools should finish writes with an atomic replacement
+and should not modify the file during the brief moment Quarkfoil itself is
+saving. This workflow supports safe external editing and explicit reconciliation;
+it does not silently merge simultaneous changes.
 
 The browser also keeps recovery snapshots in IndexedDB. These snapshots supplement the Markdown file; they are not a substitute for version control or backups.
 

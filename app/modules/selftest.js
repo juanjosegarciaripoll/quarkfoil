@@ -25,6 +25,7 @@ import { renderDeck, syncVideoPlayback } from "./render.js";
 import { arrowGeometry, bindRangeControl, buildShapePalette, canvasStartsMarquee, clipboardImageFile, deleteKey, DesignEditor, initialImageGeometry, moveGeometryGroup, pageSlideIndex, projectAssetPage, rectanglesIntersect, renameClipboardImage, repeatedActivation, resolveImportDestination, videoFile } from "./editor.js";
 import { formatBibliography, parseBibliography, prepareBibliography, renameBibliographyEntry, uniqueCitationKey } from "./bibliography.js";
 import { compileExpression, createPlotSvg } from "./plot.js";
+import { externalDeckAction } from "./external.js";
 
 const source = `---
 title: Test deck
@@ -396,6 +397,13 @@ try {
     () => Promise.resolve({ name: "figure.svg", overwrite: true }));
   assert(overwriteDestination.name === "figure.svg" && overwriteDestination.overwrite === true, "collision imports await the editable overwrite destination");
   assert(deleteKey("Delete") && deleteKey("Del"), "Delete and Del keys remove selected images and overlays");
+  assert(externalDeckAction({ knownHash: "a", diskHash: "a", dirty: false, valid: true }) === "unchanged",
+    "unchanged external deck revisions require no editor action");
+  assert(externalDeckAction({ knownHash: "a", diskHash: "b", dirty: false, valid: true }) === "reload",
+    "valid external edits reload automatically when the browser is clean");
+  assert(externalDeckAction({ knownHash: "a", diskHash: "b", dirty: true, valid: true }) === "conflict"
+    && externalDeckAction({ knownHash: "a", diskHash: "b", dirty: false, valid: false }) === "conflict",
+  "dirty browser drafts and invalid external decks require explicit reconciliation");
   const expression = compileExpression("Math.sin(x) + x ** 2");
   assert(Math.abs(expression(2) - (Math.sin(2) + 4)) < 1e-10, "plot expressions support JavaScript-style Math functions and operators");
   const barePlot = createPlotSvg("sin(x)", 0, 2 * Math.PI, 40, false);

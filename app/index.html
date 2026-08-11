@@ -55,6 +55,11 @@
     </div>
   </header>
 
+  <div id="external-change-banner" class="external-change-banner" role="alert" hidden>
+    <span id="external-change-message">Presentation changed on disk.</span>
+    <button id="external-change-review" type="button">Review</button>
+  </div>
+
   <main id="workspace" class="workspace mode-design">
     <aside id="slide-sidebar" class="slide-sidebar" aria-label="Slides">
       <div class="slide-sidebar-actions" role="group" aria-label="Selected slide actions">
@@ -206,6 +211,25 @@
       <div class="dialog-actions">
         <button value="cancel">Cancel <kbd>Esc</kbd></button>
         <button id="content-apply" value="default">Apply <kbd>Ctrl+Enter</kbd></button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="external-change-dialog">
+    <form method="dialog" class="external-change-dialog__form">
+      <h2>Presentation changed on disk</h2>
+      <p id="external-change-detail"></p>
+      <div class="external-change-versions">
+        <label>Browser draft<textarea id="external-browser-source" readonly spellcheck="false"></textarea></label>
+        <label>Disk version<textarea id="external-disk-source" readonly spellcheck="false"></textarea></label>
+      </div>
+      <label class="external-merge-label">Merged Markdown<textarea id="external-merged-source" spellcheck="false"></textarea></label>
+      <div id="external-merge-status" role="status"></div>
+      <div class="dialog-actions">
+        <button id="external-download-browser" type="button">Download browser draft</button>
+        <button id="external-use-disk" type="button">Use disk version</button>
+        <button value="cancel">Continue editing</button>
+        <button id="external-apply-merge" type="button">Apply merged draft</button>
       </div>
     </form>
   </dialog>
