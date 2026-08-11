@@ -169,6 +169,24 @@ dialog::backdrop { background: #000a; }
 #bibliography-status { min-height: 1.2em; color: #b9c2ca; }
 #bibliography-status.error { color: #ff8787; }
 #project-file-dialog { width: min(900px, 92vw); max-width: 92vw; }
+#plot-dialog { width: min(760px, 92vw); max-width: 92vw; }
+#import-dialog { width: min(520px, 92vw); max-width: 92vw; }
+.plot-dialog__form { display: grid; gap: 0.7rem; min-width: min(680px, 82vw); padding: 1rem; }
+.plot-dialog__form h2 { margin: 0; }
+.plot-dialog__form > label { display: grid; grid-template-columns: 100px minmax(0, 1fr); align-items: center; gap: 0.6rem; }
+.plot-dialog__form label.check { display: flex; }
+.plot-dialog__form input { min-width: 0; padding: 0.4rem; }
+.plot-domain { display: grid; grid-template-columns: 1fr 1fr; gap: 0.7rem; }
+.plot-domain label { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 0.5rem; }
+.plot-preview { display: grid; place-items: center; height: min(300px, 36vh); overflow: hidden; background: #f6f7f8; border: 1px solid #56616d; }
+.plot-preview svg { width: 100%; height: 100%; }
+#plot-status { min-height: 1.2em; color: #b9c2ca; }
+.import-dialog__form { display: grid; gap: 0.8rem; min-width: min(440px, 82vw); padding: 1rem; }
+.import-dialog__form h2 { margin: 0; }
+.import-dialog__form > label:not(.check) { display: grid; grid-template-columns: 80px minmax(0, 1fr); align-items: center; gap: 0.6rem; }
+.import-dialog__form label.check { display: flex; }
+.import-dialog__form input[type="text"] { min-width: 0; padding: 0.4rem; }
+#import-status { min-height: 1.2em; color: #ff8787; }
 #video-conversion-dialog { position: fixed; inset: auto 1rem 1rem auto; width: min(480px, calc(100vw - 2rem)); margin: 0; z-index: 1000; }
 .video-conversion-dialog__form { display: grid; gap: 0.8rem; padding: 1rem; }
 .video-conversion-dialog__form h2, .video-conversion-dialog__form p { margin: 0; }

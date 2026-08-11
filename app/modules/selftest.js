@@ -18,6 +18,7 @@ import {
 import { renderDeck, syncVideoPlayback } from "./render.js";
 import { bindRangeControl, clipboardImageFile, initialImageGeometry, moveGeometryGroup, pageSlideIndex, projectAssetPage, rectanglesIntersect, renameClipboardImage, repeatedActivation, videoFile } from "./editor.js";
 import { parseBibliography, prepareBibliography } from "./bibliography.js";
+import { compileExpression, createPlotSvg } from "./plot.js";
 
 const source = `---
 title: Test deck
@@ -147,14 +148,6 @@ Thought
 
 ::: overlay {#callout type="shape" shape="callout" x="35" y="5" w="25" h="20"}
 \\(E=mc^2\\)
-:::
-
-::: overlay {#sine type="shape" shape="sine" x="5" y="35" w="40" h="25"}
-
-:::
-
-::: overlay {#cosine type="shape" shape="cosine" x="50" y="35" w="40" h="25"}
-
 :::`);
   renderDeck(parsed, slides, source => source);
   const cloud = fixture.querySelector('[data-object-id="cloud"]');
@@ -166,9 +159,6 @@ Thought
   assert(fixture.querySelector('[data-object-id="callout"] .katex'), "comic callout renders an equation label");
   const calloutSurface = getComputedStyle(fixture.querySelector('[data-object-id="callout"] .shape-surface'));
   assert(calloutSurface.fill === "rgb(219, 239, 242)" && calloutSurface.stroke === "rgb(20, 108, 126)", "implicit shape colors inherit from the theme");
-  assert(fixture.querySelectorAll(".shape-curve").length === 2, "sine and cosine render as scalable curves");
-  const [sine, cosine] = fixture.querySelectorAll(".shape-curve");
-  assert(sine.getAttribute("d").startsWith("M0.00,50.00") && cosine.getAttribute("d").startsWith("M0.00,12.00"), "curves span a full cycle from zero phase without outer padding");
   fixture.remove();
 }
 
@@ -272,6 +262,15 @@ try {
   assert(repeatedActivation({ key: "overlay:text-1", time: 100 }, "overlay:text-1", 300), "a repeated canvas click is recognized for editing");
   assert(repeatedActivation({ key: "cell:left", time: 100 }, "cell:left", 300), "a repeated layout-cell click is recognized for editing");
   assert(!repeatedActivation({ key: "cell:left", time: 100 }, "cell:right", 300), "clicks on different canvas elements do not trigger editing");
+  const expression = compileExpression("Math.sin(x) + x ** 2");
+  assert(Math.abs(expression(2) - (Math.sin(2) + 4)) < 1e-10, "plot expressions support JavaScript-style Math functions and operators");
+  const barePlot = createPlotSvg("sin(x)", 0, 2 * Math.PI, 40, false);
+  assert(barePlot.includes('<svg xmlns="http://www.w3.org/2000/svg"') && !barePlot.includes('class="axes"'), "axis-free plots serialize as standalone SVG without axes");
+  assert(/<path d="M0\.00 /.test(barePlot) && barePlot.includes("800.00"), "axis-free plot curves use the full SVG width without padding");
+  const plotViewBox = barePlot.match(/viewBox="([^"]+)"/)[1].split(/\s+/).map(Number);
+  assert(plotViewBox[0] < 0 && plotViewBox[1] < 0 && plotViewBox[0] + plotViewBox[2] > 800 && plotViewBox[1] + plotViewBox[3] > 450, "plot viewports include spline overshoot and stroke instead of clipping at the data bounds");
+  const axesPlot = createPlotSvg("x", -1, 1, 20, true);
+  assert(axesPlot.includes('class="axes"') && axesPlot.includes(" C"), "plots optionally include axes and spline interpolation");
   const projectAssets = Array.from({ length: 30 }, (_, index) => ({ path: `figures/result-${index}.png` }));
   const firstAssetPage = projectAssetPage(projectAssets, "", 0);
   assert(firstAssetPage.assets.length === 24 && firstAssetPage.pages === 2, "project asset navigation shows 24 items per page");

@@ -104,8 +104,19 @@ in grid regions use the size of that region.
 
 Choose a template from the Shape palette in Design mode, then use the adjacent
 button to add it to the current slide. The palette includes rectangles,
-ellipses, a circle, diamond, hexagon, thought cloud, comic callout, and sine and
-cosine curves covering one cycle from 0 to 2π.
+ellipses, a circle, diamond, hexagon, thought cloud, and comic callout. Use the
+plot tool to create spline-interpolated SVG graphs from mathematical expressions.
+
+The plot dialog accepts a JavaScript-style expression in the independent variable
+`x`, a start and end value, and the number of sampled points. It previews a cubic
+spline through the samples. Enable axes for a padded plot with horizontal and
+vertical axes, or disable them to make the curve occupy the full SVG viewport
+without padding. Choose the SVG filename before creating the plot; Quarkfoil saves
+the generated file in the configured figures folder and inserts it as an ordinary
+image.
+Uploads show a destination dialog before writing. Change the proposed filename,
+cancel the import, or explicitly enable overwrite when replacing an existing
+presentation, image, video, or generated plot.
 
 Shapes resize and move like other overlays. Their Properties include the
 template, background color, line color, line width, and an optional shadow.

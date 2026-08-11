@@ -641,22 +641,31 @@ class SlideHandler(SimpleHTTPRequestHandler):
                 self._send_json({"error": str(error)}, HTTPStatus.BAD_REQUEST)
             return
         if parsed.path == "/api/presentation":
-            requested = Path(urllib.parse.parse_qs(parsed.query).get("name", ["presentation.md"])[0]).name
+            query = urllib.parse.parse_qs(parsed.query)
+            requested = Path(query.get("name", ["presentation.md"])[0]).name
+            overwrite = query.get("overwrite", ["false"])[0].lower() == "true"
+            temporary: str | None = None
             try:
                 if Path(requested).suffix.lower() not in PRESENTATION_SUFFIXES:
                     raise ValueError("Presentation must be a Markdown file")
                 body = self._read_body(MAX_WRITE_BYTES)
                 body.decode("utf-8")
                 candidate = self.project_root / requested
-                stem, suffix = candidate.stem, candidate.suffix
-                counter = 2
-                while candidate.exists():
-                    candidate = self.project_root / f"{stem}-{counter}{suffix}"
-                    counter += 1
-                candidate.write_bytes(body)
+                if candidate.exists() and not overwrite:
+                    self._send_json({"error": f"{requested} already exists"}, HTTPStatus.CONFLICT)
+                    return
+                fd, temporary = tempfile.mkstemp(prefix=".quarkfoil-import-", suffix=".tmp", dir=self.project_root)
+                with os.fdopen(fd, "wb") as stream:
+                    stream.write(body)
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                os.replace(temporary, candidate)
                 self._send_json({"path": candidate.relative_to(self.project_root).as_posix()}, HTTPStatus.CREATED)
             except (OSError, PermissionError, UnicodeDecodeError, ValueError) as error:
                 self._send_json({"error": str(error)}, HTTPStatus.BAD_REQUEST)
+            finally:
+                if temporary and os.path.exists(temporary):
+                    os.unlink(temporary)
             return
         if parsed.path == "/api/video-conversion":
             self._start_video_conversion(parsed)
@@ -667,6 +676,7 @@ class SlideHandler(SimpleHTTPRequestHandler):
         query = urllib.parse.parse_qs(parsed.query)
         requested = Path(query.get("name", ["asset.bin"])[0]).name
         folder = query.get("folder", ["figures"])[0]
+        overwrite = query.get("overwrite", ["false"])[0].lower() == "true"
         if requested in {"", ".", ".."}:
             requested = "asset.bin"
         try:
@@ -689,11 +699,19 @@ class SlideHandler(SimpleHTTPRequestHandler):
             self._send_json({"error": "Unsupported image or video type"}, HTTPStatus.BAD_REQUEST)
             return
         candidate = asset_dir / f"{stem}{suffix}"
-        counter = 2
-        while candidate.exists():
-            candidate = asset_dir / f"{stem}-{counter}{suffix}"
-            counter += 1
-        candidate.write_bytes(body)
+        if candidate.exists() and not overwrite:
+            self._send_json({"error": f"{candidate.name} already exists"}, HTTPStatus.CONFLICT)
+            return
+        fd, temporary = tempfile.mkstemp(prefix=".quarkfoil-asset-", suffix=".tmp", dir=asset_dir)
+        try:
+            with os.fdopen(fd, "wb") as stream:
+                stream.write(body)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temporary, candidate)
+        finally:
+            if os.path.exists(temporary):
+                os.unlink(temporary)
         relative = candidate.relative_to(self.project_root).as_posix()
         self._send_json({"ok": True, "path": relative}, HTTPStatus.CREATED)
 
@@ -701,6 +719,7 @@ class SlideHandler(SimpleHTTPRequestHandler):
         query = urllib.parse.parse_qs(parsed.query)
         requested = Path(query.get("name", ["video"])[0]).name
         folder = query.get("folder", ["figures"])[0]
+        overwrite = query.get("overwrite", ["false"])[0].lower() == "true"
         suffix = Path(requested).suffix.lower()
         if suffix not in CONVERTIBLE_VIDEO_SUFFIXES:
             self._send_json({"error": "Only AVI and MKV files require conversion"}, HTTPStatus.BAD_REQUEST)
@@ -732,11 +751,11 @@ class SlideHandler(SimpleHTTPRequestHandler):
             return
         stem = Path(requested).stem or "video"
         output = asset_dir / f"{stem}{output_suffix}"
-        counter = 2
-        while output.exists() or output.with_name(f"{output.stem}-poster.jpg").exists():
-            output = asset_dir / f"{stem}-{counter}{output_suffix}"
-            counter += 1
         poster = output.with_name(f"{output.stem}-poster.jpg")
+        if not overwrite and (output.exists() or poster.exists()):
+            source.unlink(missing_ok=True)
+            self._send_json({"error": f"{output.name} or its preview already exists"}, HTTPStatus.CONFLICT)
+            return
         assert source is not None
         job = VideoConversionJob(source, output, poster, self.project_root, command)
         self.server.video_jobs[job.id] = job  # type: ignore[attr-defined]

@@ -11,6 +11,7 @@ import {
   updateSlideProperties,
 } from "./parser.js";
 import { renderMarkdownPreview } from "./render.js";
+import { createPlotSvg } from "./plot.js";
 
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
 const round = value => Math.round(value * 10) / 10;
@@ -201,6 +202,7 @@ export class DesignEditor {
     this.dialog = document.querySelector("#content-dialog");
     this.contentEditor = document.querySelector("#content-editor");
     this.preview = document.querySelector("#content-preview");
+    this.plotDialog = document.querySelector("#plot-dialog");
     this.imageInputPurpose = "add";
     this.videoInputPurpose = "add";
     this.lastCanvasActivation = null;
@@ -227,7 +229,16 @@ export class DesignEditor {
     document.querySelector("#add-equation").addEventListener("click", () => this.addObject("equation"));
     document.querySelector("#add-image").addEventListener("click", () => this.openProjectImageDialog("add"));
     document.querySelector("#add-video").addEventListener("click", () => this.openProjectVideoDialog("add"));
+    document.querySelector("#add-plot").addEventListener("click", () => this.openPlotDialog());
     document.querySelector("#add-shape").addEventListener("click", () => this.addShape(document.querySelector("#shape-select").value));
+    for (const id of ["plot-expression", "plot-start", "plot-end", "plot-axes"]) {
+      document.querySelector(`#${id}`).addEventListener("input", () => this.updatePlotPreview());
+    }
+    document.querySelector("#plot-points").addEventListener("input", event => {
+      document.querySelector("#plot-points-value").textContent = event.target.value;
+      this.updatePlotPreview();
+    });
+    document.querySelector("#plot-create").addEventListener("click", () => this.createPlot());
     document.querySelector("#image-input").addEventListener("change", event => {
       const file = event.target.files?.[0];
       document.querySelector("#project-file-dialog").close();
@@ -838,7 +849,7 @@ export class DesignEditor {
 
   addShape(shape) {
     const id = this.uniqueId(`${shape}-${this.slideIndex() + 1}`);
-    const content = ["sine", "cosine"].includes(shape) ? "" : "Editable **label**";
+    const content = "Editable **label**";
     this.commit(insertOverlay(this.options.getDeck(), this.slideIndex(), {
       type: "shape",
       content,
@@ -851,31 +862,86 @@ export class DesignEditor {
     }));
   }
 
+  plotSvg() {
+    return createPlotSvg(
+      document.querySelector("#plot-expression").value.trim(),
+      Number(document.querySelector("#plot-start").value),
+      Number(document.querySelector("#plot-end").value),
+      Number(document.querySelector("#plot-points").value),
+      document.querySelector("#plot-axes").checked,
+    );
+  }
+
+  openPlotDialog() {
+    document.querySelector("#plot-status").textContent = "";
+    document.querySelector("#plot-overwrite").checked = false;
+    this.updatePlotPreview();
+    this.plotDialog.showModal();
+    document.querySelector("#plot-expression").focus();
+  }
+
+  updatePlotPreview() {
+    const preview = document.querySelector("#plot-preview");
+    const status = document.querySelector("#plot-status");
+    try {
+      preview.innerHTML = this.plotSvg();
+      status.textContent = "";
+    } catch (error) {
+      preview.replaceChildren();
+      status.textContent = error.message;
+    }
+  }
+
+  async createPlot() {
+    const status = document.querySelector("#plot-status");
+    const button = document.querySelector("#plot-create");
+    try {
+      let filename = document.querySelector("#plot-filename").value.trim();
+      if (!filename || /[\\/]/.test(filename)) throw new Error("Enter an SVG filename without a directory");
+      if (!filename.toLowerCase().endsWith(".svg")) filename += ".svg";
+      const svg = this.plotSvg();
+      button.disabled = true;
+      status.textContent = `Creating ${filename}…`;
+      const file = new File([svg], filename, { type: "image/svg+xml" });
+      const path = await this.options.importAsset(file, { name: filename, overwrite: document.querySelector("#plot-overwrite").checked });
+      if (!path) return;
+      this.addImagePath(path, null, 800 / 450);
+      this.plotDialog.close();
+    } catch (error) {
+      status.textContent = error.message;
+    } finally {
+      button.disabled = false;
+    }
+  }
+
   async addImage(file, position = null, cellId = null) {
-    if (!file) return;
+    if (!file) return false;
     const aspect = cellId ? null : await imageAspectRatio(file);
     const path = await this.options.importAsset(file);
-    if (!path) return;
+    if (!path) return false;
     const content = `![](${path}){fit=contain focus="50 50"}`;
     if (cellId) {
       this.commit(setCellContent(this.options.getDeck(), this.slideIndex(), cellId, content));
-      return;
+      return true;
     }
     const id = this.uniqueId(`image-${this.slideIndex() + 1}`);
     const rect = this.section().getBoundingClientRect();
     const geometry = initialImageGeometry(aspect, rect.width / rect.height, position);
     this.commit(insertOverlay(this.options.getDeck(), this.slideIndex(), { type: "image", content, id, ...geometry }));
+    return true;
   }
 
-  addImagePath(path, cellId = null) {
+  addImagePath(path, cellId = null, aspect = null) {
     if (!path) return;
     const content = `![](${path}){fit=contain focus="50 50"}`;
     if (cellId) {
       this.commit(setCellContent(this.options.getDeck(), this.slideIndex(), cellId, content));
       return;
     }
+    const rect = this.section().getBoundingClientRect();
+    const geometry = aspect ? initialImageGeometry(aspect, rect.width / rect.height) : { x: 25, y: 25, w: 50, h: 50 };
     this.commit(insertOverlay(this.options.getDeck(), this.slideIndex(), {
-      type: "image", content, id: this.uniqueId(`image-${this.slideIndex() + 1}`), x: 25, y: 25, w: 50, h: 50,
+      type: "image", content, id: this.uniqueId(`image-${this.slideIndex() + 1}`), ...geometry,
     }));
   }
 

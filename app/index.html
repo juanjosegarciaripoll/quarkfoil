@@ -40,6 +40,7 @@
       <button id="add-equation" class="toolbar-icon-button" type="button" title="Add equation" aria-label="Add equation"><span class="text-glyph" aria-hidden="true">Ω</span></button>
       <button id="add-image" class="toolbar-icon-button" type="button" title="Add image" aria-label="Add image"><svg class="action-svg" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="1.5"></rect><circle cx="8" cy="9" r="1.5"></circle><path d="M4 18l5-5 3.5 3 2.5-2 5 4"></path></svg></button>
       <button id="add-video" class="toolbar-icon-button" type="button" title="Add video" aria-label="Add video"><svg class="action-svg" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="14" height="14" rx="1.5"></rect><path d="m17 10 4-2v8l-4-2Z"></path><path d="m8 9 4 3-4 3Z"></path></svg></button>
+      <button id="add-plot" class="toolbar-icon-button" type="button" title="Add plot" aria-label="Add plot"><svg class="action-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4v16h16"></path><path d="M5 15c3-1 4-7 7-7s3 6 7 3"></path></svg></button>
       <label>Shape
         <select id="shape-select">
           <option value="rectangle">Rectangle</option>
@@ -50,8 +51,6 @@
           <option value="hexagon">Hexagon</option>
           <option value="cloud">Cloud</option>
           <option value="callout">Comic callout</option>
-          <option value="sine">Sine curve (0–2π)</option>
-          <option value="cosine">Cosine curve (0–2π)</option>
         </select>
       </label>
       <button id="add-shape" class="toolbar-icon-button" type="button" title="Add selected shape" aria-label="Add selected shape"><svg class="action-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v12H4Z"></path><path d="M7 9h10M7 12h7"></path></svg></button>
@@ -159,8 +158,6 @@
             <option value="hexagon">Hexagon</option>
             <option value="cloud">Cloud</option>
             <option value="callout">Comic callout</option>
-            <option value="sine">Sine curve (0–2π)</option>
-            <option value="cosine">Cosine curve (0–2π)</option>
           </select>
         </label>
         <label>Background <span class="color-with-alpha"><input id="prop-shape-fill" type="color" value="#dbeff2"><span class="alpha-symbol" aria-hidden="true">α</span><input id="prop-shape-fill-alpha" type="number" min="0" max="100" value="100" title="Background opacity percent" aria-label="Background opacity percent"></span></label>
@@ -233,6 +230,34 @@
       <div id="project-file-gallery" class="project-image-gallery"></div>
       <div id="project-file-status" role="status"></div>
       <div class="dialog-actions"><button id="project-file-new" type="button" hidden>New</button><button id="project-file-upload" type="button">Upload</button><button value="cancel">Cancel</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="plot-dialog">
+    <form method="dialog" class="plot-dialog__form">
+      <h2>Create plot</h2>
+      <label>Expression <input id="plot-expression" type="text" value="Math.sin(x)" spellcheck="false"></label>
+      <div class="plot-domain">
+        <label>Start <input id="plot-start" type="number" value="0" step="any"></label>
+        <label>End <input id="plot-end" type="number" value="6.283185307179586" step="any"></label>
+      </div>
+      <label>Points <span class="range-with-value"><input id="plot-points" type="range" min="4" max="300" value="80"><output id="plot-points-value">80</output></span></label>
+      <label class="check"><input id="plot-axes" type="checkbox" checked> Show axes</label>
+      <label>Filename <input id="plot-filename" type="text" value="plot.svg" spellcheck="false"></label>
+      <label class="check"><input id="plot-overwrite" type="checkbox"> Overwrite existing file</label>
+      <div id="plot-preview" class="plot-preview"></div>
+      <div id="plot-status" role="status"></div>
+      <div class="dialog-actions"><button value="cancel">Cancel</button><button id="plot-create" type="button">Create SVG</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="import-dialog">
+    <form method="dialog" class="import-dialog__form">
+      <h2 id="import-dialog-title">Import file</h2>
+      <label>Filename <input id="import-filename" type="text" spellcheck="false"></label>
+      <label class="check"><input id="import-overwrite" type="checkbox"> Overwrite existing file</label>
+      <div id="import-status" role="status"></div>
+      <div class="dialog-actions"><button value="cancel">Cancel</button><button id="import-confirm" type="button">Import</button></div>
     </form>
   </dialog>
 

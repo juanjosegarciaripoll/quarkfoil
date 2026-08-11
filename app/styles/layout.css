@@ -265,18 +265,6 @@
   stroke-width: var(--shape-stroke-width);
   stroke-linejoin: round;
 }
-.shape-axis {
-  fill: none;
-  stroke: color-mix(in srgb, var(--shape-stroke, var(--shape-default-stroke)), transparent 55%);
-  stroke-width: calc(var(--shape-stroke-width) * 0.7);
-}
-.shape-curve {
-  fill: none;
-  stroke: var(--shape-stroke, var(--shape-default-stroke));
-  stroke-width: var(--shape-stroke-width);
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
 .shape-label {
   position: relative;
   z-index: 1;

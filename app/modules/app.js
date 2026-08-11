@@ -530,8 +530,8 @@ async function listProjectFiles(kind) {
   return result.files;
 }
 
-async function createProjectPresentation(name, source) {
-  const response = await fetch(`/api/presentation?name=${encodeURIComponent(name)}`, {
+async function createProjectPresentation(name, source, overwrite = false) {
+  const response = await fetch(`/api/presentation?name=${encodeURIComponent(name)}&overwrite=${overwrite}`, {
     method: "POST",
     headers: { "Content-Type": "text/markdown; charset=utf-8" },
     body: source,
@@ -539,6 +539,38 @@ async function createProjectPresentation(name, source) {
   const result = await response.json();
   if (!response.ok) throw new Error(result.error || "Cannot create presentation");
   return result.path;
+}
+
+function chooseImportDestination(proposedName, { title = "Import file", extensions = [] } = {}) {
+  const dialog = document.querySelector("#import-dialog");
+  const filename = document.querySelector("#import-filename");
+  const overwrite = document.querySelector("#import-overwrite");
+  const status = document.querySelector("#import-status");
+  document.querySelector("#import-dialog-title").textContent = title;
+  filename.value = proposedName;
+  overwrite.checked = false;
+  status.textContent = "";
+  dialog.returnValue = "";
+  dialog.showModal();
+  filename.focus();
+  filename.select();
+  return new Promise(resolve => {
+    let settled = false;
+    const finish = value => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+    document.querySelector("#import-confirm").onclick = () => {
+      const name = filename.value.trim();
+      const suffix = name.match(/\.[^.]+$/)?.[0]?.toLowerCase() || "";
+      if (!name || /[\\/]/.test(name)) { status.textContent = "Enter a filename without a directory"; return; }
+      if (extensions.length && !extensions.includes(suffix)) { status.textContent = `Filename must end in ${extensions.join(" or ")}`; return; }
+      finish({ name, overwrite: overwrite.checked });
+      dialog.close("confirm");
+    };
+    dialog.addEventListener("close", () => finish(null), { once: true });
+  });
 }
 
 async function browseProjectFiles(kind, select, upload, { newFile: showNew = true, upload: showUpload = true } = {}) {
@@ -821,33 +853,33 @@ function figureFolder() {
   return parts.join("/");
 }
 
-async function importAsset(file) {
-  const suffix = file?.name?.match(/\.[^.]+$/)?.[0]?.toLowerCase() || "";
+async function importAsset(file, destination = null) {
+  const originalSuffix = file?.name?.match(/\.[^.]+$/)?.[0]?.toLowerCase() || "";
+  destination ||= await chooseImportDestination(file.name, { title: "Import asset", extensions: originalSuffix ? [originalSuffix] : [] });
+  if (!destination) return null;
+  const suffix = destination.name.match(/\.[^.]+$/)?.[0]?.toLowerCase() || "";
   const convertible = [".avi", ".mkv"].includes(suffix);
   if (!file || (!convertible && !["image/", "video/"].some(prefix => file.type.startsWith(prefix)))) throw new Error("Only image and video files are supported");
   const assetFolder = figureFolder();
   if (convertible) {
     if (!state.local) throw new Error("AVI and MKV conversion requires the local Quarkfoil server");
-    const result = await uploadVideoForConversion(file, assetFolder);
+    const result = await uploadVideoForConversion(file, assetFolder, destination);
     return { path: result.path, poster: result.poster, completion: monitorVideoConversion(result.id) };
   }
   if (state.local) {
-    const response = await fetch(`/api/asset?name=${encodeURIComponent(file.name)}&folder=${encodeURIComponent(assetFolder)}`, { method: "POST", headers: { "Content-Type": file.type }, body: file });
+    const response = await fetch(`/api/asset?name=${encodeURIComponent(destination.name)}&folder=${encodeURIComponent(assetFolder)}&overwrite=${destination.overwrite}`, { method: "POST", headers: { "Content-Type": file.type }, body: file });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || "Asset import failed");
     return result.path;
   }
-  const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
+  const safe = destination.name.replace(/[^a-zA-Z0-9._-]/g, "-");
   let path = `${assetFolder}/${safe}`;
   if (state.directoryHandle) {
-    const extension = safe.includes(".") ? `.${safe.split(".").pop()}` : "";
-    const stem = extension ? safe.slice(0, -extension.length) : safe;
-    let counter = 2;
-    while (true) {
-      try {
-        await nestedFileHandle(state.directoryHandle, path);
-        path = `${assetFolder}/${stem}-${counter++}${extension}`;
-      } catch { break; }
+    try {
+      await nestedFileHandle(state.directoryHandle, path);
+      if (!destination.overwrite) throw new Error(`${path} already exists`);
+    } catch (error) {
+      if (error instanceof Error && /already exists$/.test(error.message)) throw error;
     }
     const handle = await nestedFileHandle(state.directoryHandle, path, true);
     const writable = await handle.createWritable();
@@ -858,7 +890,7 @@ async function importAsset(file) {
   return path;
 }
 
-function uploadVideoForConversion(file, assetFolder) {
+function uploadVideoForConversion(file, assetFolder, destination) {
   const dialog = document.querySelector("#video-conversion-dialog");
   const progress = document.querySelector("#video-conversion-progress");
   const status = document.querySelector("#video-conversion-status");
@@ -871,7 +903,7 @@ function uploadVideoForConversion(file, assetFolder) {
   dialog.show();
   return new Promise((resolve, reject) => {
     const request = new XMLHttpRequest();
-    request.open("POST", `/api/video-conversion?name=${encodeURIComponent(file.name)}&folder=${encodeURIComponent(assetFolder)}`);
+    request.open("POST", `/api/video-conversion?name=${encodeURIComponent(destination.name)}&folder=${encodeURIComponent(assetFolder)}&overwrite=${destination.overwrite}`);
     request.setRequestHeader("Content-Type", file.type || "application/octet-stream");
     request.upload.addEventListener("progress", event => {
       if (!event.lengthComputable) {
@@ -979,11 +1011,13 @@ function bindUi() {
     const file = event.target.files?.[0];
     if (!file) return;
     if (state.local) {
+      const destination = await chooseImportDestination(file.name, { title: "Import presentation", extensions: [".md", ".markdown"] });
+      if (!destination) { event.target.value = ""; return; }
       let opened;
       try { opened = reserveProjectWindow(); }
       catch (error) { showStatus(error.message, true); event.target.value = ""; return; }
       try {
-        const path = await createProjectPresentation(file.name, file);
+        const path = await createProjectPresentation(destination.name, file, destination.overwrite);
         openProjectWindow(path, opened);
         document.querySelector("#project-file-dialog").close();
       } catch (error) {
@@ -1076,9 +1110,13 @@ async function initialize() {
     getMode: () => state.mode,
     getSlideIndex: () => state.currentSlide,
     commitSource,
-    importAsset: async file => {
-      try { return await importAsset(file); }
-      catch (error) { showStatus(error.message, true); return null; }
+    importAsset: async (file, destination) => {
+      try { return await importAsset(file, destination); }
+      catch (error) {
+        showStatus(error.message, true);
+        if (destination) throw error;
+        return null;
+      }
     },
     browseProjectFiles,
     resolveAsset: assetResolver,

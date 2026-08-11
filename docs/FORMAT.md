@@ -269,9 +269,8 @@ E = mc^2
 ```
 
 The available shapes are `rectangle`, `rounded-rectangle`, `ellipse`, `circle`,
-`diamond`, `hexagon`, `cloud`, `callout`, `sine`, and `cosine`. The trigonometric
-curves show one complete cycle from 0 to 2π. `fill` controls the
-background, `stroke` controls the outline or curve, and `stroke-width` controls
+`diamond`, `hexagon`, `cloud`, and `callout`.
+`fill` controls the background, `stroke` controls the outline, and `stroke-width` controls
 its width. Eight-digit colors can make either surface partly or fully
 transparent; for example, `fill="#fff3bf00"` removes the visible background.
 Shape geometry and labels have no implicit padding, so an overlay at

@@ -203,6 +203,12 @@ class ServerTests(unittest.TestCase):
         result = json.loads(payload)
         self.assertEqual(result["path"], "figures/diagram.svg")
         self.assertTrue((self.root / result["path"]).is_file())
+        with self.assertRaises(urllib.error.HTTPError) as context:
+            self.request("/api/asset?name=diagram.svg", method="POST", body=b"replacement", headers={"Content-Type": "image/svg+xml"})
+        self.assertEqual(context.exception.code, 409)
+        status, _, _ = self.request("/api/asset?name=diagram.svg&overwrite=true", method="POST", body=b"replacement", headers={"Content-Type": "image/svg+xml"})
+        self.assertEqual(status, 201)
+        self.assertEqual((self.root / "figures/diagram.svg").read_bytes(), b"replacement")
 
     def test_video_import_and_listing(self) -> None:
         status, _, payload = self.request(
@@ -341,18 +347,24 @@ class ServerTests(unittest.TestCase):
             self.request("/api/open?path=..%2Foutside.md", method="POST")
         self.assertEqual(context.exception.code, 400)
 
-    def test_presentation_upload_does_not_overwrite(self) -> None:
+    def test_presentation_upload_requires_explicit_overwrite(self) -> None:
         existing = self.root / "uploaded.md"
         existing.write_text("# Existing\n", encoding="utf-8")
+        with self.assertRaises(urllib.error.HTTPError) as context:
+            self.request(
+                "/api/presentation?name=uploaded.md", method="POST", body=b"# Uploaded\n",
+                headers={"Content-Type": "text/markdown"},
+            )
+        self.assertEqual(context.exception.code, 409)
+        self.assertEqual(existing.read_text(encoding="utf-8"), "# Existing\n")
         status, _, payload = self.request(
-            "/api/presentation?name=uploaded.md", method="POST", body=b"# Uploaded\n",
+            "/api/presentation?name=uploaded.md&overwrite=true", method="POST", body=b"# Uploaded\n",
             headers={"Content-Type": "text/markdown"},
         )
         self.assertEqual(status, 201)
         result = json.loads(payload)
-        self.assertEqual(result["path"], "uploaded-2.md")
-        self.assertEqual(existing.read_text(encoding="utf-8"), "# Existing\n")
-        self.assertEqual((self.root / result["path"]).read_text(encoding="utf-8"), "# Uploaded\n")
+        self.assertEqual(result["path"], "uploaded.md")
+        self.assertEqual(existing.read_text(encoding="utf-8"), "# Uploaded\n")
 
 
 if __name__ == "__main__":
