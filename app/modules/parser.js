@@ -378,6 +378,13 @@ export function parseDeck(source) {
     slides.push(slide);
     return slide;
   });
+  let activeSection = null;
+  for (const item of items) {
+    if (item.kind === "section") {
+      activeSection = item;
+      activeSection.slideCount = 0;
+    } else if (activeSection) activeSection.slideCount += 1;
+  }
   if (front.metadata.theme && !THEME_SET.has(String(front.metadata.theme))) diagnostics.push({ level: "warning", message: `Unknown deck theme '${front.metadata.theme}', using scientific-light` });
   for (const slide of slides) {
     const theme = slide.headingAttrs.values.theme;

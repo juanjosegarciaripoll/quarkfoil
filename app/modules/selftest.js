@@ -492,11 +492,13 @@ try {
   let sectioned = parseDeck(insertSection(deck, 0, "Methods"));
   assert(sectioned.sections.length === 1 && sectioned.slides.length === 2, "section markers parse without becoming presentation slides");
   assert(sectioned.items.map(item => item.kind).join(" ") === "section slide slide", "new section begins at the selected slide");
+  assert(sectioned.sections[0].slideCount === 2, "sections count their slides for collapsed sidebar labels");
   const sectionId = sectioned.sections[0].id;
   sectioned = parseDeck(updateSectionTitle(sectioned, sectionId, "Results"));
   assert(sectioned.sections[0].title === "Results" && sectioned.source.includes(".section"), "section titles serialize as readable Markdown markers");
   const movedSection = parseDeck(moveSection(sectioned, sectionId, 1));
   assert(movedSection.items[1].kind === "section" && movedSection.slides.map(slide => slide.title).join(" ") === "First Second", "section separators move independently of slides");
+  assert(movedSection.sections[0].slideCount === 1, "section slide counts follow a moved boundary");
   const slidesAcrossSection = parseDeck(moveSlide(sectioned, 0, 1));
   assert(slidesAcrossSection.items[0].kind === "section" && slidesAcrossSection.slides.map(slide => slide.title).join(" ") === "Second First", "slides move across a stationary section boundary");
   const sectionFixture = document.createElement("div");

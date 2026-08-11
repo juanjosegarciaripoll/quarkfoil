@@ -251,7 +251,7 @@ function rebuildSlideList() {
       const button = document.createElement("button");
       button.type = "button";
       button.className = "section-title";
-      button.textContent = item.title;
+      button.textContent = collapsed ? `${item.title} (${item.slideCount})` : item.title;
       button.title = "Click to select; double-click to rename";
       button.addEventListener("click", () => {
         if (!requestMode(state.mode === "source" ? "design" : state.mode)) return;

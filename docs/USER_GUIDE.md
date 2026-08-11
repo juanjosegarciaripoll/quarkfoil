@@ -121,8 +121,9 @@ Use the section button above the slide list to add a named boundary before the
 current slide. A section groups that slide and the slides that follow it until the next
 section. Use its disclosure arrow to collapse or expand those slides, click the
 section name to select it, and use the ordinary up/down buttons to move the
-boundary. Double-click its name to rename it. The delete button removes only
-the section marker and leaves its slides intact.
+boundary. A collapsed section shows its number of slides in parentheses beside
+its name. Double-click its name to rename it. The delete button removes only the
+section marker and leaves its slides intact.
 
 Sections organize the editor only; they are not displayed during the
 presentation or static export. Their names and stable IDs remain visible in the
