@@ -21,6 +21,7 @@ export const repeatedActivation = (previous, key, time, interval = 450) => Boole
   previous && previous.key === key && time - previous.time >= 0 && time - previous.time <= interval,
 );
 export const deleteKey = key => key === "Delete" || key === "Del";
+export const canvasStartsMarquee = ({ overlay, cell, title }) => !overlay && !cell && !title;
 export const projectAssetPage = (assets, query, page, pageSize = 24) => {
   const needle = query.trim().toLocaleLowerCase();
   const filtered = needle ? assets.filter(asset => asset.path.toLocaleLowerCase().includes(needle)) : assets;
@@ -597,7 +598,7 @@ export class DesignEditor {
     }
     if (!overlay) {
       const section = event.target.closest(".scientific-slide");
-      if (section) this.startMarquee(event, section);
+      if (section && canvasStartsMarquee({ overlay, cell, title })) this.startMarquee(event, section);
       return;
     }
     event.preventDefault();

@@ -17,7 +17,7 @@ import {
   updateSlideProperties,
 } from "./parser.js";
 import { renderDeck, syncVideoPlayback } from "./render.js";
-import { arrowGeometry, bindRangeControl, clipboardImageFile, deleteKey, initialImageGeometry, moveGeometryGroup, pageSlideIndex, projectAssetPage, rectanglesIntersect, renameClipboardImage, repeatedActivation, videoFile } from "./editor.js";
+import { arrowGeometry, bindRangeControl, canvasStartsMarquee, clipboardImageFile, deleteKey, initialImageGeometry, moveGeometryGroup, pageSlideIndex, projectAssetPage, rectanglesIntersect, renameClipboardImage, repeatedActivation, videoFile } from "./editor.js";
 import { parseBibliography, prepareBibliography } from "./bibliography.js";
 import { compileExpression, createPlotSvg } from "./plot.js";
 
@@ -295,6 +295,9 @@ try {
   assert(repeatedActivation({ key: "overlay:text-1", time: 100 }, "overlay:text-1", 300), "a repeated canvas click is recognized for editing");
   assert(repeatedActivation({ key: "cell:left", time: 100 }, "cell:left", 300), "a repeated layout-cell click is recognized for editing");
   assert(!repeatedActivation({ key: "cell:left", time: 100 }, "cell:right", 300), "clicks on different canvas elements do not trigger editing");
+  assert(!canvasStartsMarquee({ overlay: null, cell: {}, title: null }), "single clicks on layout cells are left for cell selection");
+  assert(!canvasStartsMarquee({ overlay: null, cell: null, title: {} }), "single clicks on slide titles are left for title selection");
+  assert(canvasStartsMarquee({ overlay: null, cell: null, title: null }), "empty slide canvas still starts marquee selection");
   assert(deleteKey("Delete") && deleteKey("Del"), "Delete and Del keys remove selected images and overlays");
   const expression = compileExpression("Math.sin(x) + x ** 2");
   assert(Math.abs(expression(2) - (Math.sin(2) + 4)) < 1e-10, "plot expressions support JavaScript-style Math functions and operators");
