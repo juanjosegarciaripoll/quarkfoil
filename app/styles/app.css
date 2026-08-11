@@ -89,7 +89,7 @@ button.active { background: #146c7e; border-color: #56cfe1; }
 .alpha-symbol { color: #aab4bd; font-size: 0.8rem; }
 .color-with-alpha-reset button { display: grid; place-items: center; min-width: 0; padding: 0; }
 #slide-color-state { color: #aab4bd; font-size: 0.72rem; line-height: 1.3; }
-#image-properties, #video-properties, #plot-properties, #shape-properties, #attribution-properties { margin-top: 0.7rem; padding-top: 0.7rem; border-top: 1px solid #3d454e; }
+#image-properties, #video-properties, #plot-properties, #arrow-properties, #shape-properties, #attribution-properties { margin-top: 0.7rem; padding-top: 0.7rem; border-top: 1px solid #3d454e; }
 #plot-properties small { color: #aab4bd; font-size: 0.7rem; line-height: 1.3; }
 #attribution-properties small { color: #aab4bd; font-size: 0.7rem; line-height: 1.3; }
 .image-source-actions { display: grid; grid-template-columns: 1fr; gap: 0.4rem; }
@@ -151,6 +151,9 @@ body.presenting .toolbar { display: none; }
 .resize-handle.ne { right: -7px; top: -7px; cursor: nesw-resize; }
 .resize-handle.se { right: -7px; bottom: -7px; cursor: nwse-resize; }
 .resize-handle.sw { left: -7px; bottom: -7px; cursor: nesw-resize; }
+.resize-handle.arrow-endpoint { transform: translate(-50%, -50%); cursor: crosshair; }
+.mode-design .overlay-arrow .arrow-hit { pointer-events: stroke; }
+.mode-design .overlay-arrow .resize-handle { pointer-events: auto; }
 
 .mode-design .fragment { visibility: visible !important; opacity: 1 !important; transform: none !important; }
 

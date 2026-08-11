@@ -246,6 +246,20 @@ function parseSlide(source, range, index, diagnostics) {
       if (!block.attrs.id) diagnostics.push({ level: "warning", slide: index + 1, message: `Overlay '${id}' has no stable source ID` });
       const alignment = block.attrs.values.align || (["equation", "shape"].includes(type) ? "center" : "left");
       const shape = block.attrs.values.shape || "rectangle";
+      const arrow = type === "arrow" ? {
+        x1: Number(block.attrs.values.x1 ?? 25),
+        y1: Number(block.attrs.values.y1 ?? 50),
+        x2: Number(block.attrs.values.x2 ?? 75),
+        y2: Number(block.attrs.values.y2 ?? 50),
+        heads: block.attrs.values.heads || "end",
+      } : null;
+      const arrowGeometry = arrow ? {
+        x: Math.max(0, Math.min(arrow.x1, arrow.x2) - 1),
+        y: Math.max(0, Math.min(arrow.y1, arrow.y2) - 1),
+        w: Math.min(100, Math.max(arrow.x1, arrow.x2) + 1) - Math.max(0, Math.min(arrow.x1, arrow.x2) - 1),
+        h: Math.min(100, Math.max(arrow.y1, arrow.y2) + 1) - Math.max(0, Math.min(arrow.y1, arrow.y2) - 1),
+        z: Number(block.attrs.values.z ?? overlays.length + 10),
+      } : null;
       overlays.push({
         id,
         type,
@@ -254,7 +268,7 @@ function parseSlide(source, range, index, diagnostics) {
         video,
         attrs: block.attrs,
         range: block.range,
-        geometry: {
+        geometry: arrowGeometry || {
           x: Number(block.attrs.values.x ?? 10),
           y: Number(block.attrs.values.y ?? 20),
           w: Number(block.attrs.values.w ?? 30),
@@ -271,6 +285,7 @@ function parseSlide(source, range, index, diagnostics) {
         stroke: block.attrs.values.stroke || null,
         strokeWidth: Number(block.attrs.values["stroke-width"] ?? 2),
         shadow: block.attrs.values.shadow === "true",
+        arrow,
       });
     } else if (block.name === "footer") footer = { source: block.body, range: block.range };
     else if (block.name === "notes") notes = block.body;
@@ -294,7 +309,9 @@ function parseSlide(source, range, index, diagnostics) {
     if (!Number.isFinite(overlay.fontSize) || overlay.fontSize <= 0) diagnostics.push({ level: "error", slide: index + 1, message: `Overlay '${overlay.id}' has invalid font size` });
     if (!["left", "center", "right"].includes(overlay.alignment)) diagnostics.push({ level: "error", slide: index + 1, message: `Overlay '${overlay.id}' has invalid alignment` });
     if (overlay.type === "shape" && !Object.hasOwn(SHAPES, overlay.shape)) diagnostics.push({ level: "error", slide: index + 1, message: `Overlay '${overlay.id}' has unknown shape '${overlay.shape}'` });
-    if (overlay.type === "shape" && (!Number.isFinite(overlay.strokeWidth) || overlay.strokeWidth < 0)) diagnostics.push({ level: "error", slide: index + 1, message: `Overlay '${overlay.id}' has invalid stroke width` });
+    if (["shape", "arrow"].includes(overlay.type) && (!Number.isFinite(overlay.strokeWidth) || overlay.strokeWidth < 0)) diagnostics.push({ level: "error", slide: index + 1, message: `Overlay '${overlay.id}' has invalid stroke width` });
+    if (overlay.type === "arrow" && (!overlay.arrow || [overlay.arrow.x1, overlay.arrow.y1, overlay.arrow.x2, overlay.arrow.y2].some(value => !Number.isFinite(value)))) diagnostics.push({ level: "error", slide: index + 1, message: `Arrow '${overlay.id}' has invalid endpoints` });
+    if (overlay.type === "arrow" && !["none", "start", "end", "both"].includes(overlay.arrow?.heads)) diagnostics.push({ level: "error", slide: index + 1, message: `Arrow '${overlay.id}' has invalid arrowheads` });
     if (overlay.type === "video" && !overlay.video?.source) diagnostics.push({ level: "error", slide: index + 1, message: `Video overlay '${overlay.id}' has no src` });
     if (overlay.color && !/^#[0-9a-f]{6}(?:[0-9a-f]{2})?$/i.test(overlay.color)) diagnostics.push({ level: "warning", slide: index + 1, message: `Overlay '${overlay.id}' has invalid text color '${overlay.color}'` });
   }
@@ -511,6 +528,14 @@ export function insertOverlay(deck, slideIndex, { type, content, id, x = 35, y =
   return patchRange(deck.source, slide.range.end, slide.range.end, block);
 }
 
+export function insertArrow(deck, slideIndex, { id, x1 = 25, y1 = 50, x2 = 75, y2 = 50, attributes = {} }) {
+  const slide = deck.slides[slideIndex];
+  const safeId = id.replace(/[^a-zA-Z0-9_-]/g, "-");
+  const extra = Object.entries(attributes).map(([key, value]) => ` ${key}=${JSON.stringify(value)}`).join("");
+  const block = `\n\n::: overlay {#${safeId} type="arrow" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"${extra}}\n\n:::\n`;
+  return patchRange(deck.source, slide.range.end, slide.range.end, block);
+}
+
 export function deleteOverlay(deck, slideIndex, objectId) {
   const overlay = deck.slides[slideIndex]?.overlays.find(item => item.id === objectId);
   if (!overlay) throw new Error(`Unknown overlay '${objectId}'`);
@@ -522,8 +547,12 @@ export function duplicateOverlay(deck, slideIndex, objectId, newId) {
   if (!overlay) throw new Error(`Unknown overlay '${objectId}'`);
   const attrs = structuredClone(overlay.attrs);
   attrs.id = newId;
-  attrs.values.x = String(overlay.geometry.x + 2);
-  attrs.values.y = String(overlay.geometry.y + 2);
+  if (overlay.arrow) {
+    for (const key of ["x1", "y1", "x2", "y2"]) attrs.values[key] = String(overlay.arrow[key] + 2);
+  } else {
+    attrs.values.x = String(overlay.geometry.x + 2);
+    attrs.values.y = String(overlay.geometry.y + 2);
+  }
   const block = `\n::: overlay {${serializeAttributes(attrs)}}\n${overlay.source.trim()}\n:::\n`;
   return patchRange(deck.source, overlay.range.end, overlay.range.end, block);
 }

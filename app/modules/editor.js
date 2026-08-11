@@ -1,6 +1,7 @@
 import {
   deleteOverlay,
   duplicateOverlay,
+  insertArrow,
   insertOverlay,
   parseDeck,
   setCellContent,
@@ -42,6 +43,17 @@ export function moveGeometryGroup(geometries, dx, dy) {
   const boundedX = clamp(round(dx), -minimumX, 100 - maximumX);
   const boundedY = clamp(round(dy), -minimumY, 100 - maximumY);
   return geometries.map(item => ({ ...item, x: round(item.x + boundedX), y: round(item.y + boundedY) }));
+}
+
+export function arrowGeometry(arrow) {
+  const x = Math.max(0, Math.min(arrow.x1, arrow.x2) - 1);
+  const y = Math.max(0, Math.min(arrow.y1, arrow.y2) - 1);
+  return {
+    x: round(x),
+    y: round(y),
+    w: round(Math.min(100, Math.max(arrow.x1, arrow.x2) + 1) - x),
+    h: round(Math.min(100, Math.max(arrow.y1, arrow.y2) + 1) - y),
+  };
 }
 
 export function rectanglesIntersect(left, right) {
@@ -197,6 +209,7 @@ export class DesignEditor {
     this.imageProperties = document.querySelector("#image-properties");
     this.videoProperties = document.querySelector("#video-properties");
     this.plotProperties = document.querySelector("#plot-properties");
+    this.arrowProperties = document.querySelector("#arrow-properties");
     this.shapeProperties = document.querySelector("#shape-properties");
     this.attributionProperties = document.querySelector("#attribution-properties");
     this.fontProperties = document.querySelector("#font-properties");
@@ -247,6 +260,9 @@ export class DesignEditor {
     });
     for (const id of ["prop-plot-fill", "prop-plot-stroke", "prop-plot-stroke-width"]) {
       document.querySelector(`#${id}`).addEventListener("change", () => this.applyPlotProperties());
+    }
+    for (const id of ["prop-arrow-stroke", "prop-arrow-stroke-width", "prop-arrow-heads"]) {
+      document.querySelector(`#${id}`).addEventListener("change", () => this.applyArrowProperties());
     }
     document.querySelector("#image-input").addEventListener("change", event => {
       const file = event.target.files?.[0];
@@ -357,7 +373,7 @@ export class DesignEditor {
     window.getSelection()?.removeAllRanges();
     if (overlay) {
       this.selectOverlay(overlay);
-      if (overlay.dataset.objectType !== "citation") this.openContentDialog();
+      if (!["citation", "arrow"].includes(overlay.dataset.objectType)) this.openContentDialog();
     }
     else if (cell) { this.selectCell(cell); this.openCellDialog(); }
     else this.openTitleDialog();
@@ -380,15 +396,22 @@ export class DesignEditor {
     this.selected = element;
     element.classList.add("selected-object");
     document.querySelectorAll(".resize-handle").forEach(handle => handle.remove());
-    for (const corner of ["nw", "ne", "se", "sw"]) {
+    const object = this.slide().overlays.find(item => item.id === element.dataset.objectId);
+    const handles = object?.arrow ? ["start", "end"] : ["nw", "ne", "se", "sw"];
+    for (const corner of handles) {
       const handle = document.createElement("span");
-      handle.className = `resize-handle ${corner}`;
-      handle.dataset.corner = corner;
+      handle.className = `resize-handle ${object?.arrow ? "arrow-endpoint" : corner}`;
+      if (object?.arrow) {
+        handle.dataset.endpoint = corner;
+        const x = corner === "start" ? object.arrow.x1 : object.arrow.x2;
+        const y = corner === "start" ? object.arrow.y1 : object.arrow.y2;
+        handle.style.left = `${100 * (x - object.geometry.x) / object.geometry.w}%`;
+        handle.style.top = `${100 * (y - object.geometry.y) / object.geometry.h}%`;
+      } else handle.dataset.corner = corner;
       element.append(handle);
     }
     this.noSelection.hidden = true;
     this.properties.hidden = false;
-    const object = this.slide().overlays.find(item => item.id === element.dataset.objectId);
     this.fillProperties(object, element);
     document.querySelector("#duplicate-object").disabled = false;
     document.querySelector("#delete-object").disabled = false;
@@ -423,6 +446,7 @@ export class DesignEditor {
     this.imageProperties.hidden = true;
     this.videoProperties.hidden = true;
     this.plotProperties.hidden = true;
+    this.arrowProperties.hidden = true;
     this.plotAsset = null;
     this.shapeProperties.hidden = true;
     this.attributionProperties.hidden = true;
@@ -456,10 +480,14 @@ export class DesignEditor {
   fillProperties(object, element) {
     if (!object) return;
     document.querySelector("#prop-id").value = object.id;
-    for (const key of ["x", "y", "w", "h", "z"]) document.querySelector(`#prop-${key}`).value = object.geometry[key];
+    for (const key of ["x", "y", "w", "h", "z"]) {
+      const input = document.querySelector(`#prop-${key}`);
+      input.value = object.geometry[key];
+      input.disabled = object.type === "arrow" && key !== "z";
+    }
     document.querySelector("#prop-fragment").value = object.fragment ?? "";
     document.querySelector("#prop-locked").checked = object.locked;
-    document.querySelector("#edit-content").hidden = ["image", "video", "citation"].includes(object.type);
+    document.querySelector("#edit-content").hidden = ["image", "video", "citation", "arrow"].includes(object.type);
     if (object.type === "image" && object.image) {
       this.imageProperties.hidden = false;
       document.querySelector("#prop-fit").value = object.image.attrs.values.fit || "contain";
@@ -469,6 +497,11 @@ export class DesignEditor {
       this.loadPlotProperties(object.image.source);
     } else if (object.type === "video" && object.video) {
       this.fillVideoProperties(object.video);
+    } else if (object.type === "arrow" && object.arrow) {
+      this.arrowProperties.hidden = false;
+      document.querySelector("#prop-arrow-stroke").value = colorInputValue(getComputedStyle(element.querySelector(".arrow-line")).stroke) || "#146c7e";
+      document.querySelector("#prop-arrow-stroke-width").value = object.strokeWidth;
+      document.querySelector("#prop-arrow-heads").value = object.arrow.heads;
     } else {
       if (object.type === "shape") {
         this.shapeProperties.hidden = false;
@@ -553,7 +586,7 @@ export class DesignEditor {
         event.stopPropagation();
         if (overlay) {
           this.selectOverlay(overlay);
-          if (overlay.dataset.objectType !== "citation") this.openContentDialog();
+          if (!["citation", "arrow"].includes(overlay.dataset.objectType)) this.openContentDialog();
         } else if (cell) {
           this.selectCell(cell);
           this.openCellDialog();
@@ -583,10 +616,15 @@ export class DesignEditor {
     if (!items.length || items.some(item => item.object.locked)) return;
     const rect = this.section().getBoundingClientRect();
     this.drag = {
-      kind: handle ? "resize" : "move",
+      kind: handle?.dataset.endpoint ? "arrow-endpoint" : handle ? "resize" : "move",
       corner: handle?.dataset.corner,
+      endpoint: handle?.dataset.endpoint,
       element: overlay,
-      items: items.map(item => ({ ...item, original: { ...item.object.geometry } })),
+      items: items.map(item => ({
+        ...item,
+        original: { ...item.object.geometry },
+        originalArrow: item.object.arrow ? { ...item.object.arrow } : null,
+      })),
       pointerId: event.pointerId,
       startX: event.clientX,
       startY: event.clientY,
@@ -668,7 +706,16 @@ export class DesignEditor {
     if (!this.drag) return;
     const dx = 100 * (event.clientX - this.drag.startX) / this.drag.rect.width;
     const dy = 100 * (event.clientY - this.drag.startY) / this.drag.rect.height;
-    if (this.drag.kind === "move") {
+    if (this.drag.kind === "arrow-endpoint") {
+      const item = this.drag.items[0];
+      const next = { ...item.originalArrow };
+      const suffix = this.drag.endpoint === "start" ? "1" : "2";
+      next[`x${suffix}`] = clamp(round(item.originalArrow[`x${suffix}`] + dx), 0, 100);
+      next[`y${suffix}`] = clamp(round(item.originalArrow[`y${suffix}`] + dy), 0, 100);
+      item.nextArrow = next;
+      item.next = { ...arrowGeometry(next), z: item.original.z };
+      this.applyArrowToElement(item.element, next);
+    } else if (this.drag.kind === "move") {
       const nextGroup = moveGeometryGroup(this.drag.items.map(item => item.original), dx, dy);
       this.drag.items.forEach((item, index) => {
         item.next = nextGroup[index];
@@ -702,7 +749,13 @@ export class DesignEditor {
     drag.element.removeEventListener("pointermove", this.boundMove);
     drag.element.removeEventListener("pointerup", this.boundUp);
     this.drag = null;
-    if (drag.kind === "move") {
+    if (drag.kind === "arrow-endpoint") {
+      const item = drag.items[0];
+      const arrow = item.nextArrow || item.originalArrow;
+      this.commit(updateOverlay(this.options.getDeck(), this.slideIndex(), item.object.id, {
+        x1: arrow.x1, y1: arrow.y1, x2: arrow.x2, y2: arrow.y2,
+      }));
+    } else if (drag.kind === "move") {
       this.commitGeometryChanges(drag.items.map(item => ({ id: item.object.id, geometry: item.next || item.original })));
     } else {
       const geometry = drag.items[0].next || drag.items[0].original;
@@ -719,11 +772,41 @@ export class DesignEditor {
     element.style.height = `${geometry.h}%`;
   }
 
+  applyArrowToElement(element, arrow) {
+    const geometry = arrowGeometry(arrow);
+    this.applyGeometryToElement(element, geometry);
+    const svg = element.querySelector(".arrow-svg");
+    if (svg) {
+      svg.style.left = `${-100 * geometry.x / geometry.w}%`;
+      svg.style.top = `${-100 * geometry.y / geometry.h}%`;
+      svg.style.width = `${10000 / geometry.w}%`;
+      svg.style.height = `${10000 / geometry.h}%`;
+    }
+    for (const line of element.querySelectorAll(".arrow-svg line")) {
+      line.setAttribute("x1", String(arrow.x1));
+      line.setAttribute("y1", String(arrow.y1));
+      line.setAttribute("x2", String(arrow.x2));
+      line.setAttribute("y2", String(arrow.y2));
+    }
+    for (const handle of element.querySelectorAll(".arrow-endpoint")) {
+      const suffix = handle.dataset.endpoint === "start" ? "1" : "2";
+      handle.style.left = `${100 * (arrow[`x${suffix}`] - geometry.x) / geometry.w}%`;
+      handle.style.top = `${100 * (arrow[`y${suffix}`] - geometry.y) / geometry.h}%`;
+    }
+  }
+
   commitGeometryChanges(changes) {
     let deck = this.options.getDeck();
     let source = deck.source;
     for (const change of changes) {
-      source = updateOverlay(deck, this.slideIndex(), change.id, { x: change.geometry.x, y: change.geometry.y });
+      const object = deck.slides[this.slideIndex()].overlays.find(item => item.id === change.id);
+      const updates = object?.arrow ? {
+        x1: round(object.arrow.x1 + change.geometry.x - object.geometry.x),
+        y1: round(object.arrow.y1 + change.geometry.y - object.geometry.y),
+        x2: round(object.arrow.x2 + change.geometry.x - object.geometry.x),
+        y2: round(object.arrow.y2 + change.geometry.y - object.geometry.y),
+      } : { x: change.geometry.x, y: change.geometry.y };
+      source = updateOverlay(deck, this.slideIndex(), change.id, updates);
       deck = parseDeck(source);
     }
     this.commit(source);
@@ -738,7 +821,8 @@ export class DesignEditor {
   applyProperties() {
     if (!this.selected) return;
     const changes = {};
-    for (const key of ["x", "y", "w", "h", "z"]) changes[key] = Number(document.querySelector(`#prop-${key}`).value);
+    const arrow = this.selected.dataset.objectType === "arrow";
+    for (const key of arrow ? ["z"] : ["x", "y", "w", "h", "z"]) changes[key] = Number(document.querySelector(`#prop-${key}`).value);
     const fragment = document.querySelector("#prop-fragment").value;
     changes.fragment = fragment === "" ? null : Number(fragment);
     changes.locked = document.querySelector("#prop-locked").checked ? "true" : null;
@@ -798,11 +882,23 @@ export class DesignEditor {
     }));
   }
 
+  applyArrowProperties() {
+    if (!this.selected || this.selected.dataset.objectType !== "arrow") return;
+    const strokeWidth = Math.max(0.25, Number(document.querySelector("#prop-arrow-stroke-width").value) || 2);
+    const stroke = document.querySelector("#prop-arrow-stroke").value;
+    const defaultStroke = resolvedThemeColor(this.section(), "--shape-default-stroke");
+    this.commit(updateOverlay(this.options.getDeck(), this.slideIndex(), this.selected.dataset.objectId, {
+      stroke: stroke === defaultStroke ? null : stroke,
+      "stroke-width": strokeWidth === 2 ? null : strokeWidth,
+      heads: document.querySelector("#prop-arrow-heads").value === "end" ? null : document.querySelector("#prop-arrow-heads").value,
+    }));
+  }
+
   openContentDialog() {
     if (this.dialog.open) return;
     if (!this.selected) return;
     const object = this.slide().overlays.find(item => item.id === this.selected.dataset.objectId);
-    if (!object || ["image", "video"].includes(object.type)) return;
+    if (!object || ["image", "video", "arrow"].includes(object.type)) return;
     this.dialogTarget = { kind: "overlay", id: object.id };
     document.querySelector("#content-dialog-title").textContent = object.type === "equation" ? "Edit LaTeX" : object.type === "shape" ? "Edit shape label" : "Edit Markdown";
     this.contentEditor.value = object.source;
@@ -861,6 +957,12 @@ export class DesignEditor {
   }
 
   addShape(shape) {
+    if (shape === "arrow") {
+      this.commit(insertArrow(this.options.getDeck(), this.slideIndex(), {
+        id: this.uniqueId(`arrow-${this.slideIndex() + 1}`),
+      }));
+      return;
+    }
     const id = this.uniqueId(`${shape}-${this.slideIndex() + 1}`);
     const content = "Editable **label**";
     this.commit(insertOverlay(this.options.getDeck(), this.slideIndex(), {

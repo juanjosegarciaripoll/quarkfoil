@@ -3,6 +3,7 @@ import {
   deleteSlide,
   duplicateSlide,
   importSlide,
+  insertArrow,
   insertOverlay,
   insertSlide,
   moveSlide,
@@ -16,7 +17,7 @@ import {
   updateSlideProperties,
 } from "./parser.js";
 import { renderDeck, syncVideoPlayback } from "./render.js";
-import { bindRangeControl, clipboardImageFile, deleteKey, initialImageGeometry, moveGeometryGroup, pageSlideIndex, projectAssetPage, rectanglesIntersect, renameClipboardImage, repeatedActivation, videoFile } from "./editor.js";
+import { arrowGeometry, bindRangeControl, clipboardImageFile, deleteKey, initialImageGeometry, moveGeometryGroup, pageSlideIndex, projectAssetPage, rectanglesIntersect, renameClipboardImage, repeatedActivation, videoFile } from "./editor.js";
 import { parseBibliography, prepareBibliography } from "./bibliography.js";
 import { compileExpression, createPlotSvg } from "./plot.js";
 
@@ -160,6 +161,38 @@ Thought
   const calloutSurface = getComputedStyle(fixture.querySelector('[data-object-id="callout"] .shape-surface'));
   assert(calloutSurface.fill === "rgb(219, 239, 242)" && calloutSurface.stroke === "rgb(20, 108, 126)", "implicit shape colors inherit from the theme");
   fixture.remove();
+}
+
+function assertArrows() {
+  let deck = parseDeck("## Arrows {.layout-free}\n");
+  deck = parseDeck(insertArrow(deck, 0, {
+    id: "flow", x1: 12, y1: 18, x2: 76, y2: 64,
+    attributes: { heads: "both", stroke: "#c92a2a", "stroke-width": 4 },
+  }));
+  const arrow = deck.slides[0].overlays[0];
+  assert(arrow.type === "arrow" && arrow.arrow.x1 === 12 && arrow.arrow.y2 === 64, "arrow endpoints parse");
+  assert(arrow.arrow.heads === "both" && arrow.stroke === "#c92a2a" && arrow.strokeWidth === 4, "arrow styles parse");
+  assert(JSON.stringify(arrowGeometry(arrow.arrow)) === JSON.stringify({ x: 11, y: 17, w: 66, h: 48 }), "arrow endpoint geometry is derived consistently");
+
+  const fixture = document.createElement("div");
+  fixture.className = "reveal mode-design";
+  const slides = document.createElement("div");
+  slides.className = "slides";
+  fixture.append(slides);
+  document.body.append(fixture);
+  renderDeck(deck, slides, source => source);
+  const line = fixture.querySelector(".arrow-svg .arrow-line");
+  assert(line && line.getAttribute("marker-start") && line.getAttribute("marker-end"), "two-headed arrow renders trusted SVG markers");
+  assert(line.getAttribute("stroke") === "#c92a2a" && line.getAttribute("stroke-width") === "4", "arrow line styling renders");
+  assert(line.getAttribute("x1") === "12" && line.getAttribute("y2") === "64", "arrow SVG retains full-slide coordinates instead of squashing its endpoints");
+  assert(getComputedStyle(fixture.querySelector(".arrow-hit")).pointerEvents === "stroke", "arrow editing hit target follows the line rather than its bounding box");
+  fixture.remove();
+
+  deck = parseDeck(updateOverlay(deck, 0, "flow", { x2: 82, y2: 40, heads: "start", stroke: "#146c7e" }));
+  assert(deck.slides[0].overlays[0].arrow.x2 === 82 && deck.slides[0].overlays[0].arrow.heads === "start", "arrow endpoint and head changes serialize");
+  const duplicated = parseDeck(duplicateOverlay(deck, 0, "flow", "flow-copy"));
+  const copy = duplicated.slides[0].overlays.find(item => item.id === "flow-copy");
+  assert(copy.arrow.x1 === 14 && copy.arrow.x2 === 84 && !copy.attrs.values.x, "duplicated arrow offsets both endpoints without box geometry");
 }
 
 function assertCitations() {
@@ -366,6 +399,7 @@ try {
   assertFrontLayout();
   assertEmptyLayouts();
   assertShapes();
+  assertArrows();
   assertCitations();
   assertThemes();
   assertTables();

@@ -113,9 +113,58 @@ function makeVideo(video, assetResolver) {
   return element;
 }
 
+let arrowMarkerSequence = 0;
+
+function makeArrow(overlay) {
+  const namespace = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(namespace, "svg");
+  svg.classList.add("arrow-svg");
+  svg.setAttribute("viewBox", "0 0 100 100");
+  svg.setAttribute("preserveAspectRatio", "none");
+  svg.style.left = `${-100 * overlay.geometry.x / overlay.geometry.w}%`;
+  svg.style.top = `${-100 * overlay.geometry.y / overlay.geometry.h}%`;
+  svg.style.width = `${10000 / overlay.geometry.w}%`;
+  svg.style.height = `${10000 / overlay.geometry.h}%`;
+  const markerId = `quarkfoil-arrowhead-${++arrowMarkerSequence}`;
+  const definitions = document.createElementNS(namespace, "defs");
+  const marker = document.createElementNS(namespace, "marker");
+  for (const [name, value] of [["id", markerId], ["viewBox", "0 0 10 10"], ["refX", "9"], ["refY", "5"], ["markerWidth", "6"], ["markerHeight", "6"], ["orient", "auto-start-reverse"], ["markerUnits", "strokeWidth"]]) marker.setAttribute(name, value);
+  const head = document.createElementNS(namespace, "path");
+  head.setAttribute("d", "M0 0 L10 5 L0 10 Z");
+  head.setAttribute("fill", overlay.stroke || "var(--shape-default-stroke)");
+  marker.append(head);
+  definitions.append(marker);
+  const line = document.createElementNS(namespace, "line");
+  line.classList.add("arrow-line");
+  const { arrow } = overlay;
+  const coordinates = {
+    x1: arrow.x1,
+    y1: arrow.y1,
+    x2: arrow.x2,
+    y2: arrow.y2,
+  };
+  for (const [name, value] of Object.entries(coordinates)) line.setAttribute(name, String(value));
+  line.setAttribute("stroke", overlay.stroke || "var(--shape-default-stroke)");
+  line.setAttribute("stroke-width", String(overlay.strokeWidth));
+  line.setAttribute("vector-effect", "non-scaling-stroke");
+  if (["start", "both"].includes(arrow.heads)) line.setAttribute("marker-start", `url(#${markerId})`);
+  if (["end", "both"].includes(arrow.heads)) line.setAttribute("marker-end", `url(#${markerId})`);
+  const hitTarget = line.cloneNode(false);
+  hitTarget.classList.remove("arrow-line");
+  hitTarget.classList.add("arrow-hit");
+  hitTarget.removeAttribute("marker-start");
+  hitTarget.removeAttribute("marker-end");
+  hitTarget.setAttribute("stroke", "transparent");
+  hitTarget.setAttribute("stroke-width", "12");
+  hitTarget.setAttribute("pointer-events", "stroke");
+  svg.append(definitions, hitTarget, line);
+  return svg;
+}
+
 function fillContent(container, item, assetResolver, bibliography, preserveLines = false) {
   if (item.type === "image" && item.image) container.append(makeImage(item.image, assetResolver));
   else if (item.type === "video" && item.video) container.append(makeVideo(item.video, assetResolver));
+  else if (item.type === "arrow" && item.arrow) container.append(makeArrow(item));
   else if (item.type === "shape") {
     container.dataset.shape = item.shape;
     container.dataset.shadow = String(item.shadow);
@@ -213,7 +262,7 @@ function renderSlide(slide, metadata, assetResolver, bibliography) {
     element.style.height = `${overlay.geometry.h}%`;
     element.style.zIndex = String(overlay.geometry.z);
     if (/^#[0-9a-f]{6}(?:[0-9a-f]{2})?$/i.test(overlay.color || "")) element.style.color = overlay.color;
-    if (!["image", "video"].includes(overlay.type)) {
+    if (!["image", "video", "arrow"].includes(overlay.type)) {
       element.style.fontSize = `${overlay.fontSize}em`;
       element.style.textAlign = overlay.alignment;
       element.dataset.align = overlay.alignment;

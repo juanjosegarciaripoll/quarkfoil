@@ -217,7 +217,7 @@ J_{\mathrm{ex}} \sim \frac{t^2}{U}
 Attributes:
 
 - `#id`: stable identifier, unique within the slide.
-- `type`: `markdown`, `equation`, `image`, `video`, or `shape`.
+- `type`: `markdown`, `equation`, `image`, `video`, `shape`, or `arrow`.
 - `x`, `y`, `w`, `h`: percentages of the full slide.
 - `z`: layer order.
 - `locked="true"`: prevent graphical movement.
@@ -282,6 +282,23 @@ styles are normally omitted: rectangle, theme fill and stroke colors, line
 width `2`, centered label, and no shadow. Consequently, implicit shape colors
 follow the presentation theme while explicit `fill` and `stroke` values remain
 fixed.
+
+### Arrows
+
+Arrows are dedicated editable overlays whose endpoints are stored directly as
+slide percentages:
+
+```markdown
+::: overlay {#flow type="arrow" x1="20" y1="30" x2="75" y2="62" heads="end" stroke="#146c7e" stroke-width="2"}
+:::
+```
+
+`x1`, `y1`, `x2`, and `y2` define the two endpoints. `heads` may be `end`
+(the default), `start`, `both`, or `none`. `stroke` controls the line and head
+color, while `stroke-width` controls their thickness. Arrows also support the
+common `z`, `fragment`, and `locked` attributes. Their bounding box is derived
+from the endpoints and is not serialized as `x`, `y`, `w`, and `h`. An omitted
+`stroke` follows the presentation theme.
 
 ## Footer and notes
 
