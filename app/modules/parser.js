@@ -414,6 +414,17 @@ export function duplicateSlide(deck, slideIndex) {
   return composeSlides(deck, slides);
 }
 
+export function importSlide(deck, slideIndex, importedSlide) {
+  if (!importedSlide?.raw) throw new Error("Unknown slide to import");
+  let source = importedSlide.raw;
+  if (importedSlide.headingAttrs?.id && deck.slides.some(slide => slide.id === importedSlide.id)) {
+    source = duplicateSlideSource(deck, importedSlide);
+  }
+  const slides = deck.slides.map(slide => slide.raw);
+  slides.splice(slideIndex + 1, 0, source);
+  return composeSlides(deck, slides);
+}
+
 export function deleteSlide(deck, slideIndex) {
   if (!deck.slides[slideIndex]) throw new Error("Unknown slide to delete");
   if (deck.slides.length === 1) throw new Error("A presentation must contain at least one slide");

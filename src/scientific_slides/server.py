@@ -33,6 +33,7 @@ MAX_DOI_BYTES = 1024 * 1024
 MAX_LISTED_ASSETS = 1000
 IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"}
 VIDEO_SUFFIXES = {".mp4", ".webm"}
+PRESENTATION_SUFFIXES = {".md", ".markdown"}
 CONVERTIBLE_VIDEO_SUFFIXES = {".avi", ".mkv"}
 ASSET_SUFFIXES = IMAGE_SUFFIXES | VIDEO_SUFFIXES
 STARTER_DECK = """---
@@ -312,6 +313,14 @@ def initialize_deck(deck: Path) -> Path:
 class SlideHandler(SimpleHTTPRequestHandler):
     server_version = "Quarkfoil/0.2.0"
 
+    def handle(self) -> None:
+        try:
+            super().handle()
+        except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError):
+            # Browsers routinely cancel image/video responses when a preview
+            # dialog closes or navigates away. That is not a server failure.
+            return
+
     @property
     def project_root(self) -> Path:
         return self.server.project_root  # type: ignore[attr-defined]
@@ -442,8 +451,32 @@ class SlideHandler(SimpleHTTPRequestHandler):
             except (OSError, PermissionError, ValueError) as error:
                 self._send_json({"error": str(error)}, HTTPStatus.BAD_REQUEST)
             return
+        if parsed.path == "/api/files":
+            try:
+                kind = urllib.parse.parse_qs(parsed.query).get("kind", ["presentation"])[0]
+                suffixes = {"image": IMAGE_SUFFIXES, "video": VIDEO_SUFFIXES, "presentation": PRESENTATION_SUFFIXES}.get(kind)
+                if suffixes is None:
+                    raise ValueError("File kind must be presentation, image, or video")
+                files = []
+                for path in sorted(self.project_root.rglob("*"), key=lambda item: item.as_posix().lower()):
+                    if len(files) >= MAX_LISTED_ASSETS:
+                        break
+                    if path.is_file() and path.suffix.lower() in suffixes and _inside(self.project_root, path):
+                        files.append({"path": path.relative_to(self.project_root).as_posix(), "name": path.name})
+                self._send_json({"files": files, "truncated": len(files) >= MAX_LISTED_ASSETS})
+            except (OSError, PermissionError, ValueError) as error:
+                self._send_json({"error": str(error)}, HTTPStatus.BAD_REQUEST)
+            return
         if parsed.path == "/api/deck":
-            data = self.deck_path.read_bytes()
+            try:
+                relative = urllib.parse.parse_qs(parsed.query).get("path", [""])[0]
+                path = self._project_file(relative) if relative else self.deck_path
+                if path.suffix.lower() not in PRESENTATION_SUFFIXES or not path.is_file():
+                    raise ValueError("Presentation must be an existing Markdown file")
+                data = path.read_bytes()
+            except (OSError, PermissionError, ValueError) as error:
+                self._send_json({"error": str(error)}, HTTPStatus.BAD_REQUEST)
+                return
             self.send_response(HTTPStatus.OK)
             self.send_header("Content-Type", "text/markdown; charset=utf-8")
             self.send_header("Content-Length", str(len(data)))
@@ -564,7 +597,15 @@ class SlideHandler(SimpleHTTPRequestHandler):
             return
 
         expected = self.headers.get("If-Match")
-        current = self.deck_path.read_bytes() if self.deck_path.exists() else b""
+        try:
+            relative = urllib.parse.parse_qs(parsed.query).get("path", [""])[0]
+            deck_path = self._project_file(relative) if relative else self.deck_path
+            if deck_path.suffix.lower() not in PRESENTATION_SUFFIXES or not deck_path.is_file():
+                raise ValueError("Presentation must be an existing Markdown file")
+        except (OSError, PermissionError, ValueError) as error:
+            self._send_json({"error": str(error)}, HTTPStatus.BAD_REQUEST)
+            return
+        current = deck_path.read_bytes()
         current_hash = hashlib.sha256(current).hexdigest()
         if expected and expected.strip('"') != current_hash:
             self._send_json(
@@ -573,13 +614,13 @@ class SlideHandler(SimpleHTTPRequestHandler):
             )
             return
 
-        fd, temporary = tempfile.mkstemp(prefix=".slides-", suffix=".tmp", dir=self.deck_path.parent)
+        fd, temporary = tempfile.mkstemp(prefix=".slides-", suffix=".tmp", dir=deck_path.parent)
         try:
             with os.fdopen(fd, "wb") as stream:
                 stream.write(body)
                 stream.flush()
                 os.fsync(stream.fileno())
-            os.replace(temporary, self.deck_path)
+            os.replace(temporary, deck_path)
         finally:
             if os.path.exists(temporary):
                 os.unlink(temporary)
@@ -587,6 +628,36 @@ class SlideHandler(SimpleHTTPRequestHandler):
 
     def do_POST(self) -> None:
         parsed = urllib.parse.urlsplit(self.path)
+        if parsed.path == "/api/open":
+            try:
+                relative = urllib.parse.parse_qs(parsed.query).get("path", [""])[0]
+                target = self._project_file(relative)
+                if target.suffix.lower() not in PRESENTATION_SUFFIXES or not target.is_file():
+                    raise ValueError("Presentation must be an existing Markdown file")
+                data = target.read_bytes()
+                data.decode("utf-8")
+                self._send_json({"path": relative, "source": data.decode("utf-8"), "hash": hashlib.sha256(data).hexdigest()})
+            except (OSError, PermissionError, UnicodeDecodeError, ValueError) as error:
+                self._send_json({"error": str(error)}, HTTPStatus.BAD_REQUEST)
+            return
+        if parsed.path == "/api/presentation":
+            requested = Path(urllib.parse.parse_qs(parsed.query).get("name", ["presentation.md"])[0]).name
+            try:
+                if Path(requested).suffix.lower() not in PRESENTATION_SUFFIXES:
+                    raise ValueError("Presentation must be a Markdown file")
+                body = self._read_body(MAX_WRITE_BYTES)
+                body.decode("utf-8")
+                candidate = self.project_root / requested
+                stem, suffix = candidate.stem, candidate.suffix
+                counter = 2
+                while candidate.exists():
+                    candidate = self.project_root / f"{stem}-{counter}{suffix}"
+                    counter += 1
+                candidate.write_bytes(body)
+                self._send_json({"path": candidate.relative_to(self.project_root).as_posix()}, HTTPStatus.CREATED)
+            except (OSError, PermissionError, UnicodeDecodeError, ValueError) as error:
+                self._send_json({"error": str(error)}, HTTPStatus.BAD_REQUEST)
+            return
         if parsed.path == "/api/video-conversion":
             self._start_video_conversion(parsed)
             return

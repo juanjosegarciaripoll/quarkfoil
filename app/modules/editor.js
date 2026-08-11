@@ -15,6 +15,9 @@ import { renderMarkdownPreview } from "./render.js";
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
 const round = value => Math.round(value * 10) / 10;
 export const videoFile = file => file?.type?.startsWith("video/") || /\.(?:avi|mkv|mp4|webm)$/i.test(file?.name || "");
+export const repeatedActivation = (previous, key, time, interval = 450) => Boolean(
+  previous && previous.key === key && time - previous.time >= 0 && time - previous.time <= interval,
+);
 export const projectAssetPage = (assets, query, page, pageSize = 24) => {
   const needle = query.trim().toLocaleLowerCase();
   const filtered = needle ? assets.filter(asset => asset.path.toLocaleLowerCase().includes(needle)) : assets;
@@ -200,6 +203,7 @@ export class DesignEditor {
     this.preview = document.querySelector("#content-preview");
     this.imageInputPurpose = "add";
     this.videoInputPurpose = "add";
+    this.lastCanvasActivation = null;
     this.bind();
   }
 
@@ -221,17 +225,12 @@ export class DesignEditor {
     document.querySelector("#reset-slide-foreground").addEventListener("click", () => this.applySlideProperties({ foreground: null }));
     document.querySelector("#add-text").addEventListener("click", () => this.addObject("markdown"));
     document.querySelector("#add-equation").addEventListener("click", () => this.addObject("equation"));
-    document.querySelector("#add-image").addEventListener("click", () => {
-      this.imageInputPurpose = "add";
-      document.querySelector("#image-input").click();
-    });
-    document.querySelector("#add-video").addEventListener("click", () => {
-      this.videoInputPurpose = "add";
-      document.querySelector("#video-input").click();
-    });
+    document.querySelector("#add-image").addEventListener("click", () => this.openProjectImageDialog("add"));
+    document.querySelector("#add-video").addEventListener("click", () => this.openProjectVideoDialog("add"));
     document.querySelector("#add-shape").addEventListener("click", () => this.addShape(document.querySelector("#shape-select").value));
     document.querySelector("#image-input").addEventListener("change", event => {
       const file = event.target.files?.[0];
+      document.querySelector("#project-file-dialog").close();
       if (this.imageInputPurpose === "replace") this.replaceImage(file);
       else this.addImage(file, null, this.selectedCell?.dataset.cellId || null);
       this.imageInputPurpose = "add";
@@ -239,6 +238,7 @@ export class DesignEditor {
     });
     document.querySelector("#video-input").addEventListener("change", event => {
       const file = event.target.files?.[0];
+      document.querySelector("#project-file-dialog").close();
       if (this.videoInputPurpose === "replace") this.replaceVideo(file);
       else this.addVideo(file);
       this.videoInputPurpose = "add";
@@ -247,16 +247,8 @@ export class DesignEditor {
     document.querySelector("#duplicate-object").addEventListener("click", () => this.duplicate());
     document.querySelector("#delete-object").addEventListener("click", () => this.remove());
     document.querySelector("#edit-content").addEventListener("click", () => this.openContentDialog());
-    document.querySelector("#replace-image").addEventListener("click", () => {
-      this.imageInputPurpose = "replace";
-      document.querySelector("#image-input").click();
-    });
-    document.querySelector("#choose-project-image").addEventListener("click", () => this.openProjectImageDialog());
-    document.querySelector("#replace-video").addEventListener("click", () => {
-      this.videoInputPurpose = "replace";
-      document.querySelector("#video-input").click();
-    });
-    document.querySelector("#choose-project-video").addEventListener("click", () => this.openProjectVideoDialog());
+    document.querySelector("#choose-project-image").addEventListener("click", () => this.openProjectImageDialog("replace"));
+    document.querySelector("#choose-project-video").addEventListener("click", () => this.openProjectVideoDialog("replace"));
     this.contentEditor.addEventListener("input", () => this.updateContentPreview());
     this.dialog.addEventListener("keydown", event => {
       if (event.key === "Escape") {
@@ -526,6 +518,26 @@ export class DesignEditor {
     if (!this.active() || event.button !== 0) return;
     const handle = event.target.closest(".resize-handle");
     const overlay = event.target.closest(".slide-overlay");
+    const cell = event.target.closest(".slide-cell");
+    const title = event.target.closest(".slide-title");
+    const key = overlay ? `overlay:${overlay.dataset.objectId}` : cell ? `cell:${cell.dataset.cellId}` : title ? "title" : null;
+    if (key) {
+      const activation = { key, time: performance.now() };
+      if (!handle && repeatedActivation(this.lastCanvasActivation, key, activation.time)) {
+        this.lastCanvasActivation = null;
+        event.preventDefault();
+        event.stopPropagation();
+        if (overlay) {
+          this.selectOverlay(overlay);
+          if (overlay.dataset.objectType !== "citation") this.openContentDialog();
+        } else if (cell) {
+          this.selectCell(cell);
+          this.openCellDialog();
+        } else this.openTitleDialog();
+        return;
+      }
+      this.lastCanvasActivation = activation;
+    }
     if (!overlay) {
       const section = event.target.closest(".scientific-slide");
       if (section) this.startMarquee(event, section);
@@ -763,6 +775,7 @@ export class DesignEditor {
   }
 
   openContentDialog() {
+    if (this.dialog.open) return;
     if (!this.selected) return;
     const object = this.slide().overlays.find(item => item.id === this.selected.dataset.objectId);
     if (!object || ["image", "video"].includes(object.type)) return;
@@ -852,6 +865,26 @@ export class DesignEditor {
     const rect = this.section().getBoundingClientRect();
     const geometry = initialImageGeometry(aspect, rect.width / rect.height, position);
     this.commit(insertOverlay(this.options.getDeck(), this.slideIndex(), { type: "image", content, id, ...geometry }));
+  }
+
+  addImagePath(path, cellId = null) {
+    if (!path) return;
+    const content = `![](${path}){fit=contain focus="50 50"}`;
+    if (cellId) {
+      this.commit(setCellContent(this.options.getDeck(), this.slideIndex(), cellId, content));
+      return;
+    }
+    this.commit(insertOverlay(this.options.getDeck(), this.slideIndex(), {
+      type: "image", content, id: this.uniqueId(`image-${this.slideIndex() + 1}`), x: 25, y: 25, w: 50, h: 50,
+    }));
+  }
+
+  addVideoPath(path) {
+    if (!path) return;
+    this.commit(insertOverlay(this.options.getDeck(), this.slideIndex(), {
+      type: "video", content: "", id: this.uniqueId(`video-${this.slideIndex() + 1}`),
+      x: 30, y: 30, w: 40, h: 22.5, attributes: { src: path },
+    }));
   }
 
   async addVideo(file, position = null) {
@@ -944,70 +977,19 @@ export class DesignEditor {
     else this.commit(setCellContent(this.options.getDeck(), this.slideIndex(), object.id, body));
   }
 
-  async openProjectImageDialog() {
-    const dialog = document.querySelector("#project-image-dialog");
-    const gallery = document.querySelector("#project-image-gallery");
-    const status = document.querySelector("#project-image-status");
-    const search = document.querySelector("#project-image-search");
-    const previous = document.querySelector("#project-image-previous");
-    const next = document.querySelector("#project-image-next");
-    gallery.replaceChildren();
-    search.value = "";
-    status.textContent = "Loading images…";
-    dialog.showModal();
-    try {
-      const assets = await this.options.listProjectImages();
-      let page = 0;
-      const render = () => {
-        const result = projectAssetPage(assets, search.value, page);
-        page = result.page;
-        gallery.replaceChildren(...result.assets.map(asset => this.projectAssetChoice(asset, "image", () => this.replaceImagePath(asset.path))));
-        previous.disabled = page === 0;
-        next.disabled = page + 1 >= result.pages;
-        status.textContent = result.count ? `${result.count} image${result.count === 1 ? "" : "s"} · Page ${page + 1} of ${result.pages}` : search.value ? "No images match your search" : "No images found in the presentation figures folder";
-      };
-      search.oninput = () => { page = 0; render(); };
-      search.onkeydown = event => { if (event.key === "Enter") event.preventDefault(); };
-      previous.onclick = () => { page -= 1; render(); };
-      next.onclick = () => { page += 1; render(); };
-      render();
-      search.focus();
-    } catch (error) {
-      status.textContent = error.message;
-    }
+  openProjectImageDialog(purpose = "replace") {
+    const cellId = this.selectedCell?.dataset.cellId || null;
+    this.options.browseProjectFiles("image", path => purpose === "add" ? this.addImagePath(path, cellId) : this.replaceImagePath(path), () => {
+      this.imageInputPurpose = purpose;
+      document.querySelector("#image-input").click();
+    });
   }
 
-  async openProjectVideoDialog() {
-    const dialog = document.querySelector("#project-video-dialog");
-    const gallery = document.querySelector("#project-video-gallery");
-    const status = document.querySelector("#project-video-status");
-    const search = document.querySelector("#project-video-search");
-    const previous = document.querySelector("#project-video-previous");
-    const next = document.querySelector("#project-video-next");
-    gallery.replaceChildren();
-    search.value = "";
-    status.textContent = "Loading videos…";
-    dialog.showModal();
-    try {
-      const assets = await this.options.listProjectVideos();
-      let page = 0;
-      const render = () => {
-        const result = projectAssetPage(assets, search.value, page);
-        page = result.page;
-        gallery.replaceChildren(...result.assets.map(asset => this.projectAssetChoice(asset, "video", () => this.replaceVideoPath(asset.path))));
-        previous.disabled = page === 0;
-        next.disabled = page + 1 >= result.pages;
-        status.textContent = result.count ? `${result.count} video${result.count === 1 ? "" : "s"} · Page ${page + 1} of ${result.pages}` : search.value ? "No videos match your search" : "No videos found in the presentation figures folder";
-      };
-      search.oninput = () => { page = 0; render(); };
-      search.onkeydown = event => { if (event.key === "Enter") event.preventDefault(); };
-      previous.onclick = () => { page -= 1; render(); };
-      next.onclick = () => { page += 1; render(); };
-      render();
-      search.focus();
-    } catch (error) {
-      status.textContent = error.message;
-    }
+  openProjectVideoDialog(purpose = "replace") {
+    this.options.browseProjectFiles("video", path => purpose === "add" ? this.addVideoPath(path) : this.replaceVideoPath(path), () => {
+      this.videoInputPurpose = purpose;
+      document.querySelector("#video-input").click();
+    });
   }
 
   projectAssetChoice(asset, kind, select) {

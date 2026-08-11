@@ -50,7 +50,7 @@ button.active { background: #146c7e; border-color: #56cfe1; }
 .properties { overflow: auto; }
 .properties { border-left: 1px solid #3d454e; }
 .slide-sidebar ol, .slide-sidebar li { min-width: 0; max-width: 100%; }
-.slide-sidebar-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.35rem; margin-bottom: 0.65rem; }
+.slide-sidebar-actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.35rem; margin-bottom: 0.65rem; }
 .slide-sidebar-move { display: grid; grid-template-columns: 1fr 1fr; gap: 0.35rem; margin-top: 0.65rem; }
 .slide-sidebar .slide-sidebar-actions button,
 .slide-sidebar .slide-sidebar-move button {
@@ -91,7 +91,7 @@ button.active { background: #146c7e; border-color: #56cfe1; }
 #slide-color-state { color: #aab4bd; font-size: 0.72rem; line-height: 1.3; }
 #image-properties, #video-properties, #shape-properties, #attribution-properties { margin-top: 0.7rem; padding-top: 0.7rem; border-top: 1px solid #3d454e; }
 #attribution-properties small { color: #aab4bd; font-size: 0.7rem; line-height: 1.3; }
-.image-source-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; }
+.image-source-actions { display: grid; grid-template-columns: 1fr; gap: 0.4rem; }
 .image-source-actions button { display: grid; place-items: center; min-width: 0; }
 #font-properties { margin-top: 0.7rem; padding-top: 0.7rem; border-top: 1px solid #3d454e; }
 .range-with-value { display: grid; grid-template-columns: minmax(0, 1fr) 3.8rem; align-items: center; gap: 0.35rem; }
@@ -168,7 +168,7 @@ dialog::backdrop { background: #000a; }
 #bibliography-source { width: 100%; min-width: 0; min-height: 0; resize: none; padding: 0.7rem; color: #edf2f4; background: #111418; border: 1px solid #56616d; font: 13px/1.4 "Cascadia Mono", Consolas, monospace; }
 #bibliography-status { min-height: 1.2em; color: #b9c2ca; }
 #bibliography-status.error { color: #ff8787; }
-#project-image-dialog, #project-video-dialog { width: min(900px, 92vw); max-width: 92vw; }
+#project-file-dialog { width: min(900px, 92vw); max-width: 92vw; }
 #video-conversion-dialog { position: fixed; inset: auto 1rem 1rem auto; width: min(480px, calc(100vw - 2rem)); margin: 0; z-index: 1000; }
 .video-conversion-dialog__form { display: grid; gap: 0.8rem; padding: 1rem; }
 .video-conversion-dialog__form h2, .video-conversion-dialog__form p { margin: 0; }
@@ -182,7 +182,11 @@ dialog::backdrop { background: #000a; }
 .project-image-choice img { width: 100%; height: 100px; object-fit: contain; background: #f6f7f8; }
 .project-image-choice video { width: 100%; height: 100px; object-fit: contain; background: #111; pointer-events: none; }
 .project-image-choice span { overflow: hidden; font-size: 0.76rem; text-overflow: ellipsis; white-space: nowrap; }
-#project-image-status { min-height: 1.2em; color: #b9c2ca; }
+#project-file-status { min-height: 1.2em; color: #b9c2ca; }
+.project-file-choice--document { grid-template-rows: 100px auto; }
+.project-file-icon { display: grid; place-items: center; height: 100px; color: #17202a; background: #f6f7f8; font-size: 2rem; font-weight: 700; }
+.project-slide-choice { grid-template-rows: 100px auto; }
+.project-slide-preview { height: 100px; padding: 0.5rem; overflow: hidden; color: #17202a; background: #f6f7f8; font-size: 0.72rem; text-align: left; white-space: pre-wrap; }
 .content-dialog__form { display: grid; grid-template: auto minmax(180px, 1fr) minmax(120px, 0.7fr) auto / 1fr; gap: 0.8rem; max-height: 82vh; padding: 1rem; }
 .content-dialog__form h2 { margin: 0; font-size: 1.05rem; }
 #content-editor { min-height: 180px; resize: vertical; padding: 0.8rem; color: #edf2f4; background: #111418; border: 1px solid #56616d; font: 14px/1.4 "Cascadia Mono", Consolas, monospace; }

@@ -12,13 +12,18 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
-from scientific_slides.server import STARTER_DECK, _normalize_doi_bibtex, _python_snapshot, _video_conversion_plan, _video_duration, _video_progress, create_server, initialize_deck
+from scientific_slides.server import STARTER_DECK, SlideHandler, _normalize_doi_bibtex, _python_snapshot, _video_conversion_plan, _video_duration, _video_progress, create_server, initialize_deck
 
 
 class DeckInitializationTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name)
+
+    def test_client_disconnect_does_not_escape_request_handler(self) -> None:
+        handler = SlideHandler.__new__(SlideHandler)
+        with mock.patch("http.server.SimpleHTTPRequestHandler.handle", side_effect=BrokenPipeError):
+            handler.handle()
 
     def tearDown(self) -> None:
         self.temporary.cleanup()
@@ -298,6 +303,56 @@ class ServerTests(unittest.TestCase):
         with self.assertRaises(urllib.error.HTTPError) as context:
             self.request("/api/assets?folder=..%2Foutside")
         self.assertEqual(context.exception.code, 400)
+
+    def test_general_file_listing_and_opening_presentation(self) -> None:
+        nested = self.root / "talks"
+        nested.mkdir()
+        deck = nested / "second.md"
+        deck.write_text("# Second\n", encoding="utf-8")
+        (nested / "notes.txt").write_text("ignored", encoding="utf-8")
+        status, _, payload = self.request("/api/files?kind=presentation")
+        self.assertEqual(status, 200)
+        self.assertIn("talks/second.md", [item["path"] for item in json.loads(payload)["files"]])
+
+        status, _, payload = self.request("/api/open?path=talks%2Fsecond.md", method="POST")
+        result = json.loads(payload)
+        self.assertEqual(status, 200)
+        self.assertEqual(result["source"], "# Second\n")
+        _, _, selected = self.request("/api/deck?path=talks%2Fsecond.md")
+        self.assertEqual(selected, b"# Second\n")
+        _, _, initial = self.request("/api/deck")
+        self.assertNotEqual(initial, b"# Second\n")
+
+    def test_deck_save_path_is_client_scoped(self) -> None:
+        other = self.root / "other.md"
+        other.write_text("# Other\n", encoding="utf-8")
+        digest = hashlib.sha256(b"# Other\n").hexdigest()
+        status, _, _ = self.request(
+            "/api/deck?path=other.md", method="PUT", body=b"# Changed\n",
+            headers={"Content-Type": "text/markdown", "If-Match": f'"{digest}"'},
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(other.read_text(encoding="utf-8"), "# Changed\n")
+        _, _, initial = self.request("/api/deck")
+        self.assertNotEqual(initial, b"# Changed\n")
+
+    def test_open_presentation_cannot_leave_project(self) -> None:
+        with self.assertRaises(urllib.error.HTTPError) as context:
+            self.request("/api/open?path=..%2Foutside.md", method="POST")
+        self.assertEqual(context.exception.code, 400)
+
+    def test_presentation_upload_does_not_overwrite(self) -> None:
+        existing = self.root / "uploaded.md"
+        existing.write_text("# Existing\n", encoding="utf-8")
+        status, _, payload = self.request(
+            "/api/presentation?name=uploaded.md", method="POST", body=b"# Uploaded\n",
+            headers={"Content-Type": "text/markdown"},
+        )
+        self.assertEqual(status, 201)
+        result = json.loads(payload)
+        self.assertEqual(result["path"], "uploaded-2.md")
+        self.assertEqual(existing.read_text(encoding="utf-8"), "# Existing\n")
+        self.assertEqual((self.root / result["path"]).read_text(encoding="utf-8"), "# Uploaded\n")
 
 
 if __name__ == "__main__":

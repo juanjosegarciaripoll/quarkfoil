@@ -2,6 +2,7 @@ import {
   deleteOverlay,
   deleteSlide,
   duplicateSlide,
+  importSlide,
   insertOverlay,
   insertSlide,
   moveSlide,
@@ -15,7 +16,7 @@ import {
   updateSlideProperties,
 } from "./parser.js";
 import { renderDeck, syncVideoPlayback } from "./render.js";
-import { bindRangeControl, clipboardImageFile, initialImageGeometry, moveGeometryGroup, pageSlideIndex, projectAssetPage, rectanglesIntersect, renameClipboardImage, videoFile } from "./editor.js";
+import { bindRangeControl, clipboardImageFile, initialImageGeometry, moveGeometryGroup, pageSlideIndex, projectAssetPage, rectanglesIntersect, renameClipboardImage, repeatedActivation, videoFile } from "./editor.js";
 import { parseBibliography, prepareBibliography } from "./bibliography.js";
 
 const source = `---
@@ -268,6 +269,9 @@ try {
   assert(renameClipboardImage(pastedPng, "plots/result")?.name === "plots-result.png", "pasted image filenames cannot introduce directories");
   assert(renameClipboardImage(pastedPng, "  ") === null, "an empty pasted image filename cancels the import");
   assert(videoFile(new File([], "recording.mkv")) && videoFile(new File([], "recording.avi")), "MKV and AVI drops are recognized without MIME metadata");
+  assert(repeatedActivation({ key: "overlay:text-1", time: 100 }, "overlay:text-1", 300), "a repeated canvas click is recognized for editing");
+  assert(repeatedActivation({ key: "cell:left", time: 100 }, "cell:left", 300), "a repeated layout-cell click is recognized for editing");
+  assert(!repeatedActivation({ key: "cell:left", time: 100 }, "cell:right", 300), "clicks on different canvas elements do not trigger editing");
   const projectAssets = Array.from({ length: 30 }, (_, index) => ({ path: `figures/result-${index}.png` }));
   const firstAssetPage = projectAssetPage(projectAssets, "", 0);
   assert(firstAssetPage.assets.length === 24 && firstAssetPage.pages === 2, "project asset navigation shows 24 items per page");
@@ -341,6 +345,10 @@ try {
   assert(Math.round(inserted.slides[1].columns[0]) === 40 && Math.round(inserted.slides[1].rows[0]) === 55, "new slide copies grid proportions");
   assert(inserted.slides[1].overlays.length === 0, "new slide does not copy overlays");
   assert(inserted.slides[1].cells.every(cell => !cell.source.trim()), "new slide cells contain no content");
+  const importedDeck = parseDeck('## Imported {#imported .layout-free}\n\n::: overlay {#note type="markdown"}\nCopied content\n:::\n');
+  const imported = parseDeck(importSlide(deck, 0, importedDeck.slides[0]));
+  assert(imported.slides.length === 3 && imported.slides[1].title === "Imported", "slide imports after the selection");
+  assert(imported.slides[1].raw.includes("Copied content"), "slide import copies its Markdown content");
   const moved = parseDeck(moveSlide(deck, 0, 1));
   assert(moved.slides[0].title === "Second" && moved.slides[1].title === "First", "selected slide moves within the deck");
 

@@ -1,6 +1,6 @@
-import { deleteSlide, duplicateSlide, insertOverlay, insertSlide, moveSlide, parseDeck } from "./parser.js";
+import { deleteSlide, duplicateSlide, importSlide, insertOverlay, insertSlide, moveSlide, parseDeck } from "./parser.js";
 import { renderDeck, syncVideoPlayback } from "./render.js";
-import { DesignEditor, pageSlideIndex } from "./editor.js";
+import { DesignEditor, pageSlideIndex, projectAssetPage } from "./editor.js";
 import { saveSnapshot } from "./storage.js";
 import { briefReference, parseBibliography, prepareBibliography } from "./bibliography.js";
 
@@ -92,6 +92,8 @@ let snapshotTimer;
 let reloadToken = null;
 let reloadCheckPending = false;
 let lastReloadCheck = 0;
+let deckChannel = null;
+let deckClaim = null;
 
 function assetResolver(source) {
   if (state.objectUrls.has(source)) return state.objectUrls.get(source);
@@ -234,6 +236,49 @@ function addSlideAfterSelection() {
   commitSource(insertSlide(state.deck, index));
 }
 
+async function chooseSlideToImport(path) {
+  const response = await fetch(assetResolver(path), { cache: "no-store" });
+  if (!response.ok) throw new Error("Cannot read presentation");
+  const imported = parseDeck(await response.text());
+  const fatal = imported.diagnostics.find(item => item.level === "error");
+  if (fatal) throw new Error(`Cannot import from ${path}: ${fatal.message}`);
+  const dialog = document.querySelector("#project-file-dialog");
+  const gallery = document.querySelector("#project-file-gallery");
+  document.querySelector("#project-file-title").textContent = `Import slide from ${path}`;
+  document.querySelector("#project-file-search").closest(".project-asset-tools").hidden = true;
+  document.querySelector("#project-file-new").hidden = true;
+  document.querySelector("#project-file-upload").hidden = true;
+  document.querySelector("#project-file-status").textContent = `${imported.slides.length} slide${imported.slides.length === 1 ? "" : "s"}`;
+  gallery.replaceChildren(...imported.slides.map((slide, index) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "project-image-choice project-slide-choice";
+    button.title = `Import slide ${index + 1}: ${slide.title || "Untitled"}`;
+    const preview = document.createElement("span");
+    preview.className = "project-slide-preview";
+    preview.textContent = slide.raw.replace(/^\s*#{1,6}\s*/, "").slice(0, 180);
+    const label = document.createElement("span");
+    label.textContent = `${index + 1}. ${slide.title || "Untitled"}`;
+    button.append(preview, label);
+    button.onclick = () => {
+      dialog.close();
+      const destination = state.currentSlide;
+      state.currentSlide = destination + 1;
+      commitSource(importSlide(state.deck, destination, slide));
+    };
+    return button;
+  }));
+  dialog.showModal();
+}
+
+function importSlideFromPresentation() {
+  if (!state.local) {
+    showStatus("Slide import requires the local Quarkfoil server", true);
+    return;
+  }
+  browseProjectFiles("presentation", path => chooseSlideToImport(path).catch(error => showStatus(error.message, true)), () => {}, { newFile: false, upload: false });
+}
+
 function deleteSelectedSlide() {
   const index = state.currentSlide;
   const slide = state.deck.slides[index];
@@ -325,6 +370,73 @@ function scheduleSnapshot() {
   snapshotTimer = setTimeout(() => saveSnapshot(state.config?.deck || state.filename, state.source).catch(() => {}), 1500);
 }
 
+function lastDeckStorageKey() {
+  return `quarkfoil:last-deck:${state.config?.projectName || "project"}`;
+}
+
+function rememberLastDeck(path) {
+  try { localStorage.setItem(lastDeckStorageKey(), path); } catch { /* Storage may be disabled. */ }
+}
+
+function recalledLastDeck() {
+  try { return localStorage.getItem(lastDeckStorageKey()); } catch { return null; }
+}
+
+function deckUrl(path) {
+  const url = new URL(location.href);
+  url.searchParams.set("deck", path);
+  return url.href;
+}
+
+function pinDeckInCurrentUrl(path) {
+  history.replaceState(null, "", deckUrl(path));
+}
+
+function reserveProjectWindow() {
+  const opened = window.open("about:blank", "_blank");
+  if (!opened) throw new Error("The browser blocked the new presentation window");
+  opened.opener = null;
+  return opened;
+}
+
+function openProjectWindow(path, opened = null) {
+  const target = opened || reserveProjectWindow();
+  target.location.replace(deckUrl(path));
+}
+
+async function claimDeckWindow(path) {
+  if (!("BroadcastChannel" in window)) return true;
+  deckChannel?.close();
+  const channel = new BroadcastChannel("quarkfoil-open-decks");
+  const requestId = crypto.randomUUID();
+  deckChannel = channel;
+  deckClaim = { path, ready: false };
+  let occupied = false;
+  channel.onmessage = event => {
+    const message = event.data;
+    if (!message || message.path !== deckClaim?.path) return;
+    if (message.type === "probe" && deckClaim.ready) {
+      channel.postMessage({ type: "occupied", path: deckClaim.path, requestId: message.requestId });
+      window.focus();
+    } else if (message.type === "occupied" && message.requestId === requestId) occupied = true;
+  };
+  channel.postMessage({ type: "probe", path, requestId });
+  await new Promise(resolve => setTimeout(resolve, 180));
+  if (occupied) {
+    channel.close();
+    deckChannel = null;
+    deckClaim = null;
+    window.close();
+    const message = document.createElement("p");
+    message.style.cssText = "margin:2rem;font:16px system-ui;color:#edf2f4";
+    message.textContent = `${path} is already open in another Quarkfoil window.`;
+    document.body.replaceChildren(message);
+    return false;
+  }
+  deckClaim.ready = true;
+  return true;
+}
+
 async function loadLocalDeck() {
   try {
     const configResponse = await fetch("/api/config", { cache: "no-store" });
@@ -332,11 +444,34 @@ async function loadLocalDeck() {
     state.config = await configResponse.json();
     state.local = state.config.mode === "local";
     state.filename = state.config.deck;
-    const response = await fetch("/api/deck", { cache: "no-store" });
-    if (!response.ok) throw new Error("Cannot load deck");
-    const source = await response.text();
-    state.serverHash = await hashText(source);
+    const requested = query.get("deck");
+    const recalled = requested || recalledLastDeck();
+    let source;
+    if (recalled && recalled !== state.config.deck) {
+      const restoredResponse = await fetch(`/api/open?path=${encodeURIComponent(recalled)}`, { method: "POST" });
+      if (restoredResponse.ok) {
+        const restored = await restoredResponse.json();
+        state.filename = restored.path;
+        state.config.deck = restored.path;
+        state.serverHash = restored.hash;
+        source = restored.source;
+      } else {
+        try { localStorage.removeItem(lastDeckStorageKey()); } catch { /* Storage may be disabled. */ }
+      }
+    }
+    if (source === undefined) {
+      const response = await fetch("/api/deck", { cache: "no-store" });
+      if (!response.ok) throw new Error("Cannot load deck");
+      source = await response.text();
+      state.serverHash = await hashText(source);
+    }
     state.savedSource = source;
+    rememberLastDeck(state.config.deck);
+    pinDeckInCurrentUrl(state.config.deck);
+    if (!await claimDeckWindow(state.config.deck)) {
+      state.duplicateDeck = true;
+      return true;
+    }
     parseAndRender(source, { preserveSlide: true });
     return true;
   } catch (error) {
@@ -388,6 +523,107 @@ async function openPortable() {
   } else document.querySelector("#file-input").click();
 }
 
+async function listProjectFiles(kind) {
+  const response = await fetch(`/api/files?kind=${encodeURIComponent(kind)}`);
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error || "Cannot list presentation files");
+  return result.files;
+}
+
+async function createProjectPresentation(name, source) {
+  const response = await fetch(`/api/presentation?name=${encodeURIComponent(name)}`, {
+    method: "POST",
+    headers: { "Content-Type": "text/markdown; charset=utf-8" },
+    body: source,
+  });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error || "Cannot create presentation");
+  return result.path;
+}
+
+async function browseProjectFiles(kind, select, upload, { newFile: showNew = true, upload: showUpload = true } = {}) {
+  if (!state.local) { upload(); return; }
+  const dialog = document.querySelector("#project-file-dialog");
+  const gallery = document.querySelector("#project-file-gallery");
+  const status = document.querySelector("#project-file-status");
+  const search = document.querySelector("#project-file-search");
+  search.closest(".project-asset-tools").hidden = false;
+  const previous = document.querySelector("#project-file-previous");
+  const next = document.querySelector("#project-file-next");
+  const labels = { presentation: "presentation", image: "image", video: "video" };
+  document.querySelector("#project-file-title").textContent = `Presentation folder — Choose ${labels[kind]}`;
+  gallery.replaceChildren();
+  search.value = "";
+  status.textContent = `Loading ${labels[kind]}s…`;
+  const uploadButton = document.querySelector("#project-file-upload");
+  uploadButton.hidden = !showUpload;
+  uploadButton.textContent = kind === "presentation" ? "Upload" : `Upload ${labels[kind]} from computer…`;
+  uploadButton.onclick = upload;
+  const newButton = document.querySelector("#project-file-new");
+  newButton.hidden = kind !== "presentation" || !showNew;
+  newButton.onclick = async () => {
+    let name = prompt("Name the new presentation", "presentation.md");
+    if (name === null) return;
+    name = name.trim();
+    if (!name) {
+      status.textContent = "Enter a filename for the new presentation";
+      return;
+    }
+    if (!/\.(?:md|markdown)$/i.test(name)) name += ".md";
+    let opened;
+    try { opened = reserveProjectWindow(); }
+    catch (error) { status.textContent = error.message; return; }
+    newButton.disabled = true;
+    status.textContent = "Creating presentation…";
+    try {
+      const path = await createProjectPresentation(name, STARTER);
+      openProjectWindow(path, opened);
+      dialog.close();
+    } catch (error) {
+      opened.close();
+      status.textContent = error.message;
+    } finally {
+      newButton.disabled = false;
+    }
+  };
+  dialog.showModal();
+  try {
+    const files = await listProjectFiles(kind);
+    let page = 0;
+    const render = () => {
+      const result = projectAssetPage(files, search.value, page);
+      page = result.page;
+      gallery.replaceChildren(...result.assets.map(file => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = `project-image-choice project-file-choice--${kind}`;
+        button.title = file.path;
+        let preview;
+        if (kind === "image") {
+          preview = document.createElement("img"); preview.alt = ""; preview.src = assetResolver(file.path);
+        } else if (kind === "video") {
+          preview = document.createElement("video"); preview.muted = true; preview.preload = "metadata"; preview.src = assetResolver(file.path);
+        } else {
+          preview = document.createElement("span"); preview.className = "project-file-icon"; preview.textContent = "MD";
+        }
+        const label = document.createElement("span"); label.textContent = file.path;
+        button.append(preview, label);
+        button.onclick = () => { dialog.close(); select(file.path); };
+        return button;
+      }));
+      previous.disabled = page === 0;
+      next.disabled = page + 1 >= result.pages;
+      status.textContent = result.count ? `${result.count} ${labels[kind]}${result.count === 1 ? "" : "s"} · Page ${page + 1} of ${result.pages}` : `No ${labels[kind]}s found`;
+    };
+    search.oninput = () => { page = 0; render(); };
+    search.onkeydown = event => { if (event.key === "Enter") event.preventDefault(); };
+    previous.onclick = () => { page -= 1; render(); };
+    next.onclick = () => { page += 1; render(); };
+    render();
+    search.focus();
+  } catch (error) { status.textContent = error.message; }
+}
+
 async function nestedFileHandle(root, path, create = false) {
   const parts = path.replaceAll("\\", "/").split("/").filter(part => part && part !== ".");
   if (parts.some(part => part === "..")) throw new Error("Asset path leaves the selected directory");
@@ -418,7 +654,7 @@ async function saveDeck() {
   try {
     if (elements.source.value !== state.source && !commitSource(elements.source.value)) return;
     if (state.local) {
-      const response = await fetch("/api/deck", {
+      const response = await fetch(`/api/deck?path=${encodeURIComponent(state.config.deck)}`, {
         method: "PUT",
         headers: { "Content-Type": "text/markdown; charset=utf-8", ...(state.serverHash ? { "If-Match": `"${state.serverHash}"` } : {}) },
         body: state.source,
@@ -724,7 +960,11 @@ async function monitorVideoConversion(jobId) {
 
 function bindUi() {
   document.querySelectorAll("[data-mode]").forEach(button => button.addEventListener("click", () => requestMode(button.dataset.mode)));
-  document.querySelector("#open-button").addEventListener("click", () => openPortable().catch(error => {
+  document.querySelector("#open-button").addEventListener("click", () => (state.local
+    ? browseProjectFiles("presentation", path => {
+      try { openProjectWindow(path); } catch (error) { showStatus(error.message, true); }
+    }, () => document.querySelector("#file-input").click())
+    : openPortable()).catch(error => {
     if (error?.name !== "AbortError") showStatus(error.message, true);
   }));
   elements.save.addEventListener("click", saveDeck);
@@ -738,6 +978,21 @@ function bindUi() {
   document.querySelector("#file-input").addEventListener("change", async event => {
     const file = event.target.files?.[0];
     if (!file) return;
+    if (state.local) {
+      let opened;
+      try { opened = reserveProjectWindow(); }
+      catch (error) { showStatus(error.message, true); event.target.value = ""; return; }
+      try {
+        const path = await createProjectPresentation(file.name, file);
+        openProjectWindow(path, opened);
+        document.querySelector("#project-file-dialog").close();
+      } catch (error) {
+        opened.close();
+        showStatus(error.message || "Upload failed", true);
+      }
+      event.target.value = "";
+      return;
+    }
     state.filename = file.name;
     const source = await file.text();
     state.savedSource = source;
@@ -760,6 +1015,7 @@ function bindUi() {
   document.querySelector("#undo-button").addEventListener("click", undo);
   document.querySelector("#redo-button").addEventListener("click", redo);
   document.querySelector("#add-slide").addEventListener("click", addSlideAfterSelection);
+  document.querySelector("#import-slide").addEventListener("click", importSlideFromPresentation);
   document.querySelector("#duplicate-slide").addEventListener("click", duplicateSelectedSlide);
   document.querySelector("#delete-slide").addEventListener("click", deleteSelectedSlide);
   document.querySelector("#move-slide-up").addEventListener("click", () => moveSelectedSlide(-1));
@@ -784,6 +1040,7 @@ function bindUi() {
 async function initialize() {
   bindUi();
   const loaded = await loadLocalDeck();
+  if (state.duplicateDeck) return;
   if (state.local && state.config?.reload) {
     await pollForReload();
     bindReloadChecks();
@@ -823,20 +1080,7 @@ async function initialize() {
       try { return await importAsset(file); }
       catch (error) { showStatus(error.message, true); return null; }
     },
-    listProjectImages: async () => {
-      if (!state.local) throw new Error("Project image browsing requires the local Quarkfoil server");
-      const response = await fetch(`/api/assets?folder=${encodeURIComponent(figureFolder())}&kind=image`);
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Cannot list project images");
-      return result.assets;
-    },
-    listProjectVideos: async () => {
-      if (!state.local) throw new Error("Project video browsing requires the local Quarkfoil server");
-      const response = await fetch(`/api/assets?folder=${encodeURIComponent(figureFolder())}&kind=video`);
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Cannot list project videos");
-      return result.assets;
-    },
+    browseProjectFiles,
     resolveAsset: assetResolver,
   });
   editor.refresh();

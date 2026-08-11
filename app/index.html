@@ -68,6 +68,7 @@
     <aside id="slide-sidebar" class="slide-sidebar" aria-label="Slides">
       <div class="slide-sidebar-actions" role="group" aria-label="Selected slide actions">
         <button id="add-slide" type="button" title="Add blank slide with the selected layout" aria-label="Add blank slide with the selected layout"><svg class="action-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button>
+        <button id="import-slide" type="button" title="Import slide from another presentation" aria-label="Import slide from another presentation"><svg class="action-svg" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="4" width="12" height="10" rx="1.5"></rect><path d="M4 17h11M11 13l4 4-4 4"></path></svg></button>
         <button id="duplicate-slide" type="button" title="Duplicate selected slide" aria-label="Duplicate selected slide"><svg class="action-svg" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="1.5"></rect><path d="M16 8V5.5A1.5 1.5 0 0 0 14.5 4h-9A1.5 1.5 0 0 0 4 5.5v9A1.5 1.5 0 0 0 5.5 16H8"></path></svg></button>
         <button id="delete-slide" type="button" title="Delete selected slide" aria-label="Delete selected slide"><svg class="action-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5"></path></svg></button>
       </div>
@@ -131,8 +132,7 @@
         <label>Focus X <span class="range-with-value"><input id="prop-focus-x" type="range" min="0" max="100"><input id="prop-focus-x-value" type="number" min="0" max="100" aria-label="Focus X value"></span></label>
         <label>Focus Y <span class="range-with-value"><input id="prop-focus-y" type="range" min="0" max="100"><input id="prop-focus-y-value" type="number" min="0" max="100" aria-label="Focus Y value"></span></label>
         <div class="image-source-actions">
-          <button id="replace-image" type="button" title="Upload replacement image" aria-label="Upload replacement image"><svg class="action-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"></path></svg></button>
-          <button id="choose-project-image" type="button" title="Choose image from presentation" aria-label="Choose image from presentation"><svg class="action-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18.5V6a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v1H7l-4 9.5Z"></path><path d="M7 9h14l-3 10H3"></path><circle cx="11" cy="13" r="1"></circle><path d="m7 18 3-3 2 2 2-2 3 3"></path></svg></button>
+          <button id="choose-project-image" type="button">Choose image…</button>
         </div>
       </form>
       <form id="video-properties" hidden>
@@ -145,8 +145,7 @@
         <label class="check"><input id="prop-video-muted" type="checkbox"> Muted</label>
         <label>Poster <input id="prop-video-poster" type="text" placeholder="figures/poster.jpg"></label>
         <div class="image-source-actions">
-          <button id="replace-video" type="button" title="Upload replacement video" aria-label="Upload replacement video"><svg class="action-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"></path></svg></button>
-          <button id="choose-project-video" type="button" title="Choose video from presentation" aria-label="Choose video from presentation"><svg class="action-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18.5V6a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v1H7l-4 9.5Z"></path><path d="M7 9h14l-3 10H3"></path><path d="m10 12 4 2.5-4 2.5Z"></path></svg></button>
+          <button id="choose-project-video" type="button">Choose video…</button>
         </div>
       </form>
       <form id="shape-properties" hidden>
@@ -223,31 +222,17 @@
     </form>
   </dialog>
 
-  <dialog id="project-image-dialog">
+  <dialog id="project-file-dialog">
     <form method="dialog" class="project-image-dialog__form">
-      <h2>Choose project image</h2>
+      <h2 id="project-file-title">Choose file</h2>
       <div class="project-asset-tools">
-        <input id="project-image-search" type="search" placeholder="Search images…" aria-label="Search project images">
-        <button id="project-image-previous" type="button" aria-label="Previous image page">Previous</button>
-        <button id="project-image-next" type="button" aria-label="Next image page">Next</button>
+        <input id="project-file-search" type="search" placeholder="Search files…" aria-label="Search presentation files">
+        <button id="project-file-previous" type="button" aria-label="Previous page">Previous</button>
+        <button id="project-file-next" type="button" aria-label="Next page">Next</button>
       </div>
-      <div id="project-image-gallery" class="project-image-gallery"></div>
-      <div id="project-image-status" role="status"></div>
-      <div class="dialog-actions"><button value="cancel">Cancel</button></div>
-    </form>
-  </dialog>
-
-  <dialog id="project-video-dialog">
-    <form method="dialog" class="project-image-dialog__form">
-      <h2>Choose project video</h2>
-      <div class="project-asset-tools">
-        <input id="project-video-search" type="search" placeholder="Search videos…" aria-label="Search project videos">
-        <button id="project-video-previous" type="button" aria-label="Previous video page">Previous</button>
-        <button id="project-video-next" type="button" aria-label="Next video page">Next</button>
-      </div>
-      <div id="project-video-gallery" class="project-image-gallery"></div>
-      <div id="project-video-status" role="status"></div>
-      <div class="dialog-actions"><button value="cancel">Cancel</button></div>
+      <div id="project-file-gallery" class="project-image-gallery"></div>
+      <div id="project-file-status" role="status"></div>
+      <div class="dialog-actions"><button id="project-file-new" type="button" hidden>New</button><button id="project-file-upload" type="button">Upload</button><button value="cancel">Cancel</button></div>
     </form>
   </dialog>
 
