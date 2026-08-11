@@ -65,6 +65,7 @@ function makeImage(image, assetResolver) {
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.classList.add("slide-image");
     svg.dataset.fit = fit;
+    svg.dataset.source = image.source;
     svg.setAttribute("viewBox", "0 0 1 1");
     svg.setAttribute("preserveAspectRatio", "none");
     svg.setAttribute("role", "img");
@@ -87,6 +88,7 @@ function makeImage(image, assetResolver) {
   }
   const img = document.createElement("img");
   img.className = "slide-image";
+  img.dataset.source = image.source;
   img.alt = image.alt || "";
   img.src = source;
   if (image.title) img.title = image.title;

@@ -115,6 +115,10 @@ vertical axes, or disable them to make the curve occupy the full SVG viewport
 without padding. Choose the SVG filename before creating the plot; Quarkfoil saves
 the generated file in the configured figures folder and inserts it as an ordinary
 image.
+Generated plots default to Stretch fitting, so resizing behaves like resizing a
+shape. When a generated plot is selected, its Properties also expose background
+fill, curve color, and line width. These controls edit the SVG asset itself, so
+every slide that references the same plot file updates together.
 Uploads show a destination dialog before writing. Change the proposed filename,
 cancel the import, or explicitly enable overwrite when replacing an existing
 presentation, image, video, or generated plot.

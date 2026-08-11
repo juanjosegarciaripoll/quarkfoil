@@ -16,7 +16,7 @@ import {
   updateSlideProperties,
 } from "./parser.js";
 import { renderDeck, syncVideoPlayback } from "./render.js";
-import { bindRangeControl, clipboardImageFile, initialImageGeometry, moveGeometryGroup, pageSlideIndex, projectAssetPage, rectanglesIntersect, renameClipboardImage, repeatedActivation, videoFile } from "./editor.js";
+import { bindRangeControl, clipboardImageFile, deleteKey, initialImageGeometry, moveGeometryGroup, pageSlideIndex, projectAssetPage, rectanglesIntersect, renameClipboardImage, repeatedActivation, videoFile } from "./editor.js";
 import { parseBibliography, prepareBibliography } from "./bibliography.js";
 import { compileExpression, createPlotSvg } from "./plot.js";
 
@@ -262,10 +262,11 @@ try {
   assert(repeatedActivation({ key: "overlay:text-1", time: 100 }, "overlay:text-1", 300), "a repeated canvas click is recognized for editing");
   assert(repeatedActivation({ key: "cell:left", time: 100 }, "cell:left", 300), "a repeated layout-cell click is recognized for editing");
   assert(!repeatedActivation({ key: "cell:left", time: 100 }, "cell:right", 300), "clicks on different canvas elements do not trigger editing");
+  assert(deleteKey("Delete") && deleteKey("Del"), "Delete and Del keys remove selected images and overlays");
   const expression = compileExpression("Math.sin(x) + x ** 2");
   assert(Math.abs(expression(2) - (Math.sin(2) + 4)) < 1e-10, "plot expressions support JavaScript-style Math functions and operators");
   const barePlot = createPlotSvg("sin(x)", 0, 2 * Math.PI, 40, false);
-  assert(barePlot.includes('<svg xmlns="http://www.w3.org/2000/svg"') && !barePlot.includes('class="axes"'), "axis-free plots serialize as standalone SVG without axes");
+  assert(barePlot.includes('<svg xmlns="http://www.w3.org/2000/svg"') && barePlot.includes('data-quarkfoil-plot="1"') && !barePlot.includes('class="axes"'), "axis-free plots serialize as identifiable standalone SVG without axes");
   assert(/<path d="M0\.00 /.test(barePlot) && barePlot.includes("800.00"), "axis-free plot curves use the full SVG width without padding");
   const plotViewBox = barePlot.match(/viewBox="([^"]+)"/)[1].split(/\s+/).map(Number);
   assert(plotViewBox[0] < 0 && plotViewBox[1] < 0 && plotViewBox[0] + plotViewBox[2] > 800 && plotViewBox[1] + plotViewBox[3] > 450, "plot viewports include spline overshoot and stroke instead of clipping at the data bounds");
@@ -291,6 +292,8 @@ try {
   assert(deck.slides[0].layout === "1-2", "layout parses");
   assert(Math.round(deck.slides[0].columns[0]) === 40, "column ratios parse");
   assert(deck.slides[0].cells.find(cell => cell.id === "top-right").image.attrs.values.fit === "cover", "image attributes parse");
+  const clearedImageCell = parseDeck(setCellContent(deck, 0, "top-right", ""));
+  assert(!clearedImageCell.slides[0].cells.find(cell => cell.id === "top-right")?.image, "deleting a selected layout image clears its cell content");
   const stretchDeck = parseDeck('## Stretch {.layout-1}\n\n::: core\n![](figures/stretch.svg){fit=stretch}\n:::\n');
   const stretchFixture = document.createElement("div");
   renderDeck(stretchDeck, stretchFixture, asset => `/test/${asset}`);

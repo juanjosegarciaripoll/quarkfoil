@@ -70,6 +70,7 @@ const state = {
   undo: [],
   redo: [],
   objectUrls: new Map(),
+  assetVersions: new Map(),
   bibliographySource: "",
   bibliographyHash: null,
   bibliography: null,
@@ -97,8 +98,22 @@ let deckClaim = null;
 
 function assetResolver(source) {
   if (state.objectUrls.has(source)) return state.objectUrls.get(source);
-  if (state.local) return `/project/${source.replaceAll("\\", "/").split("/").map(encodeURIComponent).join("/")}`;
+  if (state.local) {
+    const path = `/project/${source.replaceAll("\\", "/").split("/").map(encodeURIComponent).join("/")}`;
+    const version = state.assetVersions.get(source);
+    return version ? `${path}?v=${version}` : path;
+  }
   return source;
+}
+
+function refreshAsset(path) {
+  state.assetVersions.set(path, Date.now());
+  const resolved = assetResolver(path);
+  document.querySelectorAll(".slide-image").forEach(element => {
+    if (element.dataset.source !== path) return;
+    if (element instanceof HTMLImageElement) element.src = resolved;
+    else element.querySelector("image")?.setAttribute("href", resolved);
+  });
 }
 
 async function pollForReload() {
@@ -1120,6 +1135,7 @@ async function initialize() {
     },
     browseProjectFiles,
     resolveAsset: assetResolver,
+    refreshAsset,
   });
   editor.refresh();
   setMode(state.mode);

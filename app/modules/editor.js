@@ -19,6 +19,7 @@ export const videoFile = file => file?.type?.startsWith("video/") || /\.(?:avi|m
 export const repeatedActivation = (previous, key, time, interval = 450) => Boolean(
   previous && previous.key === key && time - previous.time >= 0 && time - previous.time <= interval,
 );
+export const deleteKey = key => key === "Delete" || key === "Del";
 export const projectAssetPage = (assets, query, page, pageSize = 24) => {
   const needle = query.trim().toLocaleLowerCase();
   const filtered = needle ? assets.filter(asset => asset.path.toLocaleLowerCase().includes(needle)) : assets;
@@ -195,6 +196,7 @@ export class DesignEditor {
     this.slideProperties = document.querySelector("#slide-properties");
     this.imageProperties = document.querySelector("#image-properties");
     this.videoProperties = document.querySelector("#video-properties");
+    this.plotProperties = document.querySelector("#plot-properties");
     this.shapeProperties = document.querySelector("#shape-properties");
     this.attributionProperties = document.querySelector("#attribution-properties");
     this.fontProperties = document.querySelector("#font-properties");
@@ -239,6 +241,13 @@ export class DesignEditor {
       this.updatePlotPreview();
     });
     document.querySelector("#plot-create").addEventListener("click", () => this.createPlot());
+    document.querySelector("#prop-plot-fill-enabled").addEventListener("change", event => {
+      document.querySelector("#prop-plot-fill").disabled = !event.target.checked;
+      this.applyPlotProperties();
+    });
+    for (const id of ["prop-plot-fill", "prop-plot-stroke", "prop-plot-stroke-width"]) {
+      document.querySelector(`#${id}`).addEventListener("change", () => this.applyPlotProperties());
+    }
     document.querySelector("#image-input").addEventListener("change", event => {
       const file = event.target.files?.[0];
       document.querySelector("#project-file-dialog").close();
@@ -399,6 +408,7 @@ export class DesignEditor {
       const focus = (cell.image.attrs.values.focus || "50 50").split(/[\s,]+/);
       setRangeControl("prop-focus-x", focus[0] || 50);
       setRangeControl("prop-focus-y", focus[1] || 50);
+      this.loadPlotProperties(cell.image.source);
     } else if (cell?.type === "video") {
       this.noSelection.textContent = "Video cell properties must currently be edited in Source mode.";
     }
@@ -412,6 +422,8 @@ export class DesignEditor {
     this.properties.hidden = true;
     this.imageProperties.hidden = true;
     this.videoProperties.hidden = true;
+    this.plotProperties.hidden = true;
+    this.plotAsset = null;
     this.shapeProperties.hidden = true;
     this.attributionProperties.hidden = true;
     this.fontProperties.hidden = true;
@@ -454,6 +466,7 @@ export class DesignEditor {
       const focus = (object.image.attrs.values.focus || "50 50").split(/[\s,]+/);
       setRangeControl("prop-focus-x", focus[0] || 50);
       setRangeControl("prop-focus-y", focus[1] || 50);
+      this.loadPlotProperties(object.image.source);
     } else if (object.type === "video" && object.video) {
       this.fillVideoProperties(object.video);
     } else {
@@ -905,13 +918,64 @@ export class DesignEditor {
       const file = new File([svg], filename, { type: "image/svg+xml" });
       const path = await this.options.importAsset(file, { name: filename, overwrite: document.querySelector("#plot-overwrite").checked });
       if (!path) return;
-      this.addImagePath(path, null, 800 / 450);
+      this.addImagePath(path, null, 800 / 450, "stretch");
       this.plotDialog.close();
     } catch (error) {
       status.textContent = error.message;
     } finally {
       button.disabled = false;
     }
+  }
+
+  async loadPlotProperties(path) {
+    if (!path?.toLowerCase().endsWith(".svg")) return;
+    const selection = this.selected?.dataset.objectId || `cell:${this.selectedCell?.dataset.cellId || ""}`;
+    try {
+      const response = await fetch(this.options.resolveAsset(path), { cache: "no-store" });
+      if (!response.ok) return;
+      const documentNode = new DOMParser().parseFromString(await response.text(), "image/svg+xml");
+      const root = documentNode.documentElement;
+      if (root.getAttribute("data-quarkfoil-plot") !== "1") return;
+      const currentSelection = this.selected?.dataset.objectId || `cell:${this.selectedCell?.dataset.cellId || ""}`;
+      if (currentSelection !== selection) return;
+      const background = root.querySelector(".plot-background");
+      const curve = root.querySelector(".curve");
+      if (!background || !curve) return;
+      this.plotAsset = { path, documentNode };
+      this.plotProperties.hidden = false;
+      const fill = background.getAttribute("fill") || "none";
+      const fillEnabled = fill !== "none";
+      document.querySelector("#prop-plot-fill-enabled").checked = fillEnabled;
+      document.querySelector("#prop-plot-fill").disabled = !fillEnabled;
+      document.querySelector("#prop-plot-fill").value = /^#[0-9a-f]{6}$/i.test(fill) ? fill : "#ffffff";
+      document.querySelector("#prop-plot-stroke").value = curve.getAttribute("stroke") || "#146c7e";
+      document.querySelector("#prop-plot-stroke-width").value = curve.getAttribute("stroke-width") || "3";
+    } catch { /* Non-Quarkfoil or unreadable SVGs retain ordinary image properties. */ }
+  }
+
+  async applyPlotProperties() {
+    if (!this.plotAsset) return;
+    const { path, documentNode } = this.plotAsset;
+    const background = documentNode.documentElement.querySelector(".plot-background");
+    const curve = documentNode.documentElement.querySelector(".curve");
+    if (!background || !curve) return;
+    background.setAttribute("fill", document.querySelector("#prop-plot-fill-enabled").checked ? document.querySelector("#prop-plot-fill").value : "none");
+    curve.setAttribute("stroke", document.querySelector("#prop-plot-stroke").value);
+    const strokeWidth = Math.max(0.25, Number(document.querySelector("#prop-plot-stroke-width").value) || 3);
+    curve.setAttribute("stroke-width", String(strokeWidth));
+    const bounds = documentNode.documentElement.getAttribute("data-plot-bounds")?.split(/\s+/).map(Number);
+    if (bounds?.length === 4 && bounds.every(Number.isFinite)) {
+      const allowance = strokeWidth / 2;
+      const viewBox = [bounds[0] - allowance, bounds[1] - allowance, bounds[2] + 2 * allowance, bounds[3] + 2 * allowance];
+      documentNode.documentElement.setAttribute("viewBox", viewBox.join(" "));
+      for (const [attribute, value] of [["x", viewBox[0]], ["y", viewBox[1]], ["width", viewBox[2]], ["height", viewBox[3]]]) background.setAttribute(attribute, String(value));
+    }
+    const source = new XMLSerializer().serializeToString(documentNode);
+    const filename = path.replaceAll("\\", "/").split("/").at(-1);
+    try {
+      const savedPath = await this.options.importAsset(new File([source], filename, { type: "image/svg+xml" }), { name: filename, overwrite: true });
+      if (savedPath) this.options.refreshAsset(savedPath);
+    } catch { /* The application import handler reports the write failure. */ }
   }
 
   async addImage(file, position = null, cellId = null) {
@@ -931,9 +995,9 @@ export class DesignEditor {
     return true;
   }
 
-  addImagePath(path, cellId = null, aspect = null) {
+  addImagePath(path, cellId = null, aspect = null, fit = "contain") {
     if (!path) return;
-    const content = `![](${path}){fit=contain focus="50 50"}`;
+    const content = `![](${path}){fit=${fit} focus="50 50"}`;
     if (cellId) {
       this.commit(setCellContent(this.options.getDeck(), this.slideIndex(), cellId, content));
       return;
@@ -1130,13 +1194,21 @@ export class DesignEditor {
   }
 
   remove() {
-    if (!this.selected) return;
-    this.commit(deleteOverlay(this.options.getDeck(), this.slideIndex(), this.selected.dataset.objectId));
+    if (this.selected) {
+      this.commit(deleteOverlay(this.options.getDeck(), this.slideIndex(), this.selected.dataset.objectId));
+      return;
+    }
+    if (this.selectedCell) {
+      const cell = this.slide().cells.find(item => item.id === this.selectedCell.dataset.cellId);
+      if (cell?.image) this.commit(setCellContent(this.options.getDeck(), this.slideIndex(), cell.id, ""));
+    }
   }
 
   onKeyDown(event) {
-    if (!this.active() || !this.selected || ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) return;
-    if (event.key === "Delete") { event.preventDefault(); this.remove(); return; }
+    const selectedCellImage = this.selectedCell && this.slide().cells.find(item => item.id === this.selectedCell.dataset.cellId)?.image;
+    if (!this.active() || (!this.selected && !selectedCellImage) || ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) return;
+    if (deleteKey(event.key)) { event.preventDefault(); this.remove(); return; }
+    if (!this.selected) return;
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "d") { event.preventDefault(); this.duplicate(); return; }
     const directions = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
     if (!directions[event.key]) return;

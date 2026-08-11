@@ -148,6 +148,13 @@
           <button id="choose-project-video" type="button">Choose video…</button>
         </div>
       </form>
+      <form id="plot-properties" hidden>
+        <label class="check"><input id="prop-plot-fill-enabled" type="checkbox"> Background</label>
+        <label>Fill <input id="prop-plot-fill" type="color" value="#ffffff"></label>
+        <label>Curve <input id="prop-plot-stroke" type="color" value="#146c7e"></label>
+        <label>Line width <input id="prop-plot-stroke-width" type="number" min="0.25" max="30" step="0.25" value="3"></label>
+        <small>Edits the generated SVG file and every use of it.</small>
+      </form>
       <form id="shape-properties" hidden>
         <label>Shape
           <select id="prop-shape">
