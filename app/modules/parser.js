@@ -96,6 +96,32 @@ function splitSlides(source, start) {
   return ranges;
 }
 
+function parseSection(source, range, index, diagnostics) {
+  const raw = source.slice(range.start, range.end);
+  const heading = /^\s*(#{1,6})\s+([^\r\n]+)\r?\n?/.exec(raw);
+  if (!heading) return null;
+  let title = heading[2].trim();
+  const attrMatch = /\s+\{([^}]*)\}\s*$/.exec(title);
+  if (!attrMatch) return null;
+  const attrs = parseAttributes(attrMatch[1]);
+  if (!attrs.classes.includes("section")) return null;
+  title = title.slice(0, attrMatch.index).trim() || "Untitled section";
+  const id = attrs.id || `section-${index + 1}`;
+  if (!attrs.id) diagnostics.push({ level: "warning", message: `Section '${title}' has no stable source ID` });
+  if (raw.slice(heading[0].length).trim()) diagnostics.push({ level: "warning", message: `Content beneath section '${title}' is not presented` });
+  return {
+    kind: "section",
+    index,
+    id,
+    title,
+    attrs,
+    raw,
+    range,
+    headingRange: { start: range.start + heading.index, end: range.start + heading.index + heading[0].replace(/\r?\n$/, "").length },
+    hashes: heading[1],
+  };
+}
+
 function lineNumber(source, offset) {
   return source.slice(0, offset).split(/\r?\n/).length;
 }
@@ -316,6 +342,7 @@ function parseSlide(source, range, index, diagnostics) {
     if (overlay.color && !/^#[0-9a-f]{6}(?:[0-9a-f]{2})?$/i.test(overlay.color)) diagnostics.push({ level: "warning", slide: index + 1, message: `Overlay '${overlay.id}' has invalid text color '${overlay.color}'` });
   }
   return {
+    kind: "slide",
     index,
     id: headingAttrs.id || `slide-${index + 1}`,
     title,
@@ -339,7 +366,18 @@ export function parseDeck(source) {
   const diagnostics = [];
   const front = splitFrontMatter(source, diagnostics);
   const ranges = splitSlides(source, front.bodyStart);
-  const slides = ranges.map((range, index) => parseSlide(source, range, index, diagnostics));
+  const slides = [];
+  const sections = [];
+  const items = ranges.map(range => {
+    const section = parseSection(source, range, sections.length, diagnostics);
+    if (section) {
+      sections.push(section);
+      return section;
+    }
+    const slide = parseSlide(source, range, slides.length, diagnostics);
+    slides.push(slide);
+    return slide;
+  });
   if (front.metadata.theme && !THEME_SET.has(String(front.metadata.theme))) diagnostics.push({ level: "warning", message: `Unknown deck theme '${front.metadata.theme}', using scientific-light` });
   for (const slide of slides) {
     const theme = slide.headingAttrs.values.theme;
@@ -354,18 +392,26 @@ export function parseDeck(source) {
   for (const id of new Set(slideIds.filter((value, index) => slideIds.indexOf(value) !== index))) {
     diagnostics.push({ level: "error", message: `Duplicate slide ID '${id}'` });
   }
-  return { source, metadata: front.metadata, frontMatterRange: { start: 0, end: front.bodyStart }, slides, diagnostics };
+  const sectionIds = sections.map(section => section.id);
+  for (const id of new Set(sectionIds.filter((value, index) => sectionIds.indexOf(value) !== index))) {
+    diagnostics.push({ level: "error", message: `Duplicate section ID '${id}'` });
+  }
+  return { source, metadata: front.metadata, frontMatterRange: { start: 0, end: front.bodyStart }, slides, sections, items, diagnostics };
 }
 
 export function patchRange(source, start, end, replacement) {
   return source.slice(0, start) + replacement + source.slice(end);
 }
 
-function composeSlides(deck, slideSources) {
+function composeItems(deck, itemSources) {
   const frontMatter = deck.source.slice(0, deck.frontMatterRange.end).trimEnd();
-  const body = slideSources.map(source => source.trim()).join("\n\n---\n\n");
+  const body = itemSources.map(source => source.trim()).join("\n\n---\n\n");
   return `${frontMatter}${frontMatter ? "\n\n" : ""}${body}\n`;
 }
+
+const itemSources = deck => deck.items.map(item => item.raw);
+const slideItemPosition = (deck, slideIndex) => deck.items.findIndex(item => item.kind === "slide" && item.index === slideIndex);
+const sectionItemPosition = (deck, sectionId) => deck.items.findIndex(item => item.kind === "section" && item.id === sectionId);
 
 function duplicateSlideSource(deck, slide) {
   if (!slide.headingAttrs.id || !slide.headingRange) return slide.raw;
@@ -409,26 +455,28 @@ function blankSlideSource(slide) {
 export function insertSlide(deck, slideIndex) {
   const slide = deck.slides[slideIndex];
   if (!slide) throw new Error("Unknown slide format to copy");
-  const slides = deck.slides.map(item => item.raw);
-  slides.splice(slideIndex + 1, 0, blankSlideSource(slide));
-  return composeSlides(deck, slides);
+  const sources = itemSources(deck);
+  sources.splice(slideItemPosition(deck, slideIndex) + 1, 0, blankSlideSource(slide));
+  return composeItems(deck, sources);
 }
 
 export function moveSlide(deck, fromIndex, toIndex) {
   if (!deck.slides[fromIndex]) throw new Error("Unknown slide to move");
   const destination = Math.max(0, Math.min(deck.slides.length - 1, toIndex));
-  const slides = deck.slides.map(slide => slide.raw);
-  const [moved] = slides.splice(fromIndex, 1);
-  slides.splice(destination, 0, moved);
-  return composeSlides(deck, slides);
+  const sources = itemSources(deck);
+  const reordered = deck.slides.map(slide => slide.raw);
+  const [moved] = reordered.splice(fromIndex, 1);
+  reordered.splice(destination, 0, moved);
+  deck.items.filter(item => item.kind === "slide").forEach((item, index) => { sources[slideItemPosition(deck, item.index)] = reordered[index]; });
+  return composeItems(deck, sources);
 }
 
 export function duplicateSlide(deck, slideIndex) {
   const slide = deck.slides[slideIndex];
   if (!slide) throw new Error("Unknown slide to duplicate");
-  const slides = deck.slides.map(item => item.raw);
-  slides.splice(slideIndex + 1, 0, duplicateSlideSource(deck, slide));
-  return composeSlides(deck, slides);
+  const sources = itemSources(deck);
+  sources.splice(slideItemPosition(deck, slideIndex) + 1, 0, duplicateSlideSource(deck, slide));
+  return composeItems(deck, sources);
 }
 
 export function importSlide(deck, slideIndex, importedSlide) {
@@ -437,15 +485,54 @@ export function importSlide(deck, slideIndex, importedSlide) {
   if (importedSlide.headingAttrs?.id && deck.slides.some(slide => slide.id === importedSlide.id)) {
     source = duplicateSlideSource(deck, importedSlide);
   }
-  const slides = deck.slides.map(slide => slide.raw);
-  slides.splice(slideIndex + 1, 0, source);
-  return composeSlides(deck, slides);
+  const sources = itemSources(deck);
+  sources.splice(slideItemPosition(deck, slideIndex) + 1, 0, source);
+  return composeItems(deck, sources);
 }
 
 export function deleteSlide(deck, slideIndex) {
   if (!deck.slides[slideIndex]) throw new Error("Unknown slide to delete");
   if (deck.slides.length === 1) throw new Error("A presentation must contain at least one slide");
-  return composeSlides(deck, deck.slides.filter((_, index) => index !== slideIndex).map(slide => slide.raw));
+  return composeItems(deck, deck.items.filter(item => item.kind !== "slide" || item.index !== slideIndex).map(item => item.raw));
+}
+
+export function insertSection(deck, slideIndex, title = "New section") {
+  const position = slideItemPosition(deck, slideIndex);
+  if (position < 0) throw new Error("Unknown slide for section insertion");
+  const normalized = String(title).trim();
+  if (!normalized || /[\r\n{}]/.test(normalized)) throw new Error("Section names must be a single nonempty line without braces");
+  const base = normalized.toLocaleLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "section";
+  const usedIds = new Set([...deck.slides.map(slide => slide.id), ...deck.sections.map(section => section.id)]);
+  let id = base;
+  let counter = 2;
+  while (usedIds.has(id)) id = `${base}-${counter++}`;
+  const sources = itemSources(deck);
+  sources.splice(position, 0, `# ${normalized} {#${id} .section}`);
+  return composeItems(deck, sources);
+}
+
+export function updateSectionTitle(deck, sectionId, title) {
+  const section = deck.sections.find(item => item.id === sectionId);
+  const normalized = String(title).trim();
+  if (!section || !normalized || /[\r\n{}]/.test(normalized)) throw new Error("Section names must be a single nonempty line without braces");
+  const replacement = `${section.hashes} ${normalized} {${serializeAttributes(section.attrs)}}`;
+  return patchRange(deck.source, section.headingRange.start, section.headingRange.end, replacement);
+}
+
+export function moveSection(deck, sectionId, direction) {
+  const position = sectionItemPosition(deck, sectionId);
+  const destination = position + Math.sign(direction);
+  if (position < 0) throw new Error(`Unknown section '${sectionId}'`);
+  if (destination < 0 || destination >= deck.items.length) return deck.source;
+  const sources = itemSources(deck);
+  [sources[position], sources[destination]] = [sources[destination], sources[position]];
+  return composeItems(deck, sources);
+}
+
+export function deleteSection(deck, sectionId) {
+  const position = sectionItemPosition(deck, sectionId);
+  if (position < 0) throw new Error(`Unknown section '${sectionId}'`);
+  return composeItems(deck, deck.items.filter((_, index) => index !== position).map(item => item.raw));
 }
 
 export function updateHeadingLayout(deck, slideIndex, layout, columns, rows) {

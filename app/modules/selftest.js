@@ -1,11 +1,14 @@
 import {
   deleteOverlay,
+  deleteSection,
   deleteSlide,
   duplicateSlide,
   importSlide,
   insertArrow,
   insertOverlay,
+  insertSection,
   insertSlide,
+  moveSection,
   moveSlide,
   duplicateOverlay,
   parseDeck,
@@ -13,6 +16,7 @@ import {
   updateBlockContent,
   updateHeadingLayout,
   updateOverlay,
+  updateSectionTitle,
   updateSlideTitle,
   updateSlideProperties,
 } from "./parser.js";
@@ -396,6 +400,21 @@ try {
   assert(imported.slides[1].raw.includes("Copied content"), "slide import copies its Markdown content");
   const moved = parseDeck(moveSlide(deck, 0, 1));
   assert(moved.slides[0].title === "Second" && moved.slides[1].title === "First", "selected slide moves within the deck");
+
+  let sectioned = parseDeck(insertSection(deck, 0, "Methods"));
+  assert(sectioned.sections.length === 1 && sectioned.slides.length === 2, "section markers parse without becoming presentation slides");
+  assert(sectioned.items.map(item => item.kind).join(" ") === "section slide slide", "new section begins at the selected slide");
+  const sectionId = sectioned.sections[0].id;
+  sectioned = parseDeck(updateSectionTitle(sectioned, sectionId, "Results"));
+  assert(sectioned.sections[0].title === "Results" && sectioned.source.includes(".section"), "section titles serialize as readable Markdown markers");
+  const movedSection = parseDeck(moveSection(sectioned, sectionId, 1));
+  assert(movedSection.items[1].kind === "section" && movedSection.slides.map(slide => slide.title).join(" ") === "First Second", "section separators move independently of slides");
+  const slidesAcrossSection = parseDeck(moveSlide(sectioned, 0, 1));
+  assert(slidesAcrossSection.items[0].kind === "section" && slidesAcrossSection.slides.map(slide => slide.title).join(" ") === "Second First", "slides move across a stationary section boundary");
+  const sectionFixture = document.createElement("div");
+  renderDeck(sectioned, sectionFixture, source => source);
+  assert(sectionFixture.querySelectorAll(".scientific-slide").length === 2, "section markers are omitted from presentation rendering");
+  assert(parseDeck(deleteSection(sectioned, sectionId)).sections.length === 0, "deleting a section retains a valid slide deck");
 
   assertCompoundLayout("1-2", ["left", "top-right", "bottom-right"], "left");
   assertCompoundLayout("2-1", ["top-left", "bottom-left", "right"], "right");

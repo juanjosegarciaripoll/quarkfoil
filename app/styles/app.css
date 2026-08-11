@@ -50,7 +50,7 @@ button.active { background: #146c7e; border-color: #56cfe1; }
 .properties { overflow: auto; }
 .properties { border-left: 1px solid #3d454e; }
 .slide-sidebar ol, .slide-sidebar li { min-width: 0; max-width: 100%; }
-.slide-sidebar-actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.35rem; margin-bottom: 0.65rem; }
+.slide-sidebar-actions { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.35rem; margin-bottom: 0.65rem; }
 .slide-sidebar-move { display: grid; grid-template-columns: 1fr 1fr; gap: 0.35rem; margin-top: 0.65rem; }
 .slide-sidebar .slide-sidebar-actions button,
 .slide-sidebar .slide-sidebar-move button {
@@ -67,6 +67,11 @@ button.active { background: #146c7e; border-color: #56cfe1; }
 .slide-sidebar ol { display: grid; align-content: start; flex: 1 1 auto; gap: 0.35rem; min-height: 0; margin: 0; padding: 0; overflow-x: hidden; overflow-y: auto; list-style: none; }
 .slide-sidebar button { display: block; min-width: 0; width: 100%; max-width: 100%; padding: 0.55rem; overflow: hidden; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
 .slide-sidebar button.current { border-color: #56cfe1; background: #29444b; }
+.slide-sidebar li.section-entry { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 0.25rem; margin-top: 0.25rem; }
+.slide-sidebar li.section-entry button { padding: 0.42rem; color: #d8f3f6; background: #202d33; border-color: #47616b; font-weight: 600; }
+.slide-sidebar li.section-entry .section-collapse { display: grid; place-items: center; padding: 0; }
+.slide-sidebar li.section-entry.section-selected .section-title { border-color: #56cfe1; background: #29444b; }
+.slide-sidebar li.section-entry.contains-current .section-title { box-shadow: inset 3px 0 #56cfe1; }
 
 .stage { position: relative; min-width: 0; min-height: 0; background: #0f1216; }
 .stage .reveal { width: 100%; height: 100%; background: #0f1216; }

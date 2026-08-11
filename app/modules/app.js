@@ -1,4 +1,4 @@
-import { deleteSlide, duplicateSlide, importSlide, insertOverlay, insertSlide, moveSlide, parseDeck } from "./parser.js";
+import { deleteSection, deleteSlide, duplicateSlide, importSlide, insertOverlay, insertSection, insertSlide, moveSection, moveSlide, parseDeck, updateSectionTitle } from "./parser.js";
 import { renderDeck, syncVideoPlayback } from "./render.js";
 import { DesignEditor, pageSlideIndex, projectAssetPage } from "./editor.js";
 import { saveSnapshot } from "./storage.js";
@@ -61,6 +61,8 @@ const state = {
   deck: null,
   mode: ["source", "design", "present"].includes(query.get("mode")) ? query.get("mode") : "design",
   currentSlide: Math.max(0, Number(query.get("slide") || 1) - 1),
+  selectedSection: null,
+  collapsedSections: new Set(),
   local: false,
   config: null,
   serverHash: null,
@@ -160,11 +162,13 @@ function parseAndRender(source, { preserveSlide = true } = {}) {
   }
   state.source = source;
   state.deck = deck;
+  state.currentSlide = Math.min(previous, Math.max(0, deck.slides.length - 1));
+  if (!deck.sections.some(section => section.id === state.selectedSection)) state.selectedSection = null;
+  state.collapsedSections = new Set([...state.collapsedSections].filter(id => deck.sections.some(section => section.id === id)));
   elements.source.value = source;
   state.bibliography = prepareBibliography(state.bibliographySource, deck);
   renderDeck(deck, elements.slides, assetResolver, state.bibliography);
   rebuildSlideList();
-  state.currentSlide = Math.min(previous, Math.max(0, deck.slides.length - 1));
   if (reveal) {
     reveal.sync();
     reveal.slide(state.currentSlide);
@@ -216,39 +220,121 @@ function updateHistoryButtons() {
 }
 
 function rebuildSlideList() {
-  elements.slideList.replaceChildren(...state.deck.slides.map((slide, index) => {
+  let activeSection = null;
+  let currentSection = null;
+  for (const item of state.deck.items) {
+    if (item.kind === "section") activeSection = item.id;
+    else if (item.index === state.currentSlide) currentSection = activeSection;
+  }
+  activeSection = null;
+  const entries = [];
+  for (const item of state.deck.items) {
+    if (item.kind === "section") {
+      activeSection = item.id;
+      const li = document.createElement("li");
+      li.className = "section-entry";
+      li.classList.toggle("section-selected", item.id === state.selectedSection);
+      li.classList.toggle("contains-current", item.id === currentSection);
+      const collapsed = state.collapsedSections.has(item.id);
+      const collapse = document.createElement("button");
+      collapse.type = "button";
+      collapse.className = "section-collapse";
+      collapse.textContent = collapsed ? "▸" : "▾";
+      collapse.title = collapsed ? `Expand ${item.title}` : `Collapse ${item.title}`;
+      collapse.setAttribute("aria-expanded", String(!collapsed));
+      collapse.addEventListener("click", event => {
+        event.stopPropagation();
+        if (collapsed) state.collapsedSections.delete(item.id);
+        else state.collapsedSections.add(item.id);
+        rebuildSlideList();
+      });
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "section-title";
+      button.textContent = item.title;
+      button.title = "Click to select; double-click to rename";
+      button.addEventListener("click", () => {
+        if (!requestMode(state.mode === "source" ? "design" : state.mode)) return;
+        state.selectedSection = item.id;
+        rebuildSlideList();
+      });
+      button.addEventListener("dblclick", event => {
+        event.preventDefault();
+        renameSection(item.id);
+      });
+      li.append(collapse, button);
+      entries.push(li);
+      continue;
+    }
+    if (activeSection && state.collapsedSections.has(activeSection)) continue;
     const li = document.createElement("li");
     const button = document.createElement("button");
     button.type = "button";
-    button.textContent = `${index + 1}. ${slide.title || "Untitled"}`;
+    button.textContent = `${item.index + 1}. ${item.title || "Untitled"}`;
     button.title = "Click to select; double-click to rename";
-    button.classList.toggle("current", index === state.currentSlide);
-    button.addEventListener("click", () => { reveal.slide(index); requestMode(state.mode === "source" ? "design" : state.mode); });
+    button.classList.toggle("current", item.index === state.currentSlide);
+    button.addEventListener("click", () => {
+      state.selectedSection = null;
+      reveal.slide(item.index);
+      requestMode(state.mode === "source" ? "design" : state.mode);
+      rebuildSlideList();
+    });
     button.addEventListener("dblclick", event => {
       event.preventDefault();
-      state.currentSlide = index;
-      reveal.slide(index);
+      state.selectedSection = null;
+      state.currentSlide = item.index;
+      reveal.slide(item.index);
       if (requestMode("design")) setTimeout(() => editor?.openTitleDialog(), 0);
     });
     li.append(button);
-    return li;
-  }));
-  document.querySelector("#duplicate-slide").disabled = !state.deck.slides.length;
-  document.querySelector("#delete-slide").disabled = state.deck.slides.length <= 1;
-  document.querySelector("#move-slide-up").disabled = state.currentSlide <= 0;
-  document.querySelector("#move-slide-down").disabled = state.currentSlide >= state.deck.slides.length - 1;
+    entries.push(li);
+  }
+  elements.slideList.replaceChildren(...entries);
+  const selectedSection = state.deck.sections.find(section => section.id === state.selectedSection);
+  const sectionPosition = selectedSection ? state.deck.items.indexOf(selectedSection) : -1;
+  document.querySelector("#duplicate-slide").disabled = Boolean(selectedSection) || !state.deck.slides.length;
+  const deleteButton = document.querySelector("#delete-slide");
+  deleteButton.disabled = !selectedSection && state.deck.slides.length <= 1;
+  deleteButton.title = selectedSection ? "Delete selected section" : "Delete selected slide";
+  deleteButton.setAttribute("aria-label", deleteButton.title);
+  document.querySelector("#move-slide-up").disabled = selectedSection ? sectionPosition <= 0 : state.currentSlide <= 0;
+  document.querySelector("#move-slide-down").disabled = selectedSection ? sectionPosition >= state.deck.items.length - 1 : state.currentSlide >= state.deck.slides.length - 1;
 }
 
 function duplicateSelectedSlide() {
+  state.selectedSection = null;
   const index = state.currentSlide;
   state.currentSlide = index + 1;
   commitSource(duplicateSlide(state.deck, index));
 }
 
 function addSlideAfterSelection() {
+  state.selectedSection = null;
   const index = state.currentSlide;
   state.currentSlide = index + 1;
   commitSource(insertSlide(state.deck, index));
+}
+
+function addSectionAfterSelection() {
+  const title = prompt("Section name", "New section");
+  if (title === null) return;
+  try {
+    const source = insertSection(state.deck, state.currentSlide, title);
+    const previousIds = new Set(state.deck.sections.map(section => section.id));
+    state.selectedSection = parseDeck(source).sections.find(section => !previousIds.has(section.id))?.id || null;
+    commitSource(source);
+  } catch (error) {
+    showStatus(error.message, true);
+  }
+}
+
+function renameSection(sectionId) {
+  const section = state.deck.sections.find(item => item.id === sectionId);
+  if (!section) return;
+  const title = prompt("Section name", section.title);
+  if (title === null || title.trim() === section.title) return;
+  try { commitSource(updateSectionTitle(state.deck, sectionId, title)); }
+  catch (error) { showStatus(error.message, true); }
 }
 
 async function chooseSlideToImport(path) {
@@ -295,6 +381,15 @@ function importSlideFromPresentation() {
 }
 
 function deleteSelectedSlide() {
+  if (state.selectedSection) {
+    const section = state.deck.sections.find(item => item.id === state.selectedSection);
+    if (!section || !confirm(`Delete section “${section.title}”? Its slides will remain.`)) return;
+    const id = state.selectedSection;
+    state.selectedSection = null;
+    state.collapsedSections.delete(id);
+    commitSource(deleteSection(state.deck, id));
+    return;
+  }
   const index = state.currentSlide;
   const slide = state.deck.slides[index];
   if (!slide || !confirm(`Delete slide ${index + 1}, “${slide.title || "Untitled"}”?`)) return;
@@ -303,6 +398,10 @@ function deleteSelectedSlide() {
 }
 
 function moveSelectedSlide(direction) {
+  if (state.selectedSection) {
+    commitSource(moveSection(state.deck, state.selectedSection, direction));
+    return;
+  }
   const from = state.currentSlide;
   const to = from + direction;
   if (to < 0 || to >= state.deck.slides.length) return;
@@ -1084,6 +1183,7 @@ function bindUi() {
   document.querySelector("#undo-button").addEventListener("click", undo);
   document.querySelector("#redo-button").addEventListener("click", redo);
   document.querySelector("#add-slide").addEventListener("click", addSlideAfterSelection);
+  document.querySelector("#add-section").addEventListener("click", addSectionAfterSelection);
   document.querySelector("#import-slide").addEventListener("click", importSlideFromPresentation);
   document.querySelector("#duplicate-slide").addEventListener("click", duplicateSelectedSlide);
   document.querySelector("#delete-slide").addEventListener("click", deleteSelectedSlide);

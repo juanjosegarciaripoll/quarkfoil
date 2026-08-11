@@ -204,6 +204,22 @@ animation from that PNG; drag, upload, or paste the original file to preserve
 it. When both an original JPEG/GIF and a synthesized PNG are available,
 Quarkfoil prefers the original representation.
 
+## Sections
+
+Section markers organize the editor sidebar without creating presentation
+slides:
+
+```markdown
+# Methods {#methods .section}
+```
+
+Place a section marker between the same `---` separators used for slides. It
+groups every following slide up to the next section marker. The ID is stable
+editor state, while `.section` distinguishes the heading from a slide. Section
+markers may be collapsed, renamed, deleted, or moved in the sidebar. Moving a
+marker changes the boundary between neighboring groups; it does not reorder the
+slides themselves. Static and interactive presentations omit section markers.
+
 ## Floating overlays
 
 ```markdown
