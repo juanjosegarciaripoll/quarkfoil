@@ -1,5 +1,6 @@
 import {
   deleteOverlay,
+  deleteOverlays,
   duplicateOverlay,
   insertArrow,
   insertOverlay,
@@ -1380,12 +1381,16 @@ export class DesignEditor {
   duplicate() {
     if (!this.selected) return;
     const id = this.selected.dataset.objectId;
-    this.commit(duplicateOverlay(this.options.getDeck(), this.slideIndex(), id, this.uniqueId(`${id}-copy`)));
+    const copyId = this.uniqueId(`${id}-copy`);
+    this.commit(duplicateOverlay(this.options.getDeck(), this.slideIndex(), id, copyId));
+    const copy = this.section()?.querySelector(`[data-object-id="${CSS.escape(copyId)}"]`);
+    if (copy) this.selectOverlay(copy);
   }
 
   remove() {
     if (this.selected) {
-      this.commit(deleteOverlay(this.options.getDeck(), this.slideIndex(), this.selected.dataset.objectId));
+      const ids = this.selectedOverlayElements().map(element => element.dataset.objectId);
+      this.commit(deleteOverlays(this.options.getDeck(), this.slideIndex(), ids));
       return;
     }
     if (this.selectedCell) {

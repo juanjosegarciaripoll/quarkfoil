@@ -1,5 +1,6 @@
 import {
   deleteOverlay,
+  deleteOverlays,
   deleteSection,
   deleteSlide,
   duplicateSlide,
@@ -21,7 +22,7 @@ import {
   updateSlideProperties,
 } from "./parser.js";
 import { renderDeck, syncVideoPlayback } from "./render.js";
-import { arrowGeometry, bindRangeControl, buildShapePalette, canvasStartsMarquee, clipboardImageFile, deleteKey, initialImageGeometry, moveGeometryGroup, pageSlideIndex, projectAssetPage, rectanglesIntersect, renameClipboardImage, repeatedActivation, resolveImportDestination, videoFile } from "./editor.js";
+import { arrowGeometry, bindRangeControl, buildShapePalette, canvasStartsMarquee, clipboardImageFile, deleteKey, DesignEditor, initialImageGeometry, moveGeometryGroup, pageSlideIndex, projectAssetPage, rectanglesIntersect, renameClipboardImage, repeatedActivation, resolveImportDestination, videoFile } from "./editor.js";
 import { parseBibliography, prepareBibliography } from "./bibliography.js";
 import { compileExpression, createPlotSvg } from "./plot.js";
 
@@ -480,6 +481,23 @@ try {
   assert(duplicated.slides.length === 3 && duplicated.slides[1].title === "First", "selected slide duplicates after itself");
   assert(duplicated.slides[1].overlays[0].id === "eq", "duplicated slide keeps slide-local overlay IDs");
   assert(!duplicated.diagnostics.some(item => item.level === "error"), "duplicated slide remains valid");
+  const duplicateSelectionFixture = document.createElement("div");
+  let duplicateSelectionDeck = deck;
+  renderDeck(duplicateSelectionDeck, duplicateSelectionFixture, source => source);
+  const duplicateEditor = Object.create(DesignEditor.prototype);
+  duplicateEditor.selected = duplicateSelectionFixture.querySelector('[data-object-id="eq"]');
+  duplicateEditor.options = { getDeck: () => duplicateSelectionDeck };
+  duplicateEditor.slideIndex = () => 0;
+  duplicateEditor.uniqueId = () => "eq-selected-copy";
+  duplicateEditor.section = () => duplicateSelectionFixture.querySelector(".scientific-slide");
+  duplicateEditor.commit = nextSource => {
+    duplicateSelectionDeck = parseDeck(nextSource);
+    renderDeck(duplicateSelectionDeck, duplicateSelectionFixture, source => source);
+  };
+  let selectedDuplicate = null;
+  duplicateEditor.selectOverlay = element => { selectedDuplicate = element; };
+  duplicateEditor.duplicate();
+  assert(selectedDuplicate?.dataset.objectId === "eq-selected-copy", "duplicating an object moves selection to the rendered copy");
   const deleted = parseDeck(deleteSlide(deck, 0));
   assert(deleted.slides.length === 1 && deleted.slides[0].title === "Second", "selected slide deletes");
   let finalDeleteRejected = false;
@@ -588,6 +606,16 @@ try {
 
   next = deleteOverlay(deck, 0, "eq-copy");
   assert(!next.includes("#eq-copy"), "overlay deletes narrowly");
+
+  let groupDeleteDeck = parseDeck(insertOverlay(deck, 0, {
+    type: "markdown", content: "First removal", id: "remove-first",
+  }));
+  groupDeleteDeck = parseDeck(insertOverlay(groupDeleteDeck, 0, {
+    type: "markdown", content: "Second removal", id: "remove-second",
+  }));
+  next = deleteOverlays(groupDeleteDeck, 0, ["remove-first", "remove-second"]);
+  assert(!next.includes("#remove-first") && !next.includes("#remove-second") && next.includes("#eq"),
+    "group deletion removes every selected overlay while preserving unselected overlays");
 
   document.body.dataset.status = "passed";
   document.querySelector("#results").textContent = `${checks.join("\n")}\n\n${checks.length} checks passed.`;

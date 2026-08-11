@@ -631,9 +631,17 @@ export function insertArrow(deck, slideIndex, { id, x1 = 25, y1 = 50, x2 = 75, y
 }
 
 export function deleteOverlay(deck, slideIndex, objectId) {
-  const overlay = deck.slides[slideIndex]?.overlays.find(item => item.id === objectId);
-  if (!overlay) throw new Error(`Unknown overlay '${objectId}'`);
-  return patchRange(deck.source, overlay.range.start, overlay.range.end, "");
+  return deleteOverlays(deck, slideIndex, [objectId]);
+}
+
+export function deleteOverlays(deck, slideIndex, objectIds) {
+  const requested = [...new Set(objectIds)];
+  if (!requested.length) return deck.source;
+  const available = new Map((deck.slides[slideIndex]?.overlays || []).map(overlay => [overlay.id, overlay]));
+  const unknown = requested.find(id => !available.has(id));
+  if (unknown) throw new Error(`Unknown overlay '${unknown}'`);
+  const overlays = requested.map(id => available.get(id)).sort((left, right) => right.range.start - left.range.start);
+  return overlays.reduce((source, overlay) => patchRange(source, overlay.range.start, overlay.range.end, ""), deck.source);
 }
 
 export function duplicateOverlay(deck, slideIndex, objectId, newId) {

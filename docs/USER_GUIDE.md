@@ -18,7 +18,9 @@ Design renders one slide and exposes graphical controls:
 - Shift-click floating overlays to add or remove them from a selection. Drag any
   selected object or use the arrow keys to move the group while preserving its
   spacing. The solid primary selection owns the properties and resize handles;
-  resizing affects only that object, never the group.
+  resizing affects only that object, never the group. The toolbar trashcan and
+  the `Delete` key remove every object in the selection. Duplicating copies the
+  primary object and moves the selection to the new copy.
 - Drag from an empty part of the slide to select every overlay intersecting the
   selection rectangle. Shift-drag adds the intersecting overlays to the current
   selection.
