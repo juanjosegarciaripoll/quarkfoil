@@ -1,4 +1,4 @@
-import { deleteSection, deleteSlide, duplicateSlide, importSlide, insertOverlay, insertSection, insertSlide, moveSection, moveSlide, parseDeck, updateSectionTitle } from "./parser.js";
+import { deleteSection, deleteSlide, duplicateSlide, importSlide, insertOverlay, insertSection, insertSlide, moveSection, moveSlide, normalizeDeck, parseDeck, updateSectionTitle } from "./parser.js";
 import { renderDeck, syncVideoPlayback } from "./render.js";
 import { DesignEditor, pageSlideIndex, projectAssetPage, resolveImportDestination } from "./editor.js";
 import { saveSnapshot } from "./storage.js";
@@ -949,6 +949,8 @@ async function saveDeck() {
       if (state.externalChange) { openExternalChangeDialog(); return; }
     }
     if (elements.source.value !== state.source && !commitSource(elements.source.value)) return;
+    const normalized = normalizeDeck(state.deck);
+    if (normalized !== state.source && !commitSource(normalized)) return;
     if (state.local) {
       const response = await fetch(`/api/deck?path=${encodeURIComponent(state.config.deck)}`, {
         method: "PUT",

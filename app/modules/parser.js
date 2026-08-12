@@ -4,6 +4,15 @@ const LAYOUTS = new Set(["1", "1-1", "1-2", "2-1", "0", "front", "free"]);
 export const THEMES = ["scientific-light", "scientific-dark"];
 const THEME_SET = new Set(THEMES);
 const CELL_NAMES = new Set(["core", "left", "right", "top-left", "bottom-left", "top-right", "bottom-right"]);
+const CELLS_BY_LAYOUT = {
+  "1": ["core"],
+  "1-1": ["left", "right"],
+  "1-2": ["left", "top-right", "bottom-right"],
+  "2-1": ["top-left", "bottom-left", "right"],
+  "0": [],
+  front: ["core"],
+  free: [],
+};
 
 export function escapeHtml(value) {
   return String(value)
@@ -208,6 +217,21 @@ function removeRanges(raw, ranges) {
   return result.trim();
 }
 
+function ordinarySourceRanges(raw, occupied, absoluteStart) {
+  const ranges = [];
+  let cursor = 0;
+  for (const [start, end] of [...occupied, [raw.length, raw.length]].sort((left, right) => left[0] - right[0])) {
+    const segment = raw.slice(cursor, start);
+    const first = segment.search(/\S/);
+    if (first >= 0) {
+      const last = segment.search(/\s*$/);
+      ranges.push({ start: absoluteStart + cursor + first, end: absoluteStart + cursor + last });
+    }
+    cursor = Math.max(cursor, end);
+  }
+  return ranges;
+}
+
 function parseSlide(source, range, index, diagnostics) {
   const raw = source.slice(range.start, range.end);
   let contentStart = range.start;
@@ -322,7 +346,8 @@ function parseSlide(source, range, index, diagnostics) {
     const ordinaryRange = parsed.occupied.length === 0
       ? { start: contentStart, headerEnd: contentStart, bodyStart: contentStart, bodyEnd: range.end, end: range.end }
       : null;
-    cells.unshift({ id: "core", type: "markdown", source: ordinary, image: null, video: null, range: ordinaryRange, attrs: parseAttributes("") });
+    const sourceRanges = ordinaryRange ? [ordinaryRange] : ordinarySourceRanges(bodyRaw, parsed.occupied, contentStart);
+    cells.unshift({ id: "core", type: "markdown", source: ordinary, image: null, video: null, range: ordinaryRange, sourceRanges, attrs: parseAttributes("") });
   }
   if (!cells.length && !["0", "free"].includes(layout)) cells.push({ id: "core", type: "markdown", source: "", image: null, video: null, range: null, attrs: parseAttributes("") });
   const duplicateCells = cells.map(cell => cell.id).filter((id, position, all) => all.indexOf(id) !== position);
@@ -410,6 +435,100 @@ export function patchRange(source, start, end, replacement) {
   return source.slice(0, start) + replacement + source.slice(end);
 }
 
+function normalizeSlideSpacing(source) {
+  let normalized = source.trimEnd();
+  if (!normalized) return "";
+  const slide = parseSlide(normalized, { start: 0, end: normalized.length }, 0, []);
+  const contentStart = slide.titleRange?.end || 0;
+  const blocks = parseDirectiveBlocks(normalized.slice(contentStart), contentStart, [], normalized).blocks;
+  const edits = [];
+  if (blocks.length && slide.titleRange) {
+    const gap = normalized.slice(slide.titleRange.end, blocks[0].range.start);
+    if (!gap.trim()) edits.push({ start: slide.titleRange.end, end: blocks[0].range.start, replacement: "\n" });
+  }
+  for (let index = 1; index < blocks.length; index += 1) {
+    const previous = blocks[index - 1];
+    const current = blocks[index];
+    const gap = normalized.slice(previous.range.end, current.range.start);
+    if (!gap.trim()) edits.push({ start: previous.range.end, end: current.range.start, replacement: "\n" });
+  }
+  for (const edit of edits.sort((left, right) => right.start - left.start)) {
+    normalized = patchRange(normalized, edit.start, edit.end, edit.replacement);
+  }
+  return `${normalized.trimEnd()}\n`;
+}
+
+function sourceNewline(source) {
+  return source.includes("\r\n") ? "\r\n" : "\n";
+}
+
+function normalizeMarkdownSpacing(source, newline) {
+  const output = [];
+  let pendingBlank = false;
+  let fence = null;
+  for (const line of String(source).split(/\r?\n/)) {
+    if (fence) {
+      output.push(line);
+      const close = /^ {0,3}(`{3,}|~{3,})[ \t]*$/.exec(line);
+      if (close && close[1][0] === fence.character && close[1].length >= fence.length) fence = null;
+      continue;
+    }
+    if (!line.trim()) {
+      pendingBlank = output.length > 0;
+      continue;
+    }
+    if (pendingBlank) output.push("");
+    pendingBlank = false;
+    output.push(line);
+    const open = /^ {0,3}(`{3,}|~{3,})/.exec(line);
+    if (open) fence = { character: open[1][0], length: open[1].length };
+  }
+  return output.join(newline);
+}
+
+function normalizeSlide(slide, newline) {
+  const raw = slide.raw;
+  const local = offset => offset - slide.range.start;
+  const title = slide.titleRange
+    ? raw.slice(local(slide.titleRange.start), local(slide.titleRange.end)).replace(/(?:\r?\n)+$/, "").replace(/^(?:[ \t]*\r?\n)+/, "")
+    : "";
+  const bodyStart = slide.titleRange ? local(slide.titleRange.end) : 0;
+  const body = raw.slice(bodyStart);
+  const blocks = parseDirectiveBlocks(body, bodyStart, [], raw).blocks;
+  const allowedCells = new Set(CELLS_BY_LAYOUT[slide.layout] || ["core"]);
+  const keepOrdinary = allowedCells.has("core");
+  const objects = [];
+  let cursor = 0;
+  for (const block of blocks) {
+    const start = block.range.start - bodyStart;
+    const end = block.range.end - bodyStart;
+    const ordinary = normalizeMarkdownSpacing(body.slice(cursor, start), newline);
+    if (keepOrdinary && ordinary) objects.push(ordinary);
+    if (!CELL_NAMES.has(block.name) || allowedCells.has(block.name)) {
+      objects.push(body.slice(start, end).replace(/\r?\n$/, ""));
+    }
+    cursor = end;
+  }
+  const ordinary = normalizeMarkdownSpacing(body.slice(cursor), newline);
+  if (keepOrdinary && ordinary) objects.push(ordinary);
+  return [title, ...objects].filter(Boolean).join(`${newline}${newline}`);
+}
+
+export function normalizeDeck(value) {
+  const deck = typeof value === "string" ? parseDeck(value) : value;
+  if (!deck?.source) throw new Error("Cannot normalize an empty presentation");
+  const fatal = deck.diagnostics.find(item => item.level === "error");
+  if (fatal) throw new Error(fatal.message);
+  const newline = sourceNewline(deck.source);
+  const frontMatter = deck.source.slice(0, deck.frontMatterRange.end).trim();
+  const items = deck.items.map(item => item.kind === "slide"
+    ? normalizeSlide(item, newline)
+    : normalizeMarkdownSpacing(item.raw, newline));
+  const separator = `${newline}${newline}---${newline}${newline}`;
+  const body = items.filter(Boolean).join(separator);
+  return `${frontMatter}${frontMatter && body ? `${newline}${newline}` : ""}${body}${newline}`;
+}
+
 function composeItems(deck, itemSources) {
   const frontMatter = deck.source.slice(0, deck.frontMatterRange.end).trimEnd();
   const body = itemSources.map(source => source.trim()).join("\n\n---\n\n");
@@ -444,17 +563,8 @@ function blankSlideSource(slide) {
   attrs.id = "";
   const hashes = slide.raw.match(/^\s*(#{1,6})/)?.[1] || "##";
   const attributes = serializeAttributes(attrs);
-  const cellsByLayout = {
-    "1": ["core"],
-    "1-1": ["left", "right"],
-    "1-2": ["left", "top-right", "bottom-right"],
-    "2-1": ["top-left", "bottom-left", "right"],
-    "0": [],
-    front: ["core"],
-    free: [],
-  };
-  const cells = (cellsByLayout[slide.layout] || ["core"])
-    .map(name => `::: ${name}\n\n:::`)
+  const cells = (CELLS_BY_LAYOUT[slide.layout] || ["core"])
+    .map(name => `::: ${name}\n:::`)
     .join("\n\n");
   return `${hashes} New slide${attributes ? ` {${attributes}}` : ""}${cells ? `\n\n${cells}` : ""}`;
 }
@@ -553,8 +663,20 @@ export function updateHeadingLayout(deck, slideIndex, layout, columns, rows) {
   if (["1-2", "2-1"].includes(layout)) attrs.values.rows = rows.map(value => Math.round(value * 10) / 10).join(" ");
   else delete attrs.values.rows;
   const hashes = slide.raw.match(/^\s*(#{1,6})/)?.[1] || "##";
-  const replacement = `${hashes} ${slide.title} {${serializeAttributes(attrs)}}`;
-  return patchRange(deck.source, slide.headingRange.start, slide.headingRange.end, replacement);
+  const heading = `${hashes} ${slide.title} {${serializeAttributes(attrs)}}`;
+  const allowedCells = new Set(CELLS_BY_LAYOUT[layout] || ["core"]);
+  const removals = slide.cells
+    .filter(cell => !allowedCells.has(cell.id))
+    .flatMap(cell => cell.range ? [cell.range] : (cell.sourceRanges || []));
+  const edits = [
+    { start: slide.headingRange.start, end: slide.headingRange.end, replacement: heading },
+    ...removals.map(range => ({ start: range.start, end: range.end, replacement: "" })),
+  ].sort((left, right) => right.start - left.start);
+  let source = slide.raw;
+  for (const edit of edits) {
+    source = patchRange(source, edit.start - slide.range.start, edit.end - slide.range.start, edit.replacement);
+  }
+  return patchRange(deck.source, slide.range.start, slide.range.end, normalizeSlideSpacing(source));
 }
 
 export function updateSlideProperties(deck, slideIndex, changes) {
@@ -580,7 +702,10 @@ export function updateSlideTitle(deck, slideIndex, title) {
   if (lines.some(line => line && !/^#{1,6}\s+\S/.test(line))) throw new Error("Each non-empty title line must be a Markdown heading beginning with #");
   lines[0] = lines[0].replace(/\s+\{[^}]*\}\s*$/, "");
   if (attributes) lines[0] += ` {${attributes}}`;
-  return patchRange(deck.source, slide.titleRange.start, slide.titleRange.end, `${lines.join("\n")}\n`);
+  const trailing = /^[ \t]*(?:\r?\n[ \t]*)*/.exec(deck.source.slice(slide.titleRange.end, slide.range.end))?.[0] || "";
+  const hasFollowingContent = slide.titleRange.end + trailing.length < slide.range.end;
+  const replacement = `${lines.join("\n")}\n${hasFollowingContent ? "\n" : ""}`;
+  return patchRange(deck.source, slide.titleRange.start, slide.titleRange.end + trailing.length, replacement);
 }
 
 export function updateOverlay(deck, slideIndex, objectId, changes) {
@@ -602,32 +727,43 @@ export function updateBlockContent(deck, slideIndex, objectId, content) {
   const cell = slide?.cells.find(item => item.id === objectId && item.range);
   const target = overlay || cell;
   if (!target?.range) throw new Error(`Cannot edit '${objectId}'`);
-  const normalized = `${content.trim()}\n`;
+  const trimmed = String(content).trim();
+  const normalized = trimmed ? `${trimmed}\n` : "";
   return patchRange(deck.source, target.range.bodyStart, target.range.bodyEnd, normalized);
+}
+
+function appendBlock(deck, slide, block) {
+  const trailingStart = slide.range.start + slide.raw.trimEnd().length;
+  const separator = slide.raw.trim() ? "\n\n" : "";
+  return patchRange(deck.source, trailingStart, slide.range.end, `${separator}${block}\n`);
+}
+
+function directiveBlock(name, content, attributes = "") {
+  const body = String(content).trim();
+  return `::: ${name}${attributes}\n${body}${body ? "\n" : ""}:::`;
 }
 
 export function setCellContent(deck, slideIndex, cellId, content) {
   const slide = deck.slides[slideIndex];
   const cell = slide?.cells.find(item => item.id === cellId && item.range);
   if (cell) return updateBlockContent(deck, slideIndex, cellId, content);
-  const block = `\n\n::: ${cellId}\n${content.trim()}\n:::\n`;
-  return patchRange(deck.source, slide.range.end, slide.range.end, block);
+  return appendBlock(deck, slide, directiveBlock(cellId, content));
 }
 
 export function insertOverlay(deck, slideIndex, { type, content, id, x = 35, y = 30, w = 30, h = 15, attributes = {} }) {
   const slide = deck.slides[slideIndex];
   const safeId = id.replace(/[^a-zA-Z0-9_-]/g, "-");
   const extra = Object.entries(attributes).map(([key, value]) => ` ${key}=${JSON.stringify(value)}`).join("");
-  const block = `\n\n::: overlay {#${safeId} type=${JSON.stringify(type)} x="${x}" y="${y}" w="${w}" h="${h}"${extra}}\n${content.trim()}\n:::\n`;
-  return patchRange(deck.source, slide.range.end, slide.range.end, block);
+  const attrs = ` {#${safeId} type=${JSON.stringify(type)} x="${x}" y="${y}" w="${w}" h="${h}"${extra}}`;
+  return appendBlock(deck, slide, directiveBlock("overlay", content, attrs));
 }
 
 export function insertArrow(deck, slideIndex, { id, x1 = 25, y1 = 50, x2 = 75, y2 = 50, attributes = {} }) {
   const slide = deck.slides[slideIndex];
   const safeId = id.replace(/[^a-zA-Z0-9_-]/g, "-");
   const extra = Object.entries(attributes).map(([key, value]) => ` ${key}=${JSON.stringify(value)}`).join("");
-  const block = `\n\n::: overlay {#${safeId} type="arrow" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"${extra}}\n\n:::\n`;
-  return patchRange(deck.source, slide.range.end, slide.range.end, block);
+  const attrs = ` {#${safeId} type="arrow" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"${extra}}`;
+  return appendBlock(deck, slide, directiveBlock("overlay", "", attrs));
 }
 
 export function deleteOverlay(deck, slideIndex, objectId) {
@@ -637,11 +773,16 @@ export function deleteOverlay(deck, slideIndex, objectId) {
 export function deleteOverlays(deck, slideIndex, objectIds) {
   const requested = [...new Set(objectIds)];
   if (!requested.length) return deck.source;
-  const available = new Map((deck.slides[slideIndex]?.overlays || []).map(overlay => [overlay.id, overlay]));
+  const slide = deck.slides[slideIndex];
+  const available = new Map((slide?.overlays || []).map(overlay => [overlay.id, overlay]));
   const unknown = requested.find(id => !available.has(id));
   if (unknown) throw new Error(`Unknown overlay '${unknown}'`);
   const overlays = requested.map(id => available.get(id)).sort((left, right) => right.range.start - left.range.start);
-  return overlays.reduce((source, overlay) => patchRange(source, overlay.range.start, overlay.range.end, ""), deck.source);
+  let source = slide.raw;
+  for (const overlay of overlays) {
+    source = patchRange(source, overlay.range.start - slide.range.start, overlay.range.end - slide.range.start, "");
+  }
+  return patchRange(deck.source, slide.range.start, slide.range.end, normalizeSlideSpacing(source));
 }
 
 export function duplicateOverlay(deck, slideIndex, objectId, newId) {

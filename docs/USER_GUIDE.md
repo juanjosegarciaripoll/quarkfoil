@@ -70,6 +70,10 @@ for a complete source example.
 - `Front page`: title in the upper half and details in the lower half.
 - `Free (nothing)`: no title, footer, or grid; only positioned overlays.
 
+Changing a slide's layout keeps regions that exist in both layouts and removes
+the Markdown for regions that the new layout does not use. Positioned objects,
+speaker notes, and footers are unaffected.
+
 Inside a layout region, one empty line separates Markdown blocks normally.
 Additional consecutive empty lines add visible vertical space. This also works
 in positioned Markdown and shape labels without altering fenced code blocks.
@@ -175,6 +179,13 @@ visible shape surface while retaining its outline and label.
 The Save button and `Ctrl+S` write the Markdown file. Unsaved changes are
 identified in the toolbar. Local-server saves require the revision hash loaded
 by the browser and use an atomic replacement to avoid partial files.
+
+Before writing, Quarkfoil normalizes the document structure. It removes grid
+regions unused by their slide layout, limits top-level Markdown to one empty
+line between objects, and writes one empty line around slide and section
+separators. Content inside `:::` directives—including overlays, grid regions,
+notes, and footers—is preserved verbatim. Normalization is idempotent, so
+repeated saves do not introduce further formatting changes.
 
 ### External editors and coding agents
 

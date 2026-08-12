@@ -12,6 +12,7 @@ import {
   moveSection,
   moveSlide,
   duplicateOverlay,
+  normalizeDeck,
   parseDeck,
   setCellContent,
   updateBlockContent,
@@ -607,12 +608,21 @@ try {
 
   const tightFront = parseDeck("# Front {.layout-front}\n::: core\nDetails\n:::\n");
   const editedFront = updateSlideTitle(tightFront, 0, "# Front\n## *A simple roadmap*");
-  assert(editedFront.includes("## *A simple roadmap*\n::: core"), "title editing preserves an adjacent core directive boundary");
+  assert(editedFront.includes("## *A simple roadmap*\n\n::: core"), "title editing leaves one readable blank line before slide content");
   assert(parseDeck(editedFront).slides[0].cells.some(cell => cell.id === "core" && cell.source === "Details"), "adjacent core directive remains parsed as content");
+
+  const untidyTitle = parseDeck("## Spaced {.layout-1}\n\n\n\n::: core\nBody\n:::\n");
+  const tidiedTitle = updateSlideTitle(untidyTitle, 0, untidyTitle.slides[0].titleSource);
+  assert(tidiedTitle.includes("{.layout-1}\n\n::: core") && !tidiedTitle.includes("{.layout-1}\n\n\n"), "title editing removes excess trailing newlines");
+  const repeatedTitleEdit = updateSlideTitle(parseDeck(tidiedTitle), 0, parseDeck(tidiedTitle).slides[0].titleSource);
+  assert(repeatedTitleEdit === tidiedTitle, "repeated title edits do not accumulate newlines");
 
   next = updateBlockContent(deck, 0, "eq", "\\[F=ma\\]");
   assert(next.includes("F=ma"), "block content patches source");
   deck = parseDeck(next);
+
+  const trailingBody = updateBlockContent(deck, 0, "eq", "Body\n\n\n");
+  assert(trailingBody.includes("Body\n:::") && !trailingBody.includes("Body\n\n:::"), "content editing removes trailing body newlines before the closing fence");
 
   next = updateHeadingLayout(deck, 0, "1-1", [35, 65], [50, 50]);
   assert(next.includes(".layout-1-1"), "layout patches heading");
@@ -621,7 +631,148 @@ try {
 
   next = setCellContent(deck, 0, "right", "New cell");
   assert(next.includes("::: right\nNew cell"), "missing cell inserts declaratively");
+  assert(!next.includes("\n\n\n::: right"), "new cells use one blank line between directive blocks");
   deck = parseDeck(next);
+
+  const onePlusOne = parseDeck(`## Switch {.layout-1-1}
+
+::: left
+Keep left
+:::
+
+::: right
+Remove right
+:::
+
+::: overlay {#keep type="markdown"}
+Keep overlay
+:::
+`);
+  const onePlusTwo = parseDeck(updateHeadingLayout(onePlusOne, 0, "1-2", [50, 50], [50, 50]));
+  assert(onePlusTwo.slides[0].cells.some(cell => cell.id === "left") && !onePlusTwo.source.includes("Remove right"), "1+1 to 1+2 removes the obsolete right cell");
+  assert(onePlusTwo.slides[0].overlays.some(overlay => overlay.id === "keep"), "layout changes retain overlays");
+  const zeroLayout = parseDeck(updateHeadingLayout(onePlusTwo, 0, "0", [50, 50], [50, 50]));
+  assert(zeroLayout.slides[0].cells.length === 0 && zeroLayout.slides[0].overlays.length === 1, "layout 0 removes every grid cell but retains overlays");
+
+  const onePlusTwoCells = parseDeck(`## Reverse {.layout-1-2}
+
+::: left
+Keep left
+:::
+
+::: top-right
+Remove top
+:::
+
+::: bottom-right
+Remove bottom
+:::
+`);
+  const onePlusOneAgain = parseDeck(updateHeadingLayout(onePlusTwoCells, 0, "1-1", [50, 50], [50, 50]));
+  assert(onePlusOneAgain.slides[0].cells.map(cell => cell.id).join(" ") === "left", "1+2 to 1+1 removes both obsolete stacked cells");
+
+  const mixedCore = parseDeck(`## Ordinary {.layout-1}
+
+Ordinary core content.
+
+::: overlay {#ordinary-overlay type="markdown"}
+Overlay content
+:::
+`);
+  const mixedZero = parseDeck(updateHeadingLayout(mixedCore, 0, "0", [50, 50], [50, 50]));
+  assert(!mixedZero.source.includes("Ordinary core content.") && mixedZero.source.includes("Overlay content"), "layout 0 removes ordinary core Markdown without removing adjacent directives");
+
+  const unnormalized = `---
+title: Normalize
+---
+
+
+
+# Methods {#methods .section}
+
+
+
+---
+
+
+## Normalize {.layout-1}
+
+
+
+First paragraph.
+
+
+
+Second paragraph.
+
+
+
+::: right
+Unused panel
+:::
+
+
+
+::: overlay {#preserved type="markdown"}
+Overlay first
+
+
+Overlay second
+:::
+
+
+
+::: notes
+Note first
+
+
+Note second
+:::
+
+
+
+---
+
+
+## Zero {.layout-0}
+
+
+
+::: core
+Hidden core panel
+:::
+
+
+
+::: footer
+Visible footer
+:::
+
+
+
+---
+
+
+## Ordinary zero {.layout-0}
+
+
+
+Hidden ordinary content.
+
+
+
+::: footer
+Another visible footer
+:::
+`;
+  const normalized = normalizeDeck(unnormalized);
+  assert(!normalized.includes("Unused panel") && !normalized.includes("Hidden ordinary content.") && !normalized.includes("Hidden core panel"), "document normalization removes cells unused by their layouts");
+  assert(normalized.includes("First paragraph.\n\nSecond paragraph.\n\n::: overlay"), "document normalization leaves one blank line between top-level objects");
+  assert(normalized.includes("Overlay first\n\n\nOverlay second") && normalized.includes("Note first\n\n\nNote second"), "document normalization preserves whitespace inside directive bodies");
+  assert(normalized.includes("# Methods {#methods .section}\n\n---\n\n## Normalize") && normalized.includes("::: overlay {#preserved type=\"markdown\"}\nOverlay first\n\n\nOverlay second\n:::\n\n::: notes"), "sections, slides, and directives use one blank line at their boundaries");
+  assert(normalizeDeck(normalized) === normalized, "document normalization is idempotent");
+  const normalizedCode = normalizeDeck("## Code {.layout-1}\n\n\n\nBefore.\n\n\n\n```text\nfirst\n\n\nsecond\n```\n");
+  assert(normalizedCode.includes("Before.\n\n```text\nfirst\n\n\nsecond\n```"), "document normalization preserves blank lines inside ordinary fenced code");
 
   next = duplicateOverlay(deck, 0, "eq", "eq-copy");
   assert(next.includes("#eq-copy"), "overlay duplicates with stable ID");
@@ -639,6 +790,7 @@ try {
   next = deleteOverlays(groupDeleteDeck, 0, ["remove-first", "remove-second"]);
   assert(!next.includes("#remove-first") && !next.includes("#remove-second") && next.includes("#eq"),
     "group deletion removes every selected overlay while preserving unselected overlays");
+  assert(!next.includes("\n\n\n:::"), "block deletion does not leave excess blank lines between directives");
 
   document.body.dataset.status = "passed";
   document.querySelector("#results").textContent = `${checks.join("\n")}\n\n${checks.length} checks passed.`;

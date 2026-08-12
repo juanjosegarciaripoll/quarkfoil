@@ -73,6 +73,31 @@ def main() -> int:
         WebDriverWait(driver, 30).until(
             lambda active_driver: active_driver.find_element(By.ID, "save-state").text == "Saved"
         )
+        driver.find_element(By.CSS_SELECTOR, '[data-mode="source"]').click()
+        normalization_editor = driver.find_element(By.ID, "source-editor")
+        messy_source = (
+            "## Browser test {.layout-1}\n\n\n\n"
+            "First paragraph.\n\n\n\nSecond paragraph.\n\n\n\n"
+            "::: right\nUnused panel\n:::\n\n\n\n"
+            "::: overlay {#preserved type=\"markdown\"}\nFirst overlay line\n\n\nSecond overlay line\n:::\n"
+        )
+        driver.execute_script(
+            "arguments[0].value = arguments[1]; arguments[0].dispatchEvent(new Event('input', {bubbles:true}));",
+            normalization_editor,
+            messy_source,
+        )
+        WebDriverWait(driver, 5).until(
+            lambda active_driver: not active_driver.find_element(By.ID, "save-button").get_attribute("disabled")
+        )
+        driver.find_element(By.ID, "save-button").click()
+        WebDriverWait(driver, 10).until(
+            lambda active_driver: active_driver.find_element(By.ID, "save-state").text == "Saved"
+        )
+        saved_source = deck.read_text(encoding="utf-8")
+        if "Unused panel" in saved_source or "First paragraph.\n\nSecond paragraph." not in saved_source:
+            raise RuntimeError("Saving did not normalize top-level presentation content")
+        if "First overlay line\n\n\nSecond overlay line" not in saved_source:
+            raise RuntimeError("Saving changed whitespace inside an overlay")
         incoming = deck.with_suffix(".incoming")
         incoming.write_text("## External reload {.layout-1}\n\nChanged outside Quarkfoil.\n", encoding="utf-8")
         incoming.replace(deck)
