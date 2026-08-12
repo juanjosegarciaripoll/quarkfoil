@@ -53,6 +53,8 @@ All notable changes to Quarkfoil are documented here. The project follows
   alpha channels for the background, area, and curve colors.
 - Empty selected Markdown layout regions and remove other selected canvas
   objects with Delete, Del, or the Backspace value used by compact keyboards.
+- Return keyboard focus to the Design canvas when selecting an object or region
+  so arrow-key movement works after editing a value in Properties.
 
 ## [0.2.0] - 2026-08-09
 

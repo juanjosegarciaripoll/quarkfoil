@@ -483,9 +483,17 @@ export class DesignEditor {
     if (!this.active() || this.drag) return;
     if (this.suppressClick) { this.suppressClick = false; return; }
     const overlay = event.target.closest(".slide-overlay");
-    if (overlay) { this.selectOverlay(overlay, { additive: event.shiftKey, toggle: event.shiftKey }); return; }
+    if (overlay) {
+      this.stage.focus({ preventScroll: true });
+      this.selectOverlay(overlay, { additive: event.shiftKey, toggle: event.shiftKey });
+      return;
+    }
     const cell = event.target.closest(".slide-cell");
-    if (cell) { this.selectCell(cell); return; }
+    if (cell) {
+      this.stage.focus({ preventScroll: true });
+      this.selectCell(cell);
+      return;
+    }
     this.clearSelection();
   }
 
@@ -702,6 +710,7 @@ export class DesignEditor {
   onPointerDown(event) {
     if (!this.active() || event.button !== 0) return;
     if (canvasLinkTarget(event.target)) return;
+    if (event.target.closest(".slide-overlay, .slide-cell")) this.stage.focus({ preventScroll: true });
     const handle = event.target.closest(".resize-handle");
     const overlay = event.target.closest(".slide-overlay");
     const cell = event.target.closest(".slide-cell");
