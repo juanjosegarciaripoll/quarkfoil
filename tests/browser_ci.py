@@ -110,6 +110,11 @@ def main() -> int:
         WebDriverWait(driver, 5).until(
             lambda active_driver: active_driver.find_element(By.ID, "color-dialog").get_attribute("open") is not None
         )
+        backdrop = driver.execute_script(
+            "return getComputedStyle(document.querySelector('#color-dialog'), '::backdrop').backgroundColor;"
+        )
+        if backdrop not in {"rgba(0, 0, 0, 0)", "transparent"}:
+            raise RuntimeError(f"Color dialog unexpectedly dims the slide with backdrop {backdrop}")
         driver.execute_script("document.querySelector('#color-dialog-value').value = '#123456';")
         driver.find_element(By.CSS_SELECTOR, "#color-dialog button[value='apply']").click()
         WebDriverWait(driver, 5).until(

@@ -41,6 +41,7 @@ All notable changes to Quarkfoil are documented here. The project follows
 
 ### Fixed
 
+- Keep the slide visible at full brightness while editing a color.
 - Decode standard LaTeX accents and Latin letter commands when displaying
   BibTeX authors, titles, and other fields.
 - Include the thesis type and institution in abbreviated thesis attributions.

@@ -244,6 +244,7 @@ body.presenting .toolbar { display: none; }
 
 dialog { width: min(900px, 88vw); max-width: 88vw; padding: 0; color: #edf2f4; background: #20252b; border: 1px solid #697681; border-radius: 8px; }
 dialog::backdrop { background: #000a; }
+#color-dialog::backdrop { background: transparent; }
 #external-change-dialog { width: min(1100px, 94vw); max-width: 94vw; }
 .external-change-dialog__form { display: grid; gap: 0.7rem; width: 100%; height: min(820px, 90vh); padding: 1rem; overflow: hidden; }
 .external-change-dialog__form h2,
