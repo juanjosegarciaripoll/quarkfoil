@@ -824,3 +824,54 @@ export function duplicateOverlay(deck, slideIndex, objectId, newId) {
   const block = `\n::: overlay {${serializeAttributes(attrs)}}\n${overlay.source.trim()}\n:::\n`;
   return patchRange(deck.source, overlay.range.end, overlay.range.end, block);
 }
+
+export function serializeOverlays(deck, slideIndex, objectIds) {
+  const slide = deck.slides[slideIndex];
+  const requested = new Set(objectIds);
+  const overlays = (slide?.overlays || []).filter(overlay => requested.has(overlay.id));
+  if (overlays.length !== requested.size) throw new Error("Cannot copy an unknown overlay");
+  return overlays.map(overlay => `::: overlay {${serializeAttributes(overlay.attrs)}}\n${overlay.source.trim()}${overlay.source.trim() ? "\n" : ""}:::`).join("\n\n");
+}
+
+export function pasteOverlays(deck, slideIndex, clipboardSource, offset = 2) {
+  const slide = deck.slides[slideIndex];
+  if (!slide) throw new Error("Unknown slide");
+  const parsed = parseDeck(`## Clipboard {.layout-free}\n\n${String(clipboardSource).trim()}\n`);
+  if (parsed.diagnostics.length || !parsed.slides[0]?.overlays.length) return null;
+  const clipboardSlide = parsed.slides[0];
+  const ordinary = clipboardSlide.cells.find(cell => cell.id === "core")?.source.trim();
+  if (ordinary || clipboardSlide.cells.some(cell => cell.range) || clipboardSlide.footer || clipboardSlide.notes) return null;
+  const minimumX = Math.min(...clipboardSlide.overlays.map(overlay => overlay.geometry.x));
+  const minimumY = Math.min(...clipboardSlide.overlays.map(overlay => overlay.geometry.y));
+  const maximumX = Math.max(...clipboardSlide.overlays.map(overlay => overlay.geometry.x + overlay.geometry.w));
+  const maximumY = Math.max(...clipboardSlide.overlays.map(overlay => overlay.geometry.y + overlay.geometry.h));
+  const dx = Math.max(-minimumX, Math.min(100 - maximumX, offset));
+  const dy = Math.max(-minimumY, Math.min(100 - maximumY, offset));
+  const used = new Set(slide.overlays.map(overlay => overlay.id));
+  const ids = [];
+  const blocks = clipboardSlide.overlays.map(overlay => {
+    const attrs = structuredClone(overlay.attrs);
+    const base = (attrs.id || "overlay").replace(/[^a-zA-Z0-9_-]/g, "-") || "overlay";
+    let id = base;
+    let counter = 1;
+    while (used.has(id)) id = `${base}-copy${counter++ === 1 ? "" : `-${counter - 1}`}`;
+    used.add(id);
+    ids.push(id);
+    attrs.id = id;
+    if (overlay.arrow) {
+      for (const key of ["x1", "x2"]) attrs.values[key] = String(overlay.arrow[key] + dx);
+      for (const key of ["y1", "y2"]) attrs.values[key] = String(overlay.arrow[key] + dy);
+    } else {
+      attrs.values.x = String(overlay.geometry.x + dx);
+      attrs.values.y = String(overlay.geometry.y + dy);
+    }
+    const body = overlay.source.trim();
+    return `::: overlay {${serializeAttributes(attrs)}}\n${body}${body ? "\n" : ""}:::`;
+  });
+  let source = deck.source;
+  for (const block of blocks) {
+    const currentDeck = parseDeck(source);
+    source = appendBlock(currentDeck, currentDeck.slides[slideIndex], block);
+  }
+  return { source, ids };
+}

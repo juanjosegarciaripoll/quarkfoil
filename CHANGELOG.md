@@ -7,6 +7,9 @@ All notable changes to Quarkfoil are documented here. The project follows
 
 ### Added
 
+- Cut, copy, and paste selected overlays and multi-object selections through
+  the system clipboard using readable Quarkfoil Markdown. Cross-slide pastes
+  preserve positions, while same-slide copies receive a visible offset.
 - Select, move, duplicate, and delete multiple slide objects together.
 - Create editable arrows with configurable endpoints, arrowheads, color, and
   line width.
@@ -38,6 +41,9 @@ All notable changes to Quarkfoil are documented here. The project follows
 
 ### Fixed
 
+- Prevent Enter in Properties fields from submitting their surrounding forms;
+  use it to commit the active value instead, and apply color and alpha controls
+  directly from native color-picker input.
 - Detect and reconcile presentation changes made outside the editor without
   silently replacing either the browser draft or the disk revision.
 - Keep image focus effective for width- and height-fitted images, and add a

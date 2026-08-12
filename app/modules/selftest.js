@@ -14,6 +14,8 @@ import {
   duplicateOverlay,
   normalizeDeck,
   parseDeck,
+  pasteOverlays,
+  serializeOverlays,
   setCellContent,
   updateBlockContent,
   updateHeadingLayout,
@@ -24,7 +26,7 @@ import {
   updateSlideNotes,
 } from "./parser.js";
 import { renderDeck, syncVideoPlayback } from "./render.js";
-import { arrowGeometry, bindRangeControl, buildShapePalette, canvasLinkTarget, canvasStartsMarquee, clipboardImageFile, deleteKey, DesignEditor, initialImageGeometry, moveGeometryGroup, pageSlideIndex, projectAssetPage, rectanglesIntersect, renameClipboardImage, repeatedActivation, resolveImportDestination, videoFile } from "./editor.js";
+import { arrowGeometry, bindRangeControl, buildShapePalette, canvasLinkTarget, canvasStartsMarquee, clipboardImageFile, deleteKey, DesignEditor, initialImageGeometry, moveGeometryGroup, overlayPasteOffset, pageSlideIndex, projectAssetPage, rectanglesIntersect, renameClipboardImage, repeatedActivation, resolveImportDestination, videoFile } from "./editor.js";
 import { formatBibliography, parseBibliography, prepareBibliography, renameBibliographyEntry, uniqueCitationKey } from "./bibliography.js";
 import { compileExpression, createPlotSvg } from "./plot.js";
 import { externalDeckAction } from "./external.js";
@@ -812,6 +814,18 @@ Another visible footer
   assert(!next.includes("#remove-first") && !next.includes("#remove-second") && next.includes("#eq"),
     "group deletion removes every selected overlay while preserving unselected overlays");
   assert(!next.includes("\n\n\n:::"), "block deletion does not leave excess blank lines between directives");
+
+  const copiedOverlays = serializeOverlays(deck, 0, ["eq", "movie"]);
+  assert(copiedOverlays.includes("#eq") && copiedOverlays.includes("#movie") && copiedOverlays.includes("F=ma"), "selected overlays serialize as readable clipboard directives");
+  const pastedOverlays = pasteOverlays(deck, 1, copiedOverlays);
+  const pastedDeck = parseDeck(pastedOverlays.source);
+  assert(pastedOverlays.ids.length === 2 && pastedDeck.slides[1].overlays.length === 2, "multiple copied overlays paste into another slide");
+  assert(pastedDeck.slides[1].overlays.find(item => item.type === "equation")?.geometry.x === deck.slides[0].overlays.find(item => item.id === "eq").geometry.x + 2, "pasted overlays receive a visible position offset");
+  const repastedOverlays = pasteOverlays(pastedDeck, 1, copiedOverlays);
+  assert(repastedOverlays.ids.every(id => !["eq", "movie"].includes(id)), "pasted overlays receive collision-safe slide-local IDs");
+  assert(pasteOverlays(deck, 1, "ordinary clipboard text") === null, "ordinary clipboard text is not mistaken for an overlay");
+  assert(overlayPasteOffset(deck.slides[0].id, deck.slides[0].id) === 2, "pasting onto the source slide offsets copied overlays");
+  assert(overlayPasteOffset(deck.slides[0].id, deck.slides[1].id) === 0, "pasting onto another slide preserves overlay positions");
 
   document.body.dataset.status = "passed";
   document.querySelector("#results").textContent = `${checks.join("\n")}\n\n${checks.length} checks passed.`;

@@ -4,7 +4,9 @@ import {
   duplicateOverlay,
   insertArrow,
   insertOverlay,
+  pasteOverlays,
   parseDeck,
+  serializeOverlays,
   setCellContent,
   updateBlockContent,
   updateHeadingLayout,
@@ -18,6 +20,8 @@ import { makeShapeSvg, SHAPES } from "./shapes.js";
 
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
 const round = value => Math.round(value * 10) / 10;
+const OVERLAY_CLIPBOARD_TYPE = "application/x-quarkfoil-overlays";
+export const overlayPasteOffset = (sourceSlideId, targetSlideId) => sourceSlideId && sourceSlideId !== targetSlideId ? 0 : 2;
 export const videoFile = file => file?.type?.startsWith("video/") || /\.(?:avi|mkv|mp4|webm)$/i.test(file?.name || "");
 export const repeatedActivation = (previous, key, time, interval = 450) => Boolean(
   previous && previous.key === key && time - previous.time >= 0 && time - previous.time <= interval,
@@ -279,18 +283,42 @@ export class DesignEditor {
   }
 
   bind() {
+    document.querySelectorAll("#properties form").forEach(form => {
+      form.addEventListener("submit", event => event.preventDefault());
+      form.addEventListener("keydown", event => {
+        if (event.key !== "Enter" || !event.target.matches("input")) return;
+        event.preventDefault();
+        event.target.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+    });
+    const bindColorControl = (id, apply, delay = 0) => {
+      let timer = null;
+      const commit = () => {
+        clearTimeout(timer);
+        timer = null;
+        apply();
+      };
+      for (const suffix of ["", "-alpha"]) {
+        const input = document.querySelector(`#${id}${suffix}`);
+        input.addEventListener("input", () => {
+          clearTimeout(timer);
+          timer = setTimeout(commit, delay);
+        });
+        input.addEventListener("change", commit);
+      }
+    };
     this.stage.addEventListener("click", event => this.onClick(event));
     this.stage.addEventListener("dblclick", event => this.onDoubleClick(event));
     this.stage.addEventListener("pointerdown", event => this.onPointerDown(event));
     document.addEventListener("keydown", event => this.onKeyDown(event));
+    document.addEventListener("copy", event => this.onCopy(event));
+    document.addEventListener("cut", event => this.onCopy(event, { cut: true }));
     document.addEventListener("paste", event => this.onPaste(event));
     for (const id of ["prop-focus-x", "prop-focus-y", "prop-font-size"]) bindRangeControl(id);
     document.querySelector("#layout-select").addEventListener("change", event => this.changeLayout(event.target.value));
     document.querySelector("#prop-slide-theme").addEventListener("change", event => this.applySlideProperties({ theme: event.target.value || null }));
     for (const name of ["background", "foreground"]) {
-      for (const suffix of ["", "-alpha"]) {
-        document.querySelector(`#prop-slide-${name}${suffix}`).addEventListener("change", () => this.applySlideProperties({ [name]: colorControlValue(`prop-slide-${name}`) }));
-      }
+      bindColorControl(`prop-slide-${name}`, () => this.applySlideProperties({ [name]: colorControlValue(`prop-slide-${name}`) }));
     }
     document.querySelector("#reset-slide-background").addEventListener("click", () => this.applySlideProperties({ background: null }));
     document.querySelector("#reset-slide-foreground").addEventListener("click", () => this.applySlideProperties({ foreground: null }));
@@ -343,18 +371,18 @@ export class DesignEditor {
       this.applyPlotProperties();
     });
     for (const name of ["background", "fill", "stroke"]) {
-      for (const suffix of ["", "-alpha"]) {
-        document.querySelector(`#prop-plot-${name}${suffix}`).addEventListener("change", () => {
-          if (name === "background") document.querySelector("#prop-plot-background-enabled").checked = true;
-          if (name === "fill") document.querySelector("#prop-plot-fill-enabled").checked = true;
-          this.applyPlotProperties();
-        });
-      }
+      bindColorControl(`prop-plot-${name}`, () => {
+        if (name === "background") document.querySelector("#prop-plot-background-enabled").checked = true;
+        if (name === "fill") document.querySelector("#prop-plot-fill-enabled").checked = true;
+        this.applyPlotProperties();
+      }, 60);
     }
     document.querySelector("#prop-plot-stroke-width").addEventListener("change", () => this.applyPlotProperties());
-    for (const id of ["prop-arrow-stroke", "prop-arrow-stroke-width", "prop-arrow-heads"]) {
+    for (const id of ["prop-arrow-stroke-width", "prop-arrow-heads"]) {
       document.querySelector(`#${id}`).addEventListener("change", () => this.applyArrowProperties());
     }
+    document.querySelector("#prop-arrow-stroke").addEventListener("input", () => this.applyArrowProperties());
+    document.querySelector("#prop-arrow-stroke").addEventListener("change", () => this.applyArrowProperties());
     document.querySelector("#image-input").addEventListener("change", event => {
       const file = event.target.files?.[0];
       document.querySelector("#project-file-dialog").close();
@@ -407,15 +435,14 @@ export class DesignEditor {
     for (const id of ["video-fit", "video-controls", "video-autoplay", "video-loop", "video-muted", "video-poster"]) {
       document.querySelector(`#prop-${id}`).addEventListener("change", () => this.applyVideoProperties());
     }
-    for (const id of ["shape", "shape-fill", "shape-fill-alpha", "shape-stroke", "shape-stroke-alpha", "shape-stroke-width", "shape-shadow"]) {
+    for (const id of ["shape", "shape-stroke-width", "shape-shadow"]) {
       document.querySelector(`#prop-${id}`).addEventListener("change", () => this.applyShapeProperties());
     }
+    for (const name of ["fill", "stroke"]) bindColorControl(`prop-shape-${name}`, () => this.applyShapeProperties());
     document.querySelector("#prop-attribution-keys").addEventListener("change", () => this.applyAttributionKeys());
     document.querySelector("#prop-font-size").addEventListener("input", event => this.previewFontSize(event.target.value));
     document.querySelector("#prop-font-size").addEventListener("change", () => this.applyFontSize());
-    for (const id of ["prop-text-color", "prop-text-color-alpha"]) {
-      document.querySelector(`#${id}`).addEventListener("change", () => this.applyTextColor(colorControlValue("prop-text-color")));
-    }
+    bindColorControl("prop-text-color", () => this.applyTextColor(colorControlValue("prop-text-color")));
     document.querySelector("#reset-text-color").addEventListener("click", () => this.applyTextColor(null));
     document.querySelectorAll(".alignment-buttons [data-align]").forEach(button => {
       button.addEventListener("click", () => this.applyAlignment(button.dataset.align));
@@ -1418,18 +1445,50 @@ export class DesignEditor {
       || ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)
       || document.activeElement?.isContentEditable) return;
     const file = clipboardImageFile(event.clipboardData);
-    if (!file) return;
+    if (file) {
+      event.preventDefault();
+      const requestedName = window.prompt("Filename for pasted image:", file.name);
+      const namedFile = renameClipboardImage(file, requestedName);
+      if (!namedFile) return;
+      const selectedObject = this.selected
+        ? this.slide().overlays.find(item => item.id === this.selected.dataset.objectId)
+        : this.selectedCell
+          ? this.slide().cells.find(item => item.id === this.selectedCell.dataset.cellId)
+          : null;
+      if (selectedObject?.image) this.replaceImage(namedFile);
+      else this.addImage(namedFile, null, this.selectedCell?.dataset.cellId || null);
+      return;
+    }
+    let internal = null;
+    try {
+      const encoded = event.clipboardData?.getData(OVERLAY_CLIPBOARD_TYPE) || "";
+      if (encoded) internal = JSON.parse(encoded);
+    } catch { /* Some browsers expose only standard clipboard types. */ }
+    const source = internal?.source || event.clipboardData?.getData("text/plain");
+    const offset = overlayPasteOffset(internal?.sourceSlideId, this.slide().id);
+    const pasted = pasteOverlays(this.options.getDeck(), this.slideIndex(), source || "", offset);
+    if (!pasted) return;
     event.preventDefault();
-    const requestedName = window.prompt("Filename for pasted image:", file.name);
-    const namedFile = renameClipboardImage(file, requestedName);
-    if (!namedFile) return;
-    const selectedObject = this.selected
-      ? this.slide().overlays.find(item => item.id === this.selected.dataset.objectId)
-      : this.selectedCell
-        ? this.slide().cells.find(item => item.id === this.selectedCell.dataset.cellId)
-        : null;
-    if (selectedObject?.image) this.replaceImage(namedFile);
-    else this.addImage(namedFile, null, this.selectedCell?.dataset.cellId || null);
+    this.options.commitSource(pasted.source);
+    pasted.ids.forEach((id, index) => {
+      const overlay = this.section()?.querySelector(`[data-object-id="${CSS.escape(id)}"]`);
+      if (overlay) this.selectOverlay(overlay, { additive: index > 0 });
+    });
+  }
+
+  onCopy(event, { cut = false } = {}) {
+    if (!this.active() || this.dialog.open || !this.selected
+      || ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)
+      || document.activeElement?.isContentEditable) return;
+    const ids = this.selectedOverlayElements().map(element => element.dataset.objectId);
+    if (!ids.length || !event.clipboardData) return;
+    const source = serializeOverlays(this.options.getDeck(), this.slideIndex(), ids);
+    event.preventDefault();
+    event.clipboardData.setData("text/plain", source);
+    try {
+      event.clipboardData.setData(OVERLAY_CLIPBOARD_TYPE, JSON.stringify({ version: 1, sourceSlideId: this.slide().id, source }));
+    } catch { /* Plain text remains portable. */ }
+    if (cut) this.commit(deleteOverlays(this.options.getDeck(), this.slideIndex(), ids));
   }
 
   duplicate() {

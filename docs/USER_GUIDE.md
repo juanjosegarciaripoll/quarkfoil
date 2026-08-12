@@ -270,4 +270,11 @@ deck-wide numbering.
 - `Shift` + arrow keys: nudge the selected overlay or group by `1%`.
 - `Delete`: delete a selected overlay.
 - `Ctrl+D`: duplicate a selected overlay.
-- `Ctrl+V`: paste a clipboard image in Design mode.
+- `Ctrl+C` / `Ctrl+X`: copy or cut the selected overlay or group.
+- `Ctrl+V`: paste copied overlays or a clipboard image in Design mode.
+
+Copied overlays use readable `::: overlay` Markdown on the system clipboard.
+They may be pasted onto another slide or another Quarkfoil window. Pasted
+objects retain their content and styling, receive collision-safe IDs, move
+slightly when pasted back onto the same slide, and become the active selection.
+Pasting onto a different slide preserves their original positions.

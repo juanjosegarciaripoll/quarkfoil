@@ -9,6 +9,7 @@ from pathlib import Path
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 
 from scientific_slides.server import create_server
@@ -95,6 +96,22 @@ def main() -> int:
         driver.get(base)
         WebDriverWait(driver, 30).until(
             lambda active_driver: active_driver.find_element(By.ID, "save-state").text == "Saved"
+        )
+        driver.execute_script(
+            "document.querySelector('.slide-overlay').dispatchEvent(new MouseEvent('click', {bubbles:true}));"
+        )
+        position = driver.find_element(By.ID, "prop-x")
+        position.send_keys(Keys.CONTROL, "a")
+        position.send_keys("25", Keys.ENTER)
+        WebDriverWait(driver, 5).until(
+            lambda active_driver: 'x="25"' in active_driver.find_element(By.ID, "source-editor").get_attribute("value")
+        )
+        driver.execute_script(
+            "const input = document.querySelector('#prop-text-color'); input.value = '#123456';"
+            "input.dispatchEvent(new Event('input', {bubbles:true}));"
+        )
+        WebDriverWait(driver, 5).until(
+            lambda active_driver: 'color="#123456"' in active_driver.find_element(By.ID, "source-editor").get_attribute("value")
         )
         original_window = driver.current_window_handle
         attribution_link = WebDriverWait(driver, 5).until(
