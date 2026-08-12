@@ -101,6 +101,7 @@ let deckCheckPending = false;
 let lastDeckCheck = 0;
 let deckChannel = null;
 let deckClaim = null;
+let bibliographyOpenPending = false;
 
 function assetResolver(source) {
   if (state.objectUrls.has(source)) return state.objectUrls.get(source);
@@ -1041,7 +1042,7 @@ function bibliographyPath() {
 
 async function loadBibliography() {
   if (!state.local) return;
-  const response = await fetch(`/api/bibliography?path=${encodeURIComponent(bibliographyPath())}`);
+  const response = await fetch(`/api/bibliography?path=${encodeURIComponent(bibliographyPath())}`, { cache: "no-store" });
   const result = await response.json();
   if (!response.ok) throw new Error(result.error || "Cannot load bibliography");
   state.bibliographySource = result.source;
@@ -1088,11 +1089,19 @@ function rebuildBibliographyList(revealKey = null) {
   if (revealedRow) requestAnimationFrame(() => revealedRow.scrollIntoView({ block: "nearest" }));
 }
 
-function openBibliography() {
-  document.querySelector("#bibliography-source").value = state.bibliographySource;
-  document.querySelector("#bibliography-search").value = "";
-  rebuildBibliographyList();
-  document.querySelector("#bibliography-dialog").showModal();
+async function openBibliography() {
+  const dialog = document.querySelector("#bibliography-dialog");
+  if (dialog.open || bibliographyOpenPending) return;
+  bibliographyOpenPending = true;
+  try {
+    await loadBibliography();
+    document.querySelector("#bibliography-source").value = state.bibliographySource;
+    document.querySelector("#bibliography-search").value = "";
+    rebuildBibliographyList();
+    dialog.showModal();
+  } catch (error) {
+    showStatus(error.message || "Cannot reload bibliography", true);
+  } finally { bibliographyOpenPending = false; }
 }
 
 function remapSourceOffset(before, after, offset) {

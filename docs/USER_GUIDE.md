@@ -217,6 +217,12 @@ BibTeX source. The source is saved losslessly to the file selected by
 `bibliography` in front matter, or `references.bib` by default. Saves are
 atomic and reject external conflicts.
 
+Each time the Bibliography button is opened, Quarkfoil reloads that file and
+its revision from disk before showing the dialog. Presentations that share a
+bibliography therefore start each editing session from the latest saved copy;
+simultaneous edits after both dialogs are open are still protected by the
+save-time conflict check.
+
 Enter a DOI and choose **Add DOI** to retrieve BibTeX metadata. Quarkfoil shows
 a preview before appending it to the draft and rejects duplicate DOIs. If a
 different entry would use an existing citation key, Quarkfoil adds a conventional

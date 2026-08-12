@@ -92,6 +92,11 @@ def main() -> int:
         WebDriverWait(driver, 5).until(lambda active_driver: "quarkfoil-attribution" in active_driver.current_url)
         driver.close()
         driver.switch_to.window(original_window)
+        bibliography_path = Path(temporary.name) / "references.bib"
+        bibliography_path.write_text(
+            "@misc{test-link, author={Tester, Alice}, year={2030}, url={about:blank#quarkfoil-attribution}}\n",
+            encoding="utf-8",
+        )
         driver.find_element(By.CSS_SELECTOR, '[data-mode="source"]').click()
         citation_editor = driver.find_element(By.ID, "source-editor")
         driver.execute_script("arguments[0].setSelectionRange(arguments[0].value.length, arguments[0].value.length);", citation_editor)
@@ -99,13 +104,15 @@ def main() -> int:
         bibliography_dialog = driver.find_element(By.ID, "bibliography-dialog")
         WebDriverWait(driver, 5).until(lambda active_driver: bibliography_dialog.get_attribute("open") is not None)
         bibliography_source = driver.find_element(By.ID, "bibliography-source")
+        if "2030" not in bibliography_source.get_attribute("value"):
+            raise RuntimeError("Opening Bibliography did not reload an externally changed shared file")
         driver.execute_script(
-            "arguments[0].value = arguments[0].value.replace('2026', '2027'); arguments[0].dispatchEvent(new Event('input', {bubbles:true}));",
+            "arguments[0].value = arguments[0].value.replace('2030', '2027'); arguments[0].dispatchEvent(new Event('input', {bubbles:true}));",
             bibliography_source,
         )
         driver.find_element(By.CSS_SELECTOR, ".bibliography-entry button").click()
         WebDriverWait(driver, 5).until(lambda active_driver: bibliography_dialog.get_attribute("open") is None)
-        WebDriverWait(driver, 5).until(lambda active_driver: "2027" in (Path(temporary.name) / "references.bib").read_text(encoding="utf-8"))
+        WebDriverWait(driver, 5).until(lambda active_driver: "2027" in bibliography_path.read_text(encoding="utf-8"))
         if "[@test-link]" not in citation_editor.get_attribute("value"):
             raise RuntimeError("Inline citation insertion did not use and save the current bibliography draft")
         driver.find_element(By.ID, "bibliography-button").click()
@@ -122,13 +129,13 @@ def main() -> int:
         driver.execute_script(
             "arguments[0].value = arguments[1].replace('2027', '2028'); arguments[0].dispatchEvent(new Event('input', {bubbles:true}));",
             bibliography_source,
-            (Path(temporary.name) / "references.bib").read_text(encoding="utf-8"),
+            bibliography_path.read_text(encoding="utf-8"),
         )
         if driver.find_elements(By.ID, "bibliography-save"):
             raise RuntimeError("Bibliography dialog still exposes a separate Save action")
         driver.find_element(By.ID, "bibliography-close").click()
         WebDriverWait(driver, 5).until(lambda active_driver: bibliography_dialog.get_attribute("open") is None)
-        WebDriverWait(driver, 5).until(lambda active_driver: "2028" in (Path(temporary.name) / "references.bib").read_text(encoding="utf-8"))
+        WebDriverWait(driver, 5).until(lambda active_driver: "2028" in bibliography_path.read_text(encoding="utf-8"))
         driver.find_element(By.CSS_SELECTOR, '[data-mode="source"]').click()
         normalization_editor = driver.find_element(By.ID, "source-editor")
         messy_source = (
