@@ -332,7 +332,7 @@ class ServerTests(unittest.TestCase):
         nested = self.root / "talks"
         nested.mkdir()
         deck = nested / "second.md"
-        deck.write_text("# Second\n", encoding="utf-8")
+        deck.write_bytes(b"# Second\n")
         (nested / "notes.txt").write_text("ignored", encoding="utf-8")
         status, _, payload = self.request("/api/files?kind=presentation")
         self.assertEqual(status, 200)
