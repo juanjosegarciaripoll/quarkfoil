@@ -106,10 +106,12 @@ def main() -> int:
         WebDriverWait(driver, 5).until(
             lambda active_driver: 'x="25"' in active_driver.find_element(By.ID, "source-editor").get_attribute("value")
         )
-        driver.execute_script(
-            "const input = document.querySelector('#prop-text-color'); input.value = '#123456';"
-            "input.dispatchEvent(new Event('input', {bubbles:true}));"
+        driver.find_element(By.ID, "prop-text-color").click()
+        WebDriverWait(driver, 5).until(
+            lambda active_driver: active_driver.find_element(By.ID, "color-dialog").get_attribute("open") is not None
         )
+        driver.execute_script("document.querySelector('#color-dialog-value').value = '#123456';")
+        driver.find_element(By.CSS_SELECTOR, "#color-dialog button[value='apply']").click()
         WebDriverWait(driver, 5).until(
             lambda active_driver: 'color="#123456"' in active_driver.find_element(By.ID, "source-editor").get_attribute("value")
         )

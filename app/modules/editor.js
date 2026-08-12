@@ -72,6 +72,13 @@ export function moveGeometryGroup(geometries, dx, dy) {
   return geometries.map(item => ({ ...item, x: round(item.x + boundedX), y: round(item.y + boundedY) }));
 }
 
+export function dialogDragPosition(rect, dx, dy, viewportWidth, viewportHeight) {
+  return {
+    left: Math.round(clamp(rect.left + dx, 0, Math.max(0, viewportWidth - rect.width))),
+    top: Math.round(clamp(rect.top + dy, 0, Math.max(0, viewportHeight - rect.height))),
+  };
+}
+
 export function arrowGeometry(arrow) {
   const x = Math.max(0, Math.min(arrow.x1, arrow.x2) - 1);
   const y = Math.max(0, Math.min(arrow.y1, arrow.y2) - 1);
@@ -270,6 +277,8 @@ export class DesignEditor {
     this.fontProperties = document.querySelector("#font-properties");
     this.noSelection = document.querySelector("#no-selection");
     this.dialog = document.querySelector("#content-dialog");
+    this.colorDialog = document.querySelector("#color-dialog");
+    this.colorDialogTarget = null;
     this.contentEditor = document.querySelector("#content-editor");
     this.preview = document.querySelector("#content-preview");
     this.plotDialog = document.querySelector("#plot-dialog");
@@ -288,24 +297,12 @@ export class DesignEditor {
       form.addEventListener("keydown", event => {
         if (event.key !== "Enter" || !event.target.matches("input")) return;
         event.preventDefault();
+        if (event.target.type === "color") return;
         event.target.dispatchEvent(new Event("change", { bubbles: true }));
       });
     });
-    const bindColorControl = (id, apply, delay = 0) => {
-      let timer = null;
-      const commit = () => {
-        clearTimeout(timer);
-        timer = null;
-        apply();
-      };
-      for (const suffix of ["", "-alpha"]) {
-        const input = document.querySelector(`#${id}${suffix}`);
-        input.addEventListener("input", () => {
-          clearTimeout(timer);
-          timer = setTimeout(commit, delay);
-        });
-        input.addEventListener("change", commit);
-      }
+    const bindColorControl = (id, apply) => {
+      for (const suffix of ["", "-alpha"]) document.querySelector(`#${id}${suffix}`).addEventListener("change", apply);
     };
     this.stage.addEventListener("click", event => this.onClick(event));
     this.stage.addEventListener("dblclick", event => this.onDoubleClick(event));
@@ -375,13 +372,12 @@ export class DesignEditor {
         if (name === "background") document.querySelector("#prop-plot-background-enabled").checked = true;
         if (name === "fill") document.querySelector("#prop-plot-fill-enabled").checked = true;
         this.applyPlotProperties();
-      }, 60);
+      });
     }
     document.querySelector("#prop-plot-stroke-width").addEventListener("change", () => this.applyPlotProperties());
     for (const id of ["prop-arrow-stroke-width", "prop-arrow-heads"]) {
       document.querySelector(`#${id}`).addEventListener("change", () => this.applyArrowProperties());
     }
-    document.querySelector("#prop-arrow-stroke").addEventListener("input", () => this.applyArrowProperties());
     document.querySelector("#prop-arrow-stroke").addEventListener("change", () => this.applyArrowProperties());
     document.querySelector("#image-input").addEventListener("change", event => {
       const file = event.target.files?.[0];
@@ -443,6 +439,39 @@ export class DesignEditor {
     document.querySelector("#prop-font-size").addEventListener("input", event => this.previewFontSize(event.target.value));
     document.querySelector("#prop-font-size").addEventListener("change", () => this.applyFontSize());
     bindColorControl("prop-text-color", () => this.applyTextColor(colorControlValue("prop-text-color")));
+    document.querySelectorAll("#properties input[type=color]").forEach(input => {
+      input.addEventListener("click", event => {
+        event.preventDefault();
+        this.openColorDialog(input);
+      });
+      input.addEventListener("keydown", event => {
+        if (!["Enter", " "].includes(event.key)) return;
+        event.preventDefault();
+        this.openColorDialog(input);
+      });
+    });
+    this.colorDialog.addEventListener("cancel", () => { this.colorDialogTarget = null; });
+    this.colorDialog.addEventListener("close", () => this.applyColorDialog());
+    const colorHandle = document.querySelector("#color-dialog-handle");
+    colorHandle.addEventListener("pointerdown", event => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      const rect = this.colorDialog.getBoundingClientRect();
+      const origin = { x: event.clientX, y: event.clientY };
+      colorHandle.setPointerCapture(event.pointerId);
+      const move = moveEvent => {
+        const position = dialogDragPosition(rect, moveEvent.clientX - origin.x, moveEvent.clientY - origin.y, window.innerWidth, window.innerHeight);
+        Object.assign(this.colorDialog.style, { inset: "auto", left: `${position.left}px`, top: `${position.top}px`, margin: "0" });
+      };
+      const stop = () => {
+        colorHandle.removeEventListener("pointermove", move);
+        colorHandle.removeEventListener("pointerup", stop);
+        colorHandle.removeEventListener("pointercancel", stop);
+      };
+      colorHandle.addEventListener("pointermove", move);
+      colorHandle.addEventListener("pointerup", stop);
+      colorHandle.addEventListener("pointercancel", stop);
+    });
     document.querySelector("#reset-text-color").addEventListener("click", () => this.applyTextColor(null));
     document.querySelectorAll(".alignment-buttons [data-align]").forEach(button => {
       button.addEventListener("click", () => this.applyAlignment(button.dataset.align));
@@ -455,6 +484,27 @@ export class DesignEditor {
   slideIndex() { return this.options.getSlideIndex(); }
   slide() { return this.options.getDeck().slides[this.slideIndex()]; }
   section() { return document.querySelector(`.scientific-slide[data-slide-index="${this.slideIndex()}"]`); }
+
+  openColorDialog(input) {
+    if (this.colorDialog.open) return;
+    this.colorDialogTarget = input;
+    document.querySelector("#color-dialog-value").value = input.value || "#000000";
+    const alpha = document.querySelector(`#${input.id}-alpha`);
+    document.querySelector("#color-dialog-alpha-row").hidden = !alpha;
+    document.querySelector("#color-dialog-alpha").value = alpha?.value || "100";
+    this.colorDialog.returnValue = "";
+    this.colorDialog.showModal();
+  }
+
+  applyColorDialog() {
+    const target = this.colorDialogTarget;
+    this.colorDialogTarget = null;
+    if (!target || this.colorDialog.returnValue !== "apply") return;
+    target.value = document.querySelector("#color-dialog-value").value;
+    const alpha = document.querySelector(`#${target.id}-alpha`);
+    if (alpha) alpha.value = document.querySelector("#color-dialog-alpha").value;
+    target.dispatchEvent(new Event("change", { bubbles: true }));
+  }
 
   openShapePalette() {
     if (this.suppressShapePaletteFocus) return;

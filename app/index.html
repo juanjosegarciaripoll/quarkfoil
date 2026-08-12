@@ -222,6 +222,18 @@
     </form>
   </dialog>
 
+  <dialog id="color-dialog">
+    <form method="dialog" class="color-dialog__form">
+      <h2 id="color-dialog-handle">Choose color</h2>
+      <label>Color <input id="color-dialog-value" type="color" value="#000000"></label>
+      <label id="color-dialog-alpha-row">Opacity <input id="color-dialog-alpha" type="number" min="0" max="100" value="100">%</label>
+      <div class="dialog-actions">
+        <button value="cancel">Cancel</button>
+        <button value="apply">Apply</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog id="external-change-dialog">
     <form method="dialog" class="external-change-dialog__form">
       <h2>Presentation changed on disk</h2>

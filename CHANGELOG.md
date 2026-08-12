@@ -41,9 +41,10 @@ All notable changes to Quarkfoil are documented here. The project follows
 
 ### Fixed
 
-- Prevent Enter in Properties fields from submitting their surrounding forms;
-  use it to commit the active value instead, and apply color and alpha controls
-  directly from native color-picker input.
+- Prevent Enter in Properties fields from submitting their surrounding forms
+  and use it to commit the active value instead. Edit colors and opacity in a
+  compact, movable confirmation dialog so native color browsing never mutates
+  or closes slides.
 - Detect and reconcile presentation changes made outside the editor without
   silently replacing either the browser draft or the disk revision.
 - Keep image focus effective for width- and height-fitted images, and add a
