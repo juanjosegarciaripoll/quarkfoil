@@ -229,6 +229,9 @@ function assertCitations() {
   const bibliography = prepareBibliography(bib, parsed);
   const doiEntry = parseBibliography("@article{wallraff2004, month={Sept}, doi={10.1038/nature02851}}")[0];
   assert(doiEntry.key === "wallraff2004" && doiEntry.fields.month === "Sept" && doiEntry.fields.doi === "10.1038/nature02851", "normalized DOI BibTeX and citation key parse");
+  const accentedEntry = parseBibliography(String.raw`@article{accents, author={M{\"u}ller, J{\'o}se and Pe{\~n}a, Ana}, title={The {\AA}ngstr{\"o}m and {\AE}ther}, year={2026}}`)[0];
+  assert(accentedEntry.fields.author === "Müller, Jóse and Peña, Ana" && accentedEntry.fields.title === "The Ångström and Æther",
+    "BibTeX LaTeX accents and letter commands render as Unicode");
   const disambiguatedKey = uniqueCitationKey("wallraff2004", ["wallraff2004", "wallraff2004a"]);
   const disambiguatedEntry = parseBibliography(renameBibliographyEntry("@article{wallraff2004, doi={10.1000/different}}", disambiguatedKey))[0];
   assert(disambiguatedEntry.key === "wallraff2004b" && disambiguatedEntry.fields.doi === "10.1000/different",

@@ -1,7 +1,30 @@
 import { escapeHtml } from "./parser.js";
 
+const LATEX_ACCENTS = new Map([
+  ["'", "\u0301"], ["`", "\u0300"], ["\"", "\u0308"], ["^", "\u0302"], ["~", "\u0303"],
+  ["=", "\u0304"], [".", "\u0307"], ["u", "\u0306"], ["v", "\u030c"], ["H", "\u030b"],
+  ["c", "\u0327"], ["k", "\u0328"], ["b", "\u0331"], ["d", "\u0323"], ["r", "\u030a"],
+]);
+
+const LATEX_LETTERS = new Map([
+  ["aa", "å"], ["AA", "Å"], ["ae", "æ"], ["AE", "Æ"], ["oe", "œ"], ["OE", "Œ"],
+  ["o", "ø"], ["O", "Ø"], ["l", "ł"], ["L", "Ł"], ["ss", "ß"], ["i", "ı"], ["j", "ȷ"],
+]);
+
+function latexToUnicode(value) {
+  return String(value)
+    .replace(/\\(["'`^~=.]|[uvHckbdr])\s*(?:\{\s*([A-Za-zıȷ])\s*\}|([A-Za-zıȷ]))/g, (_, accent, braced, bare) => {
+      const letter = braced || bare;
+      return `${letter}${LATEX_ACCENTS.get(accent)}`.normalize("NFC");
+    })
+    .replace(/\\(AA|AE|OE|aa|ae|oe|ss|[oOliLj])\b(?:\{\})?/g, (_, command) => LATEX_LETTERS.get(command))
+    .replace(/\\([#$%&_{}])/g, "$1")
+    .replace(/~/g, " ")
+    .replace(/[{}]/g, "");
+}
+
 function plain(value = "") {
-  return String(value).replace(/[{}]/g, "").replace(/--/g, "–").replace(/\\&/g, "&").trim();
+  return latexToUnicode(value).replace(/--/g, "–").trim();
 }
 
 const BIBLIOGRAPHY_FIELD_ORDER = [
