@@ -5,6 +5,11 @@ All notable changes to Quarkfoil are documented here. The project follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-12
+
+This release expands direct manipulation, media handling, plotting, and
+bibliography workflows while preserving compatibility with earlier decks.
+
 ### Added
 
 - Cut, copy, and paste selected overlays and multi-object selections through
@@ -55,6 +60,7 @@ All notable changes to Quarkfoil are documented here. The project follows
   stretch fitting mode when deliberate distortion is required.
 - Preserve reliable single-click cell selection and correct slide rendering in
   Reveal's overview mode.
+- Pause video playback when returning to Design mode or leaving its slide.
 - Keep attribution links usable in Design mode, render abbreviated
   attributions without an unwanted panel, and repair DOI bibliography imports.
 - Render thick arrowheads correctly and avoid partial or unintended overwrites
@@ -125,6 +131,7 @@ substantially expanding visual editing and scientific-presentation support.
   static exporter, scientific layouts, image objects, equations, documentation,
   packaging, and CI workflow.
 
+[0.3.0]: https://github.com/juanjosegarciaripoll/quarkfoil/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/juanjosegarciaripoll/quarkfoil/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/juanjosegarciaripoll/quarkfoil/releases/tag/v0.1.0
-[Unreleased]: https://github.com/juanjosegarciaripoll/quarkfoil/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/juanjosegarciaripoll/quarkfoil/compare/v0.3.0...HEAD
