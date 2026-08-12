@@ -1,4 +1,4 @@
-import { deleteSection, deleteSlide, duplicateSlide, importSlide, insertOverlay, insertSection, insertSlide, moveSection, moveSlide, normalizeDeck, parseDeck, updateSectionTitle } from "./parser.js";
+import { deleteSection, deleteSlide, duplicateSlide, importSlide, insertOverlay, insertSection, insertSlide, moveSection, moveSlide, normalizeDeck, parseDeck, updateSectionTitle, updateSlideNotes } from "./parser.js";
 import { renderDeck, syncVideoPlayback } from "./render.js";
 import { DesignEditor, pageSlideIndex, projectAssetPage, resolveImportDestination } from "./editor.js";
 import { saveSnapshot } from "./storage.js";
@@ -86,6 +86,8 @@ const elements = {
   slideList: document.querySelector("#slide-list"),
   source: document.querySelector("#source-editor"),
   sourcePane: document.querySelector("#source-pane"),
+  notes: document.querySelector("#slide-notes"),
+  notesResizer: document.querySelector("#notes-resizer"),
   save: document.querySelector("#save-button"),
   download: document.querySelector("#download-button"),
   saveState: document.querySelector("#save-state"),
@@ -307,6 +309,7 @@ function parseAndRender(source, { preserveSlide = true } = {}) {
   elements.source.value = source;
   state.bibliography = prepareBibliography(state.bibliographySource, deck);
   renderDeck(deck, elements.slides, assetResolver, state.bibliography);
+  elements.notes.value = deck.slides[state.currentSlide]?.notes || "";
   rebuildSlideList();
   if (reveal) {
     reveal.sync();
@@ -550,9 +553,49 @@ function moveSelectedSlide(direction) {
 
 function onSlideChanged(event) {
   state.currentSlide = event.indexh;
+  elements.notes.value = state.deck.slides[state.currentSlide]?.notes || "";
   syncVideoPlayback(event.currentSlide, { autoplay: state.mode === "present" });
   rebuildSlideList();
   editor?.refresh();
+}
+
+function updateNotes() {
+  try { commitSource(updateSlideNotes(state.deck, state.currentSlide, elements.notes.value)); }
+  catch (error) { showStatus(error.message, true); }
+}
+
+function resizeNotes(event) {
+  if (event.button !== 0) return;
+  event.preventDefault();
+  elements.notesResizer.setPointerCapture(event.pointerId);
+  const move = moveEvent => {
+    const bounds = document.querySelector("#stage").getBoundingClientRect();
+    const height = Math.max(72, Math.min(bounds.height - 160, bounds.bottom - moveEvent.clientY));
+    document.querySelector("#stage").style.setProperty("--notes-height", `${Math.round(height)}px`);
+    reveal?.layout();
+  };
+  const stop = () => {
+    elements.notesResizer.removeEventListener("pointermove", move);
+    elements.notesResizer.removeEventListener("pointerup", stop);
+    elements.notesResizer.removeEventListener("pointercancel", stop);
+  };
+  elements.notesResizer.addEventListener("pointermove", move);
+  elements.notesResizer.addEventListener("pointerup", stop);
+  elements.notesResizer.addEventListener("pointercancel", stop);
+}
+
+function resizeNotesByKeyboard(event) {
+  if (!["ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) return;
+  event.preventDefault();
+  const stage = document.querySelector("#stage");
+  const bounds = stage.getBoundingClientRect();
+  const current = document.querySelector(".notes-pane").getBoundingClientRect().height;
+  const maximum = Math.max(72, bounds.height - 160);
+  const height = event.key === "Home" ? 72
+    : event.key === "End" ? maximum
+      : Math.max(72, Math.min(maximum, current + (event.key === "ArrowUp" ? 16 : -16)));
+  stage.style.setProperty("--notes-height", `${Math.round(height)}px`);
+  reveal?.layout();
 }
 
 function setMode(mode) {
@@ -1384,6 +1427,9 @@ function bindUi() {
   document.querySelector("#external-use-disk").addEventListener("click", useExternalDiskVersion);
   document.querySelector("#external-apply-merge").addEventListener("click", applyExternalMerge);
   elements.source.addEventListener("input", updateDirtyState);
+  elements.notes.addEventListener("change", updateNotes);
+  elements.notesResizer.addEventListener("pointerdown", resizeNotes);
+  elements.notesResizer.addEventListener("keydown", resizeNotesByKeyboard);
   document.querySelector("#file-input").addEventListener("change", async event => {
     const file = event.target.files?.[0];
     if (!file) return;

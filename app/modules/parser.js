@@ -283,6 +283,7 @@ function parseSlide(source, range, index, diagnostics) {
   const overlays = [];
   let footer = null;
   let notes = "";
+  let notesRange = null;
   for (const block of parsed.blocks) {
     if (CELL_NAMES.has(block.name)) {
       const image = parseImage(block.body);
@@ -338,7 +339,10 @@ function parseSlide(source, range, index, diagnostics) {
         arrow,
       });
     } else if (block.name === "footer") footer = { source: block.body, range: block.range };
-    else if (block.name === "notes") notes = block.body;
+    else if (block.name === "notes") {
+      notes = block.body;
+      notesRange = block.range;
+    }
     else diagnostics.push({ level: "warning", slide: index + 1, message: `Unknown directive '${block.name}'` });
   }
   const ordinary = removeRanges(bodyRaw, parsed.occupied);
@@ -384,6 +388,7 @@ function parseSlide(source, range, index, diagnostics) {
     overlays,
     footer,
     notes,
+    notesRange,
   };
 }
 
@@ -748,6 +753,18 @@ export function setCellContent(deck, slideIndex, cellId, content) {
   const cell = slide?.cells.find(item => item.id === cellId && item.range);
   if (cell) return updateBlockContent(deck, slideIndex, cellId, content);
   return appendBlock(deck, slide, directiveBlock(cellId, content));
+}
+
+export function updateSlideNotes(deck, slideIndex, content) {
+  const slide = deck.slides[slideIndex];
+  if (!slide) throw new Error("Unknown slide");
+  const notes = String(content).trim();
+  if (!slide.notesRange) return notes ? appendBlock(deck, slide, directiveBlock("notes", notes)) : deck.source;
+  if (!notes) {
+    const source = patchRange(slide.raw, slide.notesRange.start - slide.range.start, slide.notesRange.end - slide.range.start, "");
+    return patchRange(deck.source, slide.range.start, slide.range.end, normalizeSlideSpacing(source));
+  }
+  return patchRange(deck.source, slide.notesRange.bodyStart, slide.notesRange.bodyEnd, `${notes}\n`);
 }
 
 export function insertOverlay(deck, slideIndex, { type, content, id, x = 35, y = 30, w = 30, h = 15, attributes = {} }) {

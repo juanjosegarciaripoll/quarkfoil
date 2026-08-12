@@ -74,6 +74,10 @@ Changing a slide's layout keeps regions that exist in both layouts and removes
 the Markdown for regions that the new layout does not use. Positioned objects,
 speaker notes, and footers are unaffected.
 
+In Design mode, edit optional speaker notes in the pane below the slide. Drag
+the divider to give the notes more or less room. Notes are stored as Markdown
+in the slide's `::: notes` block and remain available in Reveal's speaker view.
+
 Inside a layout region, one empty line separates Markdown blocks normally.
 Additional consecutive empty lines add visible vertical space. This also works
 in positioned Markdown and shape labels without altering fenced code blocks.

@@ -21,6 +21,7 @@ import {
   updateSectionTitle,
   updateSlideTitle,
   updateSlideProperties,
+  updateSlideNotes,
 } from "./parser.js";
 import { renderDeck, syncVideoPlayback } from "./render.js";
 import { arrowGeometry, bindRangeControl, buildShapePalette, canvasLinkTarget, canvasStartsMarquee, clipboardImageFile, deleteKey, DesignEditor, initialImageGeometry, moveGeometryGroup, pageSlideIndex, projectAssetPage, rectanglesIntersect, renameClipboardImage, repeatedActivation, resolveImportDestination, videoFile } from "./editor.js";
@@ -628,6 +629,15 @@ try {
 
   const trailingBody = updateBlockContent(deck, 0, "eq", "Body\n\n\n");
   assert(trailingBody.includes("Body\n:::") && !trailingBody.includes("Body\n\n:::"), "content editing removes trailing body newlines before the closing fence");
+
+  let notesDeck = parseDeck("## Notes {.layout-1}\n\nBody\n");
+  next = updateSlideNotes(notesDeck, 0, "Explain the result.\n\nMention the caveat.");
+  notesDeck = parseDeck(next);
+  assert(notesDeck.slides[0].notes === "Explain the result.\n\nMention the caveat.", "slide notes insert as Markdown");
+  next = updateSlideNotes(notesDeck, 0, "Revised note");
+  assert((next.match(/::: notes/g) || []).length === 1 && parseDeck(next).slides[0].notes === "Revised note", "slide notes update in place");
+  next = updateSlideNotes(parseDeck(next), 0, "");
+  assert(!next.includes("::: notes") && parseDeck(next).slides[0].cells[0].source === "Body", "empty slide notes remove their directive without changing slide content");
 
   next = updateHeadingLayout(deck, 0, "1-1", [35, 65], [50, 50]);
   assert(next.includes(".layout-1-1"), "layout patches heading");
