@@ -27,7 +27,7 @@ import {
 } from "./parser.js";
 import { renderDeck, syncVideoPlayback } from "./render.js";
 import { arrowGeometry, bindRangeControl, buildShapePalette, canvasLinkTarget, canvasStartsMarquee, clipboardImageFile, deleteKey, DesignEditor, dialogDragPosition, initialImageGeometry, moveGeometryGroup, overlayPasteOffset, pageSlideIndex, projectAssetPage, rectanglesIntersect, renameClipboardImage, repeatedActivation, resolveImportDestination, videoFile } from "./editor.js";
-import { formatBibliography, parseBibliography, prepareBibliography, renameBibliographyEntry, uniqueCitationKey } from "./bibliography.js";
+import { briefReference, formatBibliography, parseBibliography, prepareBibliography, renameBibliographyEntry, uniqueCitationKey } from "./bibliography.js";
 import { compileExpression, createPlotSvg } from "./plot.js";
 import { externalDeckAction } from "./external.js";
 
@@ -239,6 +239,10 @@ function assertCitations() {
     "bibliography reformatting sorts entries alphabetically by citation key");
   assert(formattedBibliography.includes("  author    = {Alpha, Alice},\n  title     = {First},")
     && formattedBibliography.includes("title  = {A {Protected} Title},"), "bibliography reformatting orders and aligns fields while retaining protected braces");
+  const thesisReference = briefReference(parseBibliography("@phdthesis{doe2020, author={Doe, Jane}, school={Example University}, year={2020}}")[0]);
+  assert(thesisReference === "Doe, PhD thesis, Example University, (2020)", "thesis attributions identify their type and institution");
+  const mastersReference = briefReference(parseBibliography("@mastersthesis{roe2021, author={Roe, Richard}, school={Example College}, year={2021}}")[0]);
+  assert(mastersReference === "Roe, Master's thesis, Example College, (2021)", "master's thesis attributions identify their type and institution");
   let bibliographyError = "";
   try { parseBibliography("@article{broken, month=Sept}"); } catch (error) { bibliographyError = error.message; }
   assert(bibliographyError.startsWith("Invalid BibTeX:"), "BibTeX parser failures produce visible error messages");

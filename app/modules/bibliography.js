@@ -85,8 +85,12 @@ export function briefReference(entry) {
   const authors = (fields.author || "Unknown author").split(/\s+and\s+/i);
   const family = authors[0].includes(",") ? authors[0].split(",")[0].trim() : authors[0].trim().split(/\s+/).pop();
   const author = authors.length > 1 ? `${family} et al.` : family;
-  const venue = fields.journal || fields.booktitle || fields.publisher || "";
-  const details = [venue, fields.volume, fields.pages || fields.number].filter(Boolean).join(" ");
+  const type = String(entry?.type || "").toLocaleLowerCase();
+  const thesis = type === "phdthesis" ? "PhD thesis" : type === "mastersthesis" ? "Master's thesis" : "";
+  const venue = fields.journal || fields.booktitle || fields.publisher || fields.school || fields.institution || "";
+  const details = thesis
+    ? [thesis, venue].filter(Boolean).join(", ")
+    : [venue, fields.volume, fields.pages || fields.number].filter(Boolean).join(" ");
   return [author, details, fields.year ? `(${fields.year})` : ""].filter(Boolean).join(", ");
 }
 

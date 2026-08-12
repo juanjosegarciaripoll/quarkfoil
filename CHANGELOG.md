@@ -41,6 +41,7 @@ All notable changes to Quarkfoil are documented here. The project follows
 
 ### Fixed
 
+- Include the thesis type and institution in abbreviated thesis attributions.
 - Prevent Enter in Properties fields from submitting their surrounding forms
   and use it to commit the active value instead. Edit colors and opacity in a
   compact, movable confirmation dialog so native color browsing never mutates
