@@ -55,6 +55,8 @@ All notable changes to Quarkfoil are documented here. The project follows
   objects with Delete, Del, or the Backspace value used by compact keyboards.
 - Return keyboard focus to the Design canvas when selecting an object or region
   so arrow-key movement works after editing a value in Properties.
+- Refresh unsaved state as soon as presentation Markdown changes, including
+  slide reordering, and treat an active speaker-notes draft as needing a save.
 
 ## [0.2.0] - 2026-08-09
 

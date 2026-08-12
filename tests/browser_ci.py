@@ -7,6 +7,7 @@ import threading
 from pathlib import Path
 
 from selenium import webdriver
+from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 
@@ -63,10 +64,24 @@ def main() -> int:
     try:
         driver = create_driver(browser)
         driver.get(f"http://127.0.0.1:{server.server_port}/selftest.html")
-        WebDriverWait(driver, 30).until(
-            lambda active_driver: active_driver.find_element(By.TAG_NAME, "body").get_attribute("data-status")
-            in {"passed", "failed"}
-        )
+        try:
+            WebDriverWait(driver, 30).until(
+                lambda active_driver: active_driver.find_element(By.TAG_NAME, "body").get_attribute("data-status")
+                in {"passed", "failed"}
+            )
+        except TimeoutException as error:
+            status = driver.find_element(By.TAG_NAME, "body").get_attribute("data-status")
+            results = driver.find_element(By.ID, "results").text
+            module_error = driver.execute_async_script(
+                "const done = arguments[0]; import('/modules/selftest.js')"
+                ".then(() => done('module loaded')).catch(error => done(error.stack || String(error)));"
+            )
+            screenshot = ROOT / "tests" / f"browser-{browser}-timeout.png"
+            driver.save_screenshot(str(screenshot))
+            raise RuntimeError(
+                f"Browser self-test timed out in {browser} with status {status!r}:\n"
+                f"{results[-4000:]}\nModule result: {module_error}\nScreenshot: {screenshot}"
+            ) from error
         status = driver.find_element(By.TAG_NAME, "body").get_attribute("data-status")
         results = driver.find_element(By.ID, "results").text
         if status != "passed" or "checks passed" not in results:

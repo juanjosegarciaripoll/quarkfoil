@@ -307,16 +307,16 @@ function parseAndRender(source, { preserveSlide = true } = {}) {
   if (!deck.sections.some(section => section.id === state.selectedSection)) state.selectedSection = null;
   state.collapsedSections = new Set([...state.collapsedSections].filter(id => deck.sections.some(section => section.id === id)));
   elements.source.value = source;
+  elements.notes.value = deck.slides[state.currentSlide]?.notes || "";
+  updateDirtyState();
   state.bibliography = prepareBibliography(state.bibliographySource, deck);
   renderDeck(deck, elements.slides, assetResolver, state.bibliography);
-  elements.notes.value = deck.slides[state.currentSlide]?.notes || "";
   rebuildSlideList();
   if (reveal) {
     reveal.sync();
     reveal.slide(state.currentSlide);
   }
   editor?.refresh();
-  updateDirtyState();
   scheduleSnapshot();
   return deck;
 }
@@ -648,10 +648,11 @@ function focusSourceOnCurrentSlide() {
 
 function updateDirtyState() {
   const sourceDraft = state.mode === "source" && elements.source.value !== state.source;
-  const dirty = state.source !== state.savedSource || sourceDraft;
+  const notesDraft = state.mode === "design" && elements.notes.value !== (state.deck?.slides[state.currentSlide]?.notes || "");
+  const dirty = state.source !== state.savedSource || sourceDraft || notesDraft;
   elements.save.disabled = !state.deck || !dirty || Boolean(state.externalChange);
   elements.download.disabled = !state.deck;
-  elements.saveState.textContent = state.externalChange ? "Changed on disk" : sourceDraft ? "Source edited" : dirty ? "Unsaved" : "Saved";
+  elements.saveState.textContent = state.externalChange ? "Changed on disk" : sourceDraft ? "Source edited" : notesDraft ? "Notes edited" : dirty ? "Unsaved" : "Saved";
   elements.saveState.classList.toggle("dirty", dirty || Boolean(state.externalChange));
 }
 
@@ -991,6 +992,9 @@ async function saveDeck() {
       while (deckCheckPending) await new Promise(resolve => setTimeout(resolve, 20));
       await pollForExternalDeck({ force: true });
       if (state.externalChange) { openExternalChangeDialog(); return; }
+    }
+    if (state.mode === "design" && elements.notes.value !== (state.deck.slides[state.currentSlide]?.notes || "")) {
+      if (!commitSource(updateSlideNotes(state.deck, state.currentSlide, elements.notes.value))) return;
     }
     if (elements.source.value !== state.source && !commitSource(elements.source.value)) return;
     const normalized = normalizeDeck(state.deck);
@@ -1427,6 +1431,7 @@ function bindUi() {
   document.querySelector("#external-use-disk").addEventListener("click", useExternalDiskVersion);
   document.querySelector("#external-apply-merge").addEventListener("click", applyExternalMerge);
   elements.source.addEventListener("input", updateDirtyState);
+  elements.notes.addEventListener("input", updateDirtyState);
   elements.notes.addEventListener("change", updateNotes);
   elements.notesResizer.addEventListener("pointerdown", resizeNotes);
   elements.notesResizer.addEventListener("keydown", resizeNotesByKeyboard);

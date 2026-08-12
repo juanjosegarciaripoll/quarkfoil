@@ -445,8 +445,8 @@ try {
   assert(!clearedImageCell.slides[0].cells.find(cell => cell.id === "top-right")?.image, "deleting a selected layout image clears its cell content");
   const clearedMarkdownCell = parseDeck(setCellContent(deck, 0, "left", ""));
   assert(!clearedMarkdownCell.slides[0].cells.find(cell => cell.id === "left")?.source, "deleting a selected Markdown region clears its content");
-  const mixedCore = parseDeck("## Mixed {.layout-1}\n\nOrdinary Markdown.\n\n::: overlay {#kept type=\"markdown\"}\nKeep this overlay.\n:::\n");
-  const clearedMixedCore = setCellContent(mixedCore, 0, "core", "");
+  const mixedCoreDeck = parseDeck("## Mixed {.layout-1}\n\nOrdinary Markdown.\n\n::: overlay {#kept type=\"markdown\"}\nKeep this overlay.\n:::\n");
+  const clearedMixedCore = setCellContent(mixedCoreDeck, 0, "core", "");
   assert(!clearedMixedCore.includes("Ordinary Markdown.") && clearedMixedCore.includes("Keep this overlay."), "clearing mixed core Markdown preserves slide directives");
   const stretchDeck = parseDeck('## Stretch {.layout-1}\n\n::: core\n![](figures/stretch.svg){fit=stretch}\n:::\n');
   const stretchFixture = document.createElement("div");
