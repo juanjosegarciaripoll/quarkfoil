@@ -226,7 +226,9 @@ alphabetically by citation key. **Reformat** applies the same canonical multilin
 format and sorting to entries edited or pasted by hand. Because rewriting cannot
 safely preserve every BibTeX extension, Reformat refuses `%` comments and
 `@comment`, `@preamble`, or `@string` directives instead of silently discarding
-them. Save remains a separate action.
+them. **Close**, `Escape`, **Insert [n]**, and **Add attribution** save the
+current valid bibliography automatically. A parse error or external-file
+conflict leaves the dialog open so the draft can be repaired or reconciled.
 Pressing `Enter` in the DOI field performs the same Add DOI action and keeps the
 dialog open. Pressing `Enter` in the reference search field leaves the current
 filter in place and does not submit or close the dialog. After a DOI is added,
@@ -236,10 +238,10 @@ the four-digit year, such as `wallraff2004`. Latin accents are stripped for
 portable ASCII keys, so Peñas becomes `penas`. DOI lookup is the only
 bibliography operation that requires the network.
 
-**Insert [n]** inserts an inline citation at the Source editor caret. **Add
-attribution** first saves the bibliography draft, then creates a positioned,
+**Insert [n]** saves the bibliography and inserts an inline citation at the
+Source editor caret. **Add attribution** saves it and then creates a positioned,
 resizable brief reference for crediting a copied figure. If the bibliography
-cannot be saved, no attribution is added and the dialog reports the error.
+cannot be saved, neither insertion happens and the dialog reports the error.
 Select an attribution in Design mode to edit its reference keys and show one or
 more papers. Its generated reference text is not directly editable.
 Attributions do not display or consume citation numbers; inline citations keep

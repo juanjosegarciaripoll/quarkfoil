@@ -1075,6 +1075,7 @@ function rebuildBibliographyList(revealKey = null) {
     description.append(title, summary);
     const cite = document.createElement("button");
     cite.type = "button"; cite.textContent = "Insert [n]";
+    cite.title = "Save the bibliography draft and insert an inline citation";
     cite.addEventListener("click", () => insertInlineCitation(entry.key));
     const attribute = document.createElement("button");
     attribute.type = "button"; attribute.textContent = "Add attribution";
@@ -1094,9 +1095,31 @@ function openBibliography() {
   document.querySelector("#bibliography-dialog").showModal();
 }
 
-function insertInlineCitation(key) {
+function remapSourceOffset(before, after, offset) {
+  let prefix = 0;
+  while (prefix < before.length && prefix < after.length && before[prefix] === after[prefix]) prefix += 1;
+  if (offset <= prefix) return offset;
+  let beforeSuffix = before.length;
+  let afterSuffix = after.length;
+  while (beforeSuffix > prefix && afterSuffix > prefix && before[beforeSuffix - 1] === after[afterSuffix - 1]) {
+    beforeSuffix -= 1;
+    afterSuffix -= 1;
+  }
+  return offset >= beforeSuffix ? afterSuffix + offset - beforeSuffix : prefix;
+}
+
+async function insertInlineCitation(key) {
   if (state.mode !== "source") { bibliographyMessage("Switch to Source mode to insert an inline citation", true); return; }
   const editor = elements.source;
+  const draft = editor.value;
+  const selectionStart = editor.selectionStart;
+  const selectionEnd = editor.selectionEnd;
+  if (draft !== state.source && !commitSource(draft)) return;
+  const sourceBeforeSave = state.source;
+  if (!await saveBibliography()) return;
+  const start = remapSourceOffset(sourceBeforeSave, state.source, selectionStart);
+  const end = remapSourceOffset(sourceBeforeSave, state.source, selectionEnd);
+  editor.setSelectionRange(start, end);
   editor.setRangeText(`[@${key}]`, editor.selectionStart, editor.selectionEnd, "end");
   editor.dispatchEvent(new Event("input"));
   document.querySelector("#bibliography-dialog").close();
@@ -1104,13 +1127,14 @@ function insertInlineCitation(key) {
 }
 
 async function insertCitationOverlay(key) {
-  if (!await saveBibliography({ announce: false })) return;
+  if (!await saveBibliography()) return;
   const base = `citation-${key.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
   const used = new Set(state.deck.slides[state.currentSlide].overlays.map(item => item.id));
   let id = base; let counter = 2;
   while (used.has(id)) id = `${base}-${counter++}`;
-  commitSource(insertOverlay(state.deck, state.currentSlide, { type: "citation", content: "", id, x: 55, y: 82, w: 40, h: 8, attributes: { key, display: "brief", align: "left", "font-size": "0.7em" } }));
-  document.querySelector("#bibliography-dialog").close();
+  if (commitSource(insertOverlay(state.deck, state.currentSlide, { type: "citation", content: "", id, x: 55, y: 82, w: 40, h: 8, attributes: { key, display: "brief", align: "left", "font-size": "0.7em" } }))) {
+    document.querySelector("#bibliography-dialog").close();
+  }
 }
 
 async function fetchDoi() {
@@ -1137,7 +1161,7 @@ async function fetchDoi() {
     document.querySelector("#doi-input").value = "";
     document.querySelector("#bibliography-search").value = "";
     rebuildBibliographyList(incoming.key);
-    bibliographyMessage(`Added ${incoming.key} to the draft; save to write the bibliography`);
+    bibliographyMessage(`Added ${incoming.key}; it will be saved when the dialog closes or the reference is used`);
   } catch (error) { bibliographyMessage(error.message, true); }
 }
 
@@ -1151,15 +1175,16 @@ function reformatBibliographyDraft() {
   try {
     source.value = formatBibliography(source.value);
     rebuildBibliographyList();
-    bibliographyMessage("Bibliography draft reformatted and alphabetized; save to write it");
+    bibliographyMessage("Bibliography draft reformatted and alphabetized");
   } catch (error) { bibliographyMessage(error.message, true); }
 }
 
-async function saveBibliography({ announce = true } = {}) {
+async function saveBibliography() {
   const source = document.querySelector("#bibliography-source").value;
   try { parseBibliography(source); }
   catch (error) { bibliographyMessage(error.message, true); return false; }
   if (!state.local) { bibliographyMessage("Saving requires the local Quarkfoil server", true); return false; }
+  if (state.mode === "source" && elements.source.value !== state.source && !commitSource(elements.source.value)) return false;
   try {
     const response = await fetch(`/api/bibliography?path=${encodeURIComponent(bibliographyPath())}`, { method: "PUT", headers: { "Content-Type": "application/x-bibtex; charset=utf-8", "If-Match": `"${state.bibliographyHash}"` }, body: source });
     const result = await response.json();
@@ -1169,12 +1194,16 @@ async function saveBibliography({ announce = true } = {}) {
     if (!state.deck.metadata?.bibliography && /^---\r?\n/.test(state.source)) {
       if (!commitSource(state.source.replace(/^---\r?\n/, `---\nbibliography: ${bibliographyPath()}\n`))) return false;
     } else parseAndRender(state.source);
-    if (announce) bibliographyMessage("Bibliography saved");
     return true;
   } catch (error) {
     bibliographyMessage(error.message || "Save failed", true);
     return false;
   }
+}
+
+async function closeBibliography() {
+  if (!await saveBibliography()) return;
+  document.querySelector("#bibliography-dialog").close();
 }
 
 function figureFolder() {
@@ -1387,7 +1416,11 @@ function bindUi() {
     event.preventDefault();
     fetchDoi();
   });
-  document.querySelector("#bibliography-save").addEventListener("click", () => saveBibliography());
+  document.querySelector("#bibliography-close").addEventListener("click", closeBibliography);
+  document.querySelector("#bibliography-dialog").addEventListener("cancel", event => {
+    event.preventDefault();
+    closeBibliography();
+  });
   document.querySelector("#undo-button").addEventListener("click", undo);
   document.querySelector("#redo-button").addEventListener("click", redo);
   document.querySelector("#add-slide").addEventListener("click", addSlideAfterSelection);

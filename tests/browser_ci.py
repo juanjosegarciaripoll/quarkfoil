@@ -93,6 +93,43 @@ def main() -> int:
         driver.close()
         driver.switch_to.window(original_window)
         driver.find_element(By.CSS_SELECTOR, '[data-mode="source"]').click()
+        citation_editor = driver.find_element(By.ID, "source-editor")
+        driver.execute_script("arguments[0].setSelectionRange(arguments[0].value.length, arguments[0].value.length);", citation_editor)
+        driver.find_element(By.ID, "bibliography-button").click()
+        bibliography_dialog = driver.find_element(By.ID, "bibliography-dialog")
+        WebDriverWait(driver, 5).until(lambda active_driver: bibliography_dialog.get_attribute("open") is not None)
+        bibliography_source = driver.find_element(By.ID, "bibliography-source")
+        driver.execute_script(
+            "arguments[0].value = arguments[0].value.replace('2026', '2027'); arguments[0].dispatchEvent(new Event('input', {bubbles:true}));",
+            bibliography_source,
+        )
+        driver.find_element(By.CSS_SELECTOR, ".bibliography-entry button").click()
+        WebDriverWait(driver, 5).until(lambda active_driver: bibliography_dialog.get_attribute("open") is None)
+        WebDriverWait(driver, 5).until(lambda active_driver: "2027" in (Path(temporary.name) / "references.bib").read_text(encoding="utf-8"))
+        if "[@test-link]" not in citation_editor.get_attribute("value"):
+            raise RuntimeError("Inline citation insertion did not use and save the current bibliography draft")
+        driver.find_element(By.ID, "bibliography-button").click()
+        WebDriverWait(driver, 5).until(lambda active_driver: bibliography_dialog.get_attribute("open") is not None)
+        bibliography_source = driver.find_element(By.ID, "bibliography-source")
+        driver.execute_script(
+            "arguments[0].value = '@article{broken'; arguments[0].dispatchEvent(new Event('input', {bubbles:true}));",
+            bibliography_source,
+        )
+        driver.find_element(By.ID, "bibliography-close").click()
+        WebDriverWait(driver, 5).until(lambda active_driver: "Invalid BibTeX" in active_driver.find_element(By.ID, "bibliography-status").text)
+        if bibliography_dialog.get_attribute("open") is None:
+            raise RuntimeError("Invalid bibliography draft closed instead of reporting the save error")
+        driver.execute_script(
+            "arguments[0].value = arguments[1].replace('2027', '2028'); arguments[0].dispatchEvent(new Event('input', {bubbles:true}));",
+            bibliography_source,
+            (Path(temporary.name) / "references.bib").read_text(encoding="utf-8"),
+        )
+        if driver.find_elements(By.ID, "bibliography-save"):
+            raise RuntimeError("Bibliography dialog still exposes a separate Save action")
+        driver.find_element(By.ID, "bibliography-close").click()
+        WebDriverWait(driver, 5).until(lambda active_driver: bibliography_dialog.get_attribute("open") is None)
+        WebDriverWait(driver, 5).until(lambda active_driver: "2028" in (Path(temporary.name) / "references.bib").read_text(encoding="utf-8"))
+        driver.find_element(By.CSS_SELECTOR, '[data-mode="source"]').click()
         normalization_editor = driver.find_element(By.ID, "source-editor")
         messy_source = (
             "## Browser test {.layout-1}\n\n\n\n"
