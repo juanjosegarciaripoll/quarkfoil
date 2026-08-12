@@ -23,7 +23,7 @@ import {
   updateSlideProperties,
 } from "./parser.js";
 import { renderDeck, syncVideoPlayback } from "./render.js";
-import { arrowGeometry, bindRangeControl, buildShapePalette, canvasStartsMarquee, clipboardImageFile, deleteKey, DesignEditor, initialImageGeometry, moveGeometryGroup, pageSlideIndex, projectAssetPage, rectanglesIntersect, renameClipboardImage, repeatedActivation, resolveImportDestination, videoFile } from "./editor.js";
+import { arrowGeometry, bindRangeControl, buildShapePalette, canvasLinkTarget, canvasStartsMarquee, clipboardImageFile, deleteKey, DesignEditor, initialImageGeometry, moveGeometryGroup, pageSlideIndex, projectAssetPage, rectanglesIntersect, renameClipboardImage, repeatedActivation, resolveImportDestination, videoFile } from "./editor.js";
 import { formatBibliography, parseBibliography, prepareBibliography, renameBibliographyEntry, uniqueCitationKey } from "./bibliography.js";
 import { compileExpression, createPlotSvg } from "./plot.js";
 import { externalDeckAction } from "./external.js";
@@ -394,6 +394,11 @@ try {
   assert(!canvasStartsMarquee({ overlay: null, cell: {}, title: null }), "single clicks on layout cells are left for cell selection");
   assert(!canvasStartsMarquee({ overlay: null, cell: null, title: {} }), "single clicks on slide titles are left for title selection");
   assert(canvasStartsMarquee({ overlay: null, cell: null, title: null }), "empty slide canvas still starts marquee selection");
+  const canvasLink = document.createElement("a");
+  canvasLink.href = "about:blank#citation";
+  const canvasLinkLabel = document.createElement("span");
+  canvasLink.append(canvasLinkLabel);
+  assert(canvasLinkTarget(canvasLinkLabel) === canvasLink && canvasLinkTarget(document.createElement("span")) === null, "links inside movable overlays bypass canvas drag handling");
   const overwriteDestination = await resolveImportDestination(Promise.resolve(true), { name: "figure.svg", overwrite: false },
     () => Promise.resolve({ name: "figure.svg", overwrite: true }));
   assert(overwriteDestination.name === "figure.svg" && overwriteDestination.overwrite === true, "collision imports await the editable overwrite destination");

@@ -24,6 +24,7 @@ export const repeatedActivation = (previous, key, time, interval = 450) => Boole
 );
 export const deleteKey = key => key === "Delete" || key === "Del";
 export const canvasStartsMarquee = ({ overlay, cell, title }) => !overlay && !cell && !title;
+export const canvasLinkTarget = target => target?.closest?.("a[href]") || null;
 export function buildShapePalette(target, choose) {
   const buttons = Object.entries(SHAPES).map(([shape, label]) => {
     const button = document.createElement("button");
@@ -662,6 +663,7 @@ export class DesignEditor {
 
   onPointerDown(event) {
     if (!this.active() || event.button !== 0) return;
+    if (canvasLinkTarget(event.target)) return;
     const handle = event.target.closest(".resize-handle");
     const overlay = event.target.closest(".slide-overlay");
     const cell = event.target.closest(".slide-cell");

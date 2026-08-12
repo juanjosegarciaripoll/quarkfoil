@@ -47,7 +47,15 @@ def main() -> int:
     browser = parse_args().browser
     temporary = tempfile.TemporaryDirectory()
     deck = Path(temporary.name) / "deck.md"
-    deck.write_text("## Browser test {.layout-1}\n\nInitial content.\n", encoding="utf-8")
+    deck.write_text(
+        "## Browser test {.layout-1}\n\nInitial content.\n\n"
+        "::: overlay {#link-test type=\"citation\" key=\"test-link\" display=\"brief\" x=\"10\" y=\"70\" w=\"40\" h=\"8\"}\n:::\n",
+        encoding="utf-8",
+    )
+    (Path(temporary.name) / "references.bib").write_text(
+        "@misc{test-link, author={Tester, Alice}, year={2026}, url={about:blank#quarkfoil-attribution}}\n",
+        encoding="utf-8",
+    )
     server = create_server(deck, "127.0.0.1", 0)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -73,6 +81,17 @@ def main() -> int:
         WebDriverWait(driver, 30).until(
             lambda active_driver: active_driver.find_element(By.ID, "save-state").text == "Saved"
         )
+        original_window = driver.current_window_handle
+        attribution_link = WebDriverWait(driver, 5).until(
+            lambda active_driver: active_driver.find_element(By.CSS_SELECTOR, ".overlay-citation a[href]")
+        )
+        attribution_link.click()
+        WebDriverWait(driver, 5).until(lambda active_driver: len(active_driver.window_handles) == 2)
+        link_window = next(handle for handle in driver.window_handles if handle != original_window)
+        driver.switch_to.window(link_window)
+        WebDriverWait(driver, 5).until(lambda active_driver: "quarkfoil-attribution" in active_driver.current_url)
+        driver.close()
+        driver.switch_to.window(original_window)
         driver.find_element(By.CSS_SELECTOR, '[data-mode="source"]').click()
         normalization_editor = driver.find_element(By.ID, "source-editor")
         messy_source = (

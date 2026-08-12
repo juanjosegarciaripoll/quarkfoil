@@ -209,6 +209,7 @@ body.presenting .toolbar { display: none; }
 .mode-design .slide-title { cursor: text; }
 .mode-design .slide-title:hover { outline: 1px dashed #22b8cf88; outline-offset: -1px; }
 .mode-design .slide-overlay { cursor: move; outline: 1px dashed transparent; }
+.mode-design .slide-overlay a[href] { cursor: pointer; }
 .mode-design .slide-overlay:hover { outline-color: #22b8cf88; }
 .mode-design .slide-overlay.selected-object { outline: 2px solid #22b8cf; }
 .mode-design .slide-overlay.selected-object:not(:has(.resize-handle)) { outline-style: dashed; }
