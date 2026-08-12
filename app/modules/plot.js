@@ -123,7 +123,7 @@ function splineGeometry(points) {
     bounds.minimumY = Math.min(bounds.minimumY, minimumY);
     bounds.maximumY = Math.max(bounds.maximumY, maximumY);
   }
-  return { path, bounds };
+  return { path, bounds, first: points[0], last: points.at(-1) };
 }
 
 export function createPlotSvg(expression, start, end, pointCount, axes) {
@@ -156,11 +156,12 @@ export function createPlotSvg(expression, start, end, pointCount, axes) {
   if (segment.length) segments.push(segment);
   const geometries = segments.map(splineGeometry).filter(Boolean);
   const paths = geometries.map(item => `<path d="${item.path}"/>`).join("");
+  const baselineY = padding.top + (maximumY - Math.max(minimumY, Math.min(maximumY, 0))) / (maximumY - minimumY) * plotHeight;
+  const areas = geometries.map(item => `<path d="${item.path} L${item.last[0].toFixed(2)} ${baselineY.toFixed(2)} L${item.first[0].toFixed(2)} ${baselineY.toFixed(2)} Z"/>`).join("");
   let axisMarkup = "";
   if (axes) {
-    const xAxisY = padding.top + (maximumY - Math.max(minimumY, Math.min(maximumY, 0))) / (maximumY - minimumY) * plotHeight;
     const yAxisX = padding.left + (Math.max(Math.min(start, end), Math.min(Math.max(start, end), 0)) - start) / (end - start) * plotWidth;
-    axisMarkup = `<g class="axes" fill="none" stroke="#61717b" stroke-width="1.5"><path d="M${padding.left} ${xAxisY.toFixed(2)}H${width - padding.right}"/><path d="M${yAxisX.toFixed(2)} ${padding.top}V${height - padding.bottom}"/></g>`;
+    axisMarkup = `<g class="axes" fill="none" stroke="#61717b" stroke-width="1.5"><path d="M${padding.left} ${baselineY.toFixed(2)}H${width - padding.right}"/><path d="M${yAxisX.toFixed(2)} ${padding.top}V${height - padding.bottom}"/></g>`;
   }
   const strokeAllowance = 1.5;
   const plotMinimumX = Math.min(0, ...geometries.map(item => item.bounds.minimumX));
@@ -173,5 +174,5 @@ export function createPlotSvg(expression, start, end, pointCount, axes) {
   const maximumViewY = plotMaximumY + strokeAllowance;
   const viewBox = `${minimumX.toFixed(2)} ${minimumViewY.toFixed(2)} ${(maximumX - minimumX).toFixed(2)} ${(maximumViewY - minimumViewY).toFixed(2)}`;
   const bounds = `${plotMinimumX.toFixed(4)} ${plotMinimumY.toFixed(4)} ${(plotMaximumX - plotMinimumX).toFixed(4)} ${(plotMaximumY - plotMinimumY).toFixed(4)}`;
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" data-quarkfoil-plot="1" data-plot-bounds="${bounds}"><rect class="plot-background" x="${minimumX.toFixed(2)}" y="${minimumViewY.toFixed(2)}" width="${(maximumX - minimumX).toFixed(2)}" height="${(maximumViewY - minimumViewY).toFixed(2)}" fill="none"/>${axisMarkup}<g class="curve" fill="none" stroke="#146c7e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">${paths}</g></svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" data-quarkfoil-plot="1" data-plot-bounds="${bounds}" data-area-baseline="${baselineY.toFixed(2)}"><rect class="plot-background" x="${minimumX.toFixed(2)}" y="${minimumViewY.toFixed(2)}" width="${(maximumX - minimumX).toFixed(2)}" height="${(maximumViewY - minimumViewY).toFixed(2)}" fill="none"/><g class="area" fill="none" stroke="none">${areas}</g>${axisMarkup}<g class="curve" fill="none" stroke="#146c7e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">${paths}</g></svg>`;
 }

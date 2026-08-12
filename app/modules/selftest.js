@@ -420,6 +420,7 @@ try {
   assert(plotViewBox[0] < 0 && plotViewBox[1] < 0 && plotViewBox[0] + plotViewBox[2] > 800 && plotViewBox[1] + plotViewBox[3] > 450, "plot viewports include spline overshoot and stroke instead of clipping at the data bounds");
   const axesPlot = createPlotSvg("x", -1, 1, 20, true);
   assert(axesPlot.includes('class="axes"') && axesPlot.includes(" C"), "plots optionally include axes and spline interpolation");
+  assert(axesPlot.includes('class="area" fill="none"') && /class="area"[^>]*><path d="[^"]+ Z"/.test(axesPlot), "plots include a closed, independently fillable area to the zero baseline");
   const projectAssets = Array.from({ length: 30 }, (_, index) => ({ path: `figures/result-${index}.png` }));
   const firstAssetPage = projectAssetPage(projectAssets, "", 0);
   assert(firstAssetPage.assets.length === 24 && firstAssetPage.pages === 2, "project asset navigation shows 24 items per page");

@@ -3,6 +3,54 @@
 All notable changes to Quarkfoil are documented here. The project follows
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- Select, move, duplicate, and delete multiple slide objects together.
+- Create editable arrows with configurable endpoints, arrowheads, color, and
+  line width.
+- Generate SVG plot assets from mathematical expressions and style their fill,
+  curve color, and line width.
+- Organize slides into collapsible sections, with slide counts shown when a
+  section is folded.
+- Reveal Markdown headings, paragraphs, and list items progressively using
+  explicit fragment indices.
+- Edit optional Reveal speaker notes in a resizable pane below the Design-mode
+  slide canvas.
+
+### Changed
+
+- Unified project browsing for presentations, images, and videos; paginated
+  large media galleries and added explicit rename or overwrite handling for
+  import collisions.
+- Improved video imports by reusing compatible streams when possible and
+  reporting conversion progress for media that requires optimization.
+- Streamlined bibliography editing, consistently formatted and sorted entries,
+  refreshed shared bibliography changes before editing, and exposed newly
+  retrieved DOI references immediately.
+- Normalize presentation source when saving while preserving intentional extra
+  Markdown spacing and fenced-code content.
+- Added editable numeric values beside sliders, opacity controls for colors,
+  a visual shape palette, and Page Up/Page Down slide navigation in the editor.
+- Normalized slide typography and increased table text size for readability.
+- Run the browser self-test in Firefox as well as Microsoft Edge.
+
+### Fixed
+
+- Detect and reconcile presentation changes made outside the editor without
+  silently replacing either the browser draft or the disk revision.
+- Keep image focus effective for width- and height-fitted images, and add a
+  stretch fitting mode when deliberate distortion is required.
+- Preserve reliable single-click cell selection and correct slide rendering in
+  Reveal's overview mode.
+- Keep attribution links usable in Design mode, render abbreviated
+  attributions without an unwanted panel, and repair DOI bibliography imports.
+- Render thick arrowheads correctly and avoid partial or unintended overwrites
+  when importing project files.
+- Separate generated-plot background color from a fillable area between the
+  curve and the zero baseline, and keep both color pickers available.
+
 ## [0.2.0] - 2026-08-09
 
 This release remains compatible with presentations created by 0.1.0 while
@@ -59,3 +107,4 @@ substantially expanding visual editing and scientific-presentation support.
 
 [0.2.0]: https://github.com/juanjosegarciaripoll/quarkfoil/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/juanjosegarciaripoll/quarkfoil/releases/tag/v0.1.0
+[Unreleased]: https://github.com/juanjosegarciaripoll/quarkfoil/compare/v0.2.0...HEAD

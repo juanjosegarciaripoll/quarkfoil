@@ -219,6 +219,34 @@ function imageAspectRatio(file) {
   });
 }
 
+function ensurePlotArea(root, background, curve) {
+  const existing = root.querySelector(".area");
+  if (existing) return existing;
+  const encodedBaseline = root.getAttribute("data-area-baseline");
+  let baseline = encodedBaseline === null ? Number.NaN : Number(encodedBaseline);
+  if (!Number.isFinite(baseline)) {
+    const horizontalAxis = root.querySelector(".axes path")?.getAttribute("d")?.match(/^M[-+.\d]+\s+([-+.\d]+)H/);
+    baseline = horizontalAxis ? Number(horizontalAxis[1]) : Number(background.getAttribute("y")) + Number(background.getAttribute("height"));
+  }
+  if (!Number.isFinite(baseline)) return null;
+  const area = document.createElementNS("http://www.w3.org/2000/svg", "g");
+  area.setAttribute("class", "area");
+  area.setAttribute("fill", "none");
+  area.setAttribute("stroke", "none");
+  for (const curvePath of curve.querySelectorAll("path")) {
+    const d = curvePath.getAttribute("d") || "";
+    const numbers = [...d.matchAll(/[-+]?(?:\d+(?:\.\d*)?|\.\d+)/g)].map(match => Number(match[0]));
+    if (numbers.length < 4 || numbers.some(value => !Number.isFinite(value))) continue;
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", `${d} L${numbers.at(-2)} ${baseline} L${numbers[0]} ${baseline} Z`);
+    area.append(path);
+  }
+  if (!area.childElementCount) return null;
+  root.setAttribute("data-area-baseline", String(baseline));
+  root.insertBefore(area, curve);
+  return area;
+}
+
 export class DesignEditor {
   constructor(options) {
     this.options = options;
@@ -308,11 +336,21 @@ export class DesignEditor {
       this.updatePlotPreview();
     });
     document.querySelector("#plot-create").addEventListener("click", () => this.createPlot());
-    document.querySelector("#prop-plot-fill-enabled").addEventListener("change", event => {
-      document.querySelector("#prop-plot-fill").disabled = !event.target.checked;
+    document.querySelector("#prop-plot-background-enabled").addEventListener("change", () => {
       this.applyPlotProperties();
     });
-    for (const id of ["prop-plot-fill", "prop-plot-stroke", "prop-plot-stroke-width"]) {
+    document.querySelector("#prop-plot-background").addEventListener("change", () => {
+      document.querySelector("#prop-plot-background-enabled").checked = true;
+      this.applyPlotProperties();
+    });
+    document.querySelector("#prop-plot-fill-enabled").addEventListener("change", () => {
+      this.applyPlotProperties();
+    });
+    document.querySelector("#prop-plot-fill").addEventListener("change", () => {
+      document.querySelector("#prop-plot-fill-enabled").checked = true;
+      this.applyPlotProperties();
+    });
+    for (const id of ["prop-plot-stroke", "prop-plot-stroke-width"]) {
       document.querySelector(`#${id}`).addEventListener("change", () => this.applyPlotProperties());
     }
     for (const id of ["prop-arrow-stroke", "prop-arrow-stroke-width", "prop-arrow-heads"]) {
@@ -1134,13 +1172,16 @@ export class DesignEditor {
       const background = root.querySelector(".plot-background");
       const curve = root.querySelector(".curve");
       if (!background || !curve) return;
+      const area = ensurePlotArea(root, background, curve);
+      if (!area) return;
       this.plotAsset = { path, documentNode };
       this.plotProperties.hidden = false;
-      const fill = background.getAttribute("fill") || "none";
-      const fillEnabled = fill !== "none";
-      document.querySelector("#prop-plot-fill-enabled").checked = fillEnabled;
-      document.querySelector("#prop-plot-fill").disabled = !fillEnabled;
-      document.querySelector("#prop-plot-fill").value = /^#[0-9a-f]{6}$/i.test(fill) ? fill : "#ffffff";
+      const backgroundFill = background.getAttribute("fill") || "none";
+      document.querySelector("#prop-plot-background-enabled").checked = backgroundFill !== "none";
+      document.querySelector("#prop-plot-background").value = /^#[0-9a-f]{6}$/i.test(backgroundFill) ? backgroundFill : "#ffffff";
+      const areaFill = area.getAttribute("fill") || "none";
+      document.querySelector("#prop-plot-fill-enabled").checked = areaFill !== "none";
+      document.querySelector("#prop-plot-fill").value = /^#[0-9a-f]{6}$/i.test(areaFill) ? areaFill : "#ffffff";
       document.querySelector("#prop-plot-stroke").value = curve.getAttribute("stroke") || "#146c7e";
       document.querySelector("#prop-plot-stroke-width").value = curve.getAttribute("stroke-width") || "3";
     } catch { /* Non-Quarkfoil or unreadable SVGs retain ordinary image properties. */ }
@@ -1150,9 +1191,11 @@ export class DesignEditor {
     if (!this.plotAsset) return;
     const { path, documentNode } = this.plotAsset;
     const background = documentNode.documentElement.querySelector(".plot-background");
+    const area = documentNode.documentElement.querySelector(".area");
     const curve = documentNode.documentElement.querySelector(".curve");
-    if (!background || !curve) return;
-    background.setAttribute("fill", document.querySelector("#prop-plot-fill-enabled").checked ? document.querySelector("#prop-plot-fill").value : "none");
+    if (!background || !area || !curve) return;
+    background.setAttribute("fill", document.querySelector("#prop-plot-background-enabled").checked ? document.querySelector("#prop-plot-background").value : "none");
+    area.setAttribute("fill", document.querySelector("#prop-plot-fill-enabled").checked ? document.querySelector("#prop-plot-fill").value : "none");
     curve.setAttribute("stroke", document.querySelector("#prop-plot-stroke").value);
     const strokeWidth = Math.max(0.25, Number(document.querySelector("#prop-plot-stroke-width").value) || 3);
     curve.setAttribute("stroke-width", String(strokeWidth));
