@@ -63,8 +63,8 @@ All notable changes to Quarkfoil are documented here. The project follows
   so arrow-key movement works after editing a value in Properties.
 - Refresh unsaved state as soon as presentation Markdown changes, including
   slide reordering, and treat an active speaker-notes draft as needing a save.
-- Keep the presentation-opening server test byte-stable across Windows and
-  POSIX newline conventions.
+- Keep presentation opening and conflict-checking server tests byte-stable
+  across Windows and POSIX newline conventions.
 
 ## [0.2.0] - 2026-08-09
 

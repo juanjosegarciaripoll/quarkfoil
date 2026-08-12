@@ -349,14 +349,14 @@ class ServerTests(unittest.TestCase):
 
     def test_deck_save_path_is_client_scoped(self) -> None:
         other = self.root / "other.md"
-        other.write_text("# Other\n", encoding="utf-8")
+        other.write_bytes(b"# Other\n")
         digest = hashlib.sha256(b"# Other\n").hexdigest()
         status, _, _ = self.request(
             "/api/deck?path=other.md", method="PUT", body=b"# Changed\n",
             headers={"Content-Type": "text/markdown", "If-Match": f'"{digest}"'},
         )
         self.assertEqual(status, 200)
-        self.assertEqual(other.read_text(encoding="utf-8"), "# Changed\n")
+        self.assertEqual(other.read_bytes(), b"# Changed\n")
         _, _, initial = self.request("/api/deck")
         self.assertNotEqual(initial, b"# Changed\n")
 
