@@ -49,7 +49,10 @@ All notable changes to Quarkfoil are documented here. The project follows
 - Render thick arrowheads correctly and avoid partial or unintended overwrites
   when importing project files.
 - Separate generated-plot background color from a fillable area between the
-  curve and the zero baseline, and keep both color pickers available.
+  curve and the zero baseline, keep both color pickers available, and support
+  alpha channels for the background, area, and curve colors.
+- Empty selected Markdown layout regions and remove other selected canvas
+  objects with Delete, Del, or the Backspace value used by compact keyboards.
 
 ## [0.2.0] - 2026-08-09
 

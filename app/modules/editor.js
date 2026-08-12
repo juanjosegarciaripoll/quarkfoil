@@ -22,7 +22,7 @@ export const videoFile = file => file?.type?.startsWith("video/") || /\.(?:avi|m
 export const repeatedActivation = (previous, key, time, interval = 450) => Boolean(
   previous && previous.key === key && time - previous.time >= 0 && time - previous.time <= interval,
 );
-export const deleteKey = key => key === "Delete" || key === "Del";
+export const deleteKey = key => key === "Delete" || key === "Del" || key === "Backspace";
 export const canvasStartsMarquee = ({ overlay, cell, title }) => !overlay && !cell && !title;
 export const canvasLinkTarget = target => target?.closest?.("a[href]") || null;
 export function buildShapePalette(target, choose) {
@@ -339,20 +339,19 @@ export class DesignEditor {
     document.querySelector("#prop-plot-background-enabled").addEventListener("change", () => {
       this.applyPlotProperties();
     });
-    document.querySelector("#prop-plot-background").addEventListener("change", () => {
-      document.querySelector("#prop-plot-background-enabled").checked = true;
-      this.applyPlotProperties();
-    });
     document.querySelector("#prop-plot-fill-enabled").addEventListener("change", () => {
       this.applyPlotProperties();
     });
-    document.querySelector("#prop-plot-fill").addEventListener("change", () => {
-      document.querySelector("#prop-plot-fill-enabled").checked = true;
-      this.applyPlotProperties();
-    });
-    for (const id of ["prop-plot-stroke", "prop-plot-stroke-width"]) {
-      document.querySelector(`#${id}`).addEventListener("change", () => this.applyPlotProperties());
+    for (const name of ["background", "fill", "stroke"]) {
+      for (const suffix of ["", "-alpha"]) {
+        document.querySelector(`#prop-plot-${name}${suffix}`).addEventListener("change", () => {
+          if (name === "background") document.querySelector("#prop-plot-background-enabled").checked = true;
+          if (name === "fill") document.querySelector("#prop-plot-fill-enabled").checked = true;
+          this.applyPlotProperties();
+        });
+      }
     }
+    document.querySelector("#prop-plot-stroke-width").addEventListener("change", () => this.applyPlotProperties());
     for (const id of ["prop-arrow-stroke", "prop-arrow-stroke-width", "prop-arrow-heads"]) {
       document.querySelector(`#${id}`).addEventListener("change", () => this.applyArrowProperties());
     }
@@ -563,6 +562,7 @@ export class DesignEditor {
     } else if (cell?.type === "video") {
       this.noSelection.textContent = "Video cell properties must currently be edited in Source mode.";
     }
+    document.querySelector("#delete-object").disabled = !cell?.source.trim();
   }
 
   clearSelection() {
@@ -1178,11 +1178,11 @@ export class DesignEditor {
       this.plotProperties.hidden = false;
       const backgroundFill = background.getAttribute("fill") || "none";
       document.querySelector("#prop-plot-background-enabled").checked = backgroundFill !== "none";
-      document.querySelector("#prop-plot-background").value = /^#[0-9a-f]{6}$/i.test(backgroundFill) ? backgroundFill : "#ffffff";
+      setColorControl("prop-plot-background", backgroundFill, "#ffffff");
       const areaFill = area.getAttribute("fill") || "none";
       document.querySelector("#prop-plot-fill-enabled").checked = areaFill !== "none";
-      document.querySelector("#prop-plot-fill").value = /^#[0-9a-f]{6}$/i.test(areaFill) ? areaFill : "#ffffff";
-      document.querySelector("#prop-plot-stroke").value = curve.getAttribute("stroke") || "#146c7e";
+      setColorControl("prop-plot-fill", areaFill, "#ffffff");
+      setColorControl("prop-plot-stroke", curve.getAttribute("stroke"), "#146c7e");
       document.querySelector("#prop-plot-stroke-width").value = curve.getAttribute("stroke-width") || "3";
     } catch { /* Non-Quarkfoil or unreadable SVGs retain ordinary image properties. */ }
   }
@@ -1194,9 +1194,9 @@ export class DesignEditor {
     const area = documentNode.documentElement.querySelector(".area");
     const curve = documentNode.documentElement.querySelector(".curve");
     if (!background || !area || !curve) return;
-    background.setAttribute("fill", document.querySelector("#prop-plot-background-enabled").checked ? document.querySelector("#prop-plot-background").value : "none");
-    area.setAttribute("fill", document.querySelector("#prop-plot-fill-enabled").checked ? document.querySelector("#prop-plot-fill").value : "none");
-    curve.setAttribute("stroke", document.querySelector("#prop-plot-stroke").value);
+    background.setAttribute("fill", document.querySelector("#prop-plot-background-enabled").checked ? colorControlValue("prop-plot-background") : "none");
+    area.setAttribute("fill", document.querySelector("#prop-plot-fill-enabled").checked ? colorControlValue("prop-plot-fill") : "none");
+    curve.setAttribute("stroke", colorControlValue("prop-plot-stroke"));
     const strokeWidth = Math.max(0.25, Number(document.querySelector("#prop-plot-stroke-width").value) || 3);
     curve.setAttribute("stroke-width", String(strokeWidth));
     const bounds = documentNode.documentElement.getAttribute("data-plot-bounds")?.split(/\s+/).map(Number);
@@ -1440,13 +1440,12 @@ export class DesignEditor {
     }
     if (this.selectedCell) {
       const cell = this.slide().cells.find(item => item.id === this.selectedCell.dataset.cellId);
-      if (cell?.image) this.commit(setCellContent(this.options.getDeck(), this.slideIndex(), cell.id, ""));
+      if (cell?.source.trim()) this.commit(setCellContent(this.options.getDeck(), this.slideIndex(), cell.id, ""));
     }
   }
 
   onKeyDown(event) {
-    const selectedCellImage = this.selectedCell && this.slide().cells.find(item => item.id === this.selectedCell.dataset.cellId)?.image;
-    if (!this.active() || (!this.selected && !selectedCellImage) || ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) return;
+    if (!this.active() || (!this.selected && !this.selectedCell) || ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) return;
     if (deleteKey(event.key)) { event.preventDefault(); this.remove(); return; }
     if (!this.selected) return;
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "d") { event.preventDefault(); this.duplicate(); return; }

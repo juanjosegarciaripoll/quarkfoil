@@ -403,7 +403,7 @@ try {
   const overwriteDestination = await resolveImportDestination(Promise.resolve(true), { name: "figure.svg", overwrite: false },
     () => Promise.resolve({ name: "figure.svg", overwrite: true }));
   assert(overwriteDestination.name === "figure.svg" && overwriteDestination.overwrite === true, "collision imports await the editable overwrite destination");
-  assert(deleteKey("Delete") && deleteKey("Del"), "Delete and Del keys remove selected images and overlays");
+  assert(deleteKey("Delete") && deleteKey("Del") && deleteKey("Backspace"), "Delete-key variants remove selected canvas content");
   assert(externalDeckAction({ knownHash: "a", diskHash: "a", dirty: false, valid: true }) === "unchanged",
     "unchanged external deck revisions require no editor action");
   assert(externalDeckAction({ knownHash: "a", diskHash: "b", dirty: false, valid: true }) === "reload",
@@ -443,6 +443,11 @@ try {
   assert(deck.slides[0].cells.find(cell => cell.id === "top-right").image.attrs.values.fit === "cover", "image attributes parse");
   const clearedImageCell = parseDeck(setCellContent(deck, 0, "top-right", ""));
   assert(!clearedImageCell.slides[0].cells.find(cell => cell.id === "top-right")?.image, "deleting a selected layout image clears its cell content");
+  const clearedMarkdownCell = parseDeck(setCellContent(deck, 0, "left", ""));
+  assert(!clearedMarkdownCell.slides[0].cells.find(cell => cell.id === "left")?.source, "deleting a selected Markdown region clears its content");
+  const mixedCore = parseDeck("## Mixed {.layout-1}\n\nOrdinary Markdown.\n\n::: overlay {#kept type=\"markdown\"}\nKeep this overlay.\n:::\n");
+  const clearedMixedCore = setCellContent(mixedCore, 0, "core", "");
+  assert(!clearedMixedCore.includes("Ordinary Markdown.") && clearedMixedCore.includes("Keep this overlay."), "clearing mixed core Markdown preserves slide directives");
   const stretchDeck = parseDeck('## Stretch {.layout-1}\n\n::: core\n![](figures/stretch.svg){fit=stretch}\n:::\n');
   const stretchFixture = document.createElement("div");
   renderDeck(stretchDeck, stretchFixture, asset => `/test/${asset}`);

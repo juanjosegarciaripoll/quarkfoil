@@ -750,8 +750,16 @@ function directiveBlock(name, content, attributes = "") {
 
 export function setCellContent(deck, slideIndex, cellId, content) {
   const slide = deck.slides[slideIndex];
-  const cell = slide?.cells.find(item => item.id === cellId && item.range);
-  if (cell) return updateBlockContent(deck, slideIndex, cellId, content);
+  const cell = slide?.cells.find(item => item.id === cellId);
+  if (cell?.range) return updateBlockContent(deck, slideIndex, cellId, content);
+  if (cell?.sourceRanges?.length) {
+    if (String(content).trim()) throw new Error(`Cannot edit mixed '${cellId}' content outside Source mode`);
+    let source = deck.source;
+    for (const range of [...cell.sourceRanges].sort((left, right) => right.start - left.start)) {
+      source = patchRange(source, range.start, range.end, "");
+    }
+    return source;
+  }
   return appendBlock(deck, slide, directiveBlock(cellId, content));
 }
 

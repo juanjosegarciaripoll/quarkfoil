@@ -153,10 +153,10 @@
       </form>
       <form id="plot-properties" hidden>
         <label class="check"><input id="prop-plot-background-enabled" type="checkbox"> Background</label>
-        <label>Background <input id="prop-plot-background" type="color" value="#ffffff"></label>
+        <label>Background <span class="color-with-alpha"><input id="prop-plot-background" type="color" value="#ffffff"><span class="alpha-symbol" aria-hidden="true">α</span><input id="prop-plot-background-alpha" type="number" min="0" max="100" value="100" title="Background opacity percent" aria-label="Plot background opacity percent"></span></label>
         <label class="check"><input id="prop-plot-fill-enabled" type="checkbox"> Area</label>
-        <label>Fill <input id="prop-plot-fill" type="color" value="#ffffff"></label>
-        <label>Curve <input id="prop-plot-stroke" type="color" value="#146c7e"></label>
+        <label>Fill <span class="color-with-alpha"><input id="prop-plot-fill" type="color" value="#ffffff"><span class="alpha-symbol" aria-hidden="true">α</span><input id="prop-plot-fill-alpha" type="number" min="0" max="100" value="100" title="Area opacity percent" aria-label="Plot area opacity percent"></span></label>
+        <label>Curve <span class="color-with-alpha"><input id="prop-plot-stroke" type="color" value="#146c7e"><span class="alpha-symbol" aria-hidden="true">α</span><input id="prop-plot-stroke-alpha" type="number" min="0" max="100" value="100" title="Curve opacity percent" aria-label="Plot curve opacity percent"></span></label>
         <label>Line width <input id="prop-plot-stroke-width" type="number" min="0.25" max="30" step="0.25" value="3"></label>
         <small>Edits the generated SVG file and every use of it.</small>
       </form>
