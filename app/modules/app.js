@@ -1511,9 +1511,11 @@ function bindUi() {
   document.addEventListener("keydown", event => {
     const editing = textEditingTarget(event.target);
     const draftEditorOpen = state.mode === "source" || Boolean(document.querySelector("#content-dialog[open]"));
+    const undoShortcut = (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z";
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") { event.preventDefault(); saveDeck(); }
-    if (!editing && !draftEditorOpen && (event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "z") { event.preventDefault(); undo(); }
-    if (!editing && !draftEditorOpen && (event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "z") { event.preventDefault(); redo(); }
+    if (!editing && draftEditorOpen && undoShortcut) event.preventDefault();
+    if (!editing && !draftEditorOpen && undoShortcut && !event.shiftKey) { event.preventDefault(); undo(); }
+    if (!editing && !draftEditorOpen && undoShortcut && event.shiftKey) { event.preventDefault(); redo(); }
     if (event.key === "Escape" && state.mode === "present") setMode("design");
     if (state.mode === "design" && reveal && state.deck && !editing && !document.querySelector("dialog[open]") && !event.ctrlKey && !event.metaKey && !event.altKey && ["PageUp", "PageDown"].includes(event.key)) {
       event.preventDefault();

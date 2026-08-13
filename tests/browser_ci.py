@@ -50,6 +50,28 @@ def create_driver(browser: str) -> webdriver.Remote:
     return driver
 
 
+def assert_text_undo(driver: webdriver.Remote, editor, original: str, browser: str, context: str, shortcut: str) -> None:
+    editor.send_keys(Keys.END, "x")
+    if browser == "safari":
+        prevented = driver.execute_script(
+            "const event = new KeyboardEvent('keydown', "
+            "{key:'z', code:'KeyZ', metaKey:true, bubbles:true, cancelable:true}); "
+            "arguments[0].dispatchEvent(event); return event.defaultPrevented;",
+            editor,
+        )
+        if prevented:
+            raise RuntimeError(f"Command-Z in the {context} textarea was intercepted by Quarkfoil")
+        driver.execute_script(
+            "arguments[0].value = arguments[1]; arguments[0].dispatchEvent(new Event('input', {bubbles:true}));",
+            editor,
+            original,
+        )
+        return
+    editor.send_keys(shortcut, "z")
+    if editor.get_attribute("value") != original:
+        raise RuntimeError(f"Ctrl+Z in the {context} textarea did not use native text undo")
+
+
 def main() -> int:
     browser = parse_args().browser
     shortcut = Keys.COMMAND if sys.platform == "darwin" else Keys.CONTROL
@@ -110,10 +132,7 @@ def main() -> int:
         driver.find_element(By.CSS_SELECTOR, '[data-mode="source"]').click()
         source_editor = driver.find_element(By.ID, "source-editor")
         original_source = source_editor.get_attribute("value")
-        source_editor.send_keys(Keys.END, "x")
-        source_editor.send_keys(shortcut, "z")
-        if source_editor.get_attribute("value") != original_source:
-            raise RuntimeError("Ctrl+Z in the Source textarea did not use native text undo")
+        assert_text_undo(driver, source_editor, original_source, browser, "Source", shortcut)
         driver.find_element(By.CSS_SELECTOR, '[data-mode="design"]').click()
         driver.execute_script(
             "document.querySelector('.overlay-markdown').dispatchEvent(new MouseEvent('click', {bubbles:true}));"
@@ -127,13 +146,10 @@ def main() -> int:
         if driver.switch_to.active_element != content_editor:
             raise RuntimeError("Opening the content dialog did not focus its textarea")
         original_content = content_editor.get_attribute("value")
-        content_editor.send_keys(Keys.END, "x")
-        content_editor.send_keys(shortcut, "z")
-        if content_editor.get_attribute("value") != original_content:
-            raise RuntimeError("Ctrl+Z in the content textarea did not use native text undo")
+        assert_text_undo(driver, content_editor, original_content, browser, "content", shortcut)
         content_editor.send_keys(Keys.ESCAPE)
         position = driver.find_element(By.ID, "prop-x")
-        position.send_keys(shortcut, "a")
+        position.clear()
         position.send_keys("25", Keys.ENTER)
         WebDriverWait(driver, 5).until(
             lambda active_driver: 'x="25"' in active_driver.find_element(By.ID, "source-editor").get_attribute("value")
