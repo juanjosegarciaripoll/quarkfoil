@@ -104,7 +104,7 @@ def main() -> int:
         driver.find_element(By.CSS_SELECTOR, '[data-mode="source"]').click()
         source_editor = driver.find_element(By.ID, "source-editor")
         original_source = source_editor.get_attribute("value")
-        source_editor.send_keys(Keys.END, "Native source undo")
+        source_editor.send_keys(Keys.END, "x")
         source_editor.send_keys(Keys.CONTROL, "z")
         if source_editor.get_attribute("value") != original_source:
             raise RuntimeError("Ctrl+Z in the Source textarea did not use native text undo")
@@ -118,8 +118,10 @@ def main() -> int:
         content_dialog = driver.find_element(By.ID, "content-dialog")
         WebDriverWait(driver, 5).until(lambda active_driver: content_dialog.get_attribute("open") is not None)
         content_editor = driver.find_element(By.ID, "content-editor")
+        if driver.switch_to.active_element != content_editor:
+            raise RuntimeError("Opening the content dialog did not focus its textarea")
         original_content = content_editor.get_attribute("value")
-        content_editor.send_keys(Keys.END, "Native dialog undo")
+        content_editor.send_keys(Keys.END, "x")
         content_editor.send_keys(Keys.CONTROL, "z")
         if content_editor.get_attribute("value") != original_content:
             raise RuntimeError("Ctrl+Z in the content textarea did not use native text undo")
@@ -130,6 +132,17 @@ def main() -> int:
         WebDriverWait(driver, 5).until(
             lambda active_driver: 'x="25"' in active_driver.find_element(By.ID, "source-editor").get_attribute("value")
         )
+        driver.execute_script(
+            "document.querySelector('.overlay-markdown').dispatchEvent(new MouseEvent('dblclick', {bubbles:true}));"
+        )
+        WebDriverWait(driver, 5).until(lambda active_driver: content_dialog.get_attribute("open") is not None)
+        content_editor = driver.find_element(By.ID, "content-editor")
+        content_editor.send_keys(Keys.END, "x")
+        dialog_draft = content_editor.get_attribute("value")
+        driver.find_element(By.CSS_SELECTOR, "#content-dialog button[value='cancel']").send_keys(Keys.CONTROL, "z")
+        if content_editor.get_attribute("value") != dialog_draft or 'x="25"' not in driver.find_element(By.ID, "source-editor").get_attribute("value"):
+            raise RuntimeError("Ctrl+Z outside the open content textarea changed global document history")
+        driver.find_element(By.CSS_SELECTOR, "#content-dialog button[value='cancel']").send_keys(Keys.ESCAPE)
         driver.find_element(By.ID, "prop-text-color").click()
         WebDriverWait(driver, 5).until(
             lambda active_driver: active_driver.find_element(By.ID, "color-dialog").get_attribute("open") is not None

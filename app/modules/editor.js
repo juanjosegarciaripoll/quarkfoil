@@ -1131,6 +1131,7 @@ export class DesignEditor {
     this.contentEditor.value = object.source;
     renderMarkdownPreview(object.source, this.preview, { breaks: true, preserveBlankLines: true });
     this.dialog.showModal();
+    this.contentEditor.focus();
   }
 
   openCellDialog() {
@@ -1150,6 +1151,7 @@ export class DesignEditor {
     this.contentEditor.value = cell?.source || "";
     renderMarkdownPreview(cell?.source || "", this.preview, { preserveBlankLines: true });
     this.dialog.showModal();
+    this.contentEditor.focus();
   }
 
   openTitleDialog() {
@@ -1161,6 +1163,7 @@ export class DesignEditor {
     this.contentEditor.value = slide.titleSource;
     this.updateContentPreview();
     this.dialog.showModal();
+    this.contentEditor.focus();
   }
 
   applyContentDialog() {
