@@ -21,12 +21,12 @@ function preserveAdditionalBlankLines(source, spacers) {
 function preserveMarkdownFragments(source, fragments) {
   return source.split(/(```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]*`)/g).map((part, index) => {
     if (index % 2) return part;
-    return part.replace(/[ \t]*\{fragment\s*=\s*(\d+)\}[ \t]*(?=\r?$)/gm, (whole, value) => {
+    return part.replace(/([ \t]*)\{fragment\s*=\s*(\d+)\}[ \t]*(?=\r?$)/gm, (whole, leading, value) => {
       const fragmentIndex = Number(value);
       if (!Number.isSafeInteger(fragmentIndex)) return whole;
       const token = `SCIFRAGMENTPLACEHOLDER${fragments.length}X`;
       fragments.push({ token, index: fragmentIndex });
-      return token;
+      return `${leading}${token}`;
     });
   }).join("");
 }

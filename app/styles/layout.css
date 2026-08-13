@@ -284,6 +284,7 @@
   pointer-events: auto;
   overflow: visible;
 }
+.overlay-markdown { display: block; }
 .overlay-markdown > :where(p, ul, ol, blockquote, pre),
 .shape-label > :where(p, ul, ol, blockquote, pre) { font-size: 0.68em; line-height: 1.38; }
 .slide-overlay :where(ul, ol) { padding-inline-start: var(--list-indent); list-style-position: outside; }

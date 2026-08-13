@@ -317,6 +317,10 @@ function assertTypography() {
 
 First paragraph with enough text to establish its line height. {fragment=1}
 
+**Reachable:**  {fragment=5}
+- Ising, $\\lambda^\\perp = 0$
+- Heisenberg, $\\lambda^z = \\lambda^\\perp$
+
 
 Second paragraph.
 
@@ -341,10 +345,17 @@ code line two {fragment=9}
 
 After an additional blank line. {fragment=4}
 :::
+
+::: overlay {#reachable type="markdown" x="5" y="55" w="40" h="30"}
+**Reachable:**  {fragment=5}
+- Ising, $\\lambda^\\perp = 0$
+- Heisenberg, $\\lambda^z = \\lambda^\\perp$
+:::
 `);
   renderDeck(deck, fixture, source => source);
   const cell = fixture.querySelector(".slide-cell");
-  const [topItem, nestedItem] = cell.querySelectorAll("li");
+  const topItem = [...cell.querySelectorAll("li")].find(item => item.firstChild?.textContent.includes("First item"));
+  const nestedItem = topItem.querySelector("li");
   const cellSize = parseFloat(getComputedStyle(cell).fontSize);
   assert(Math.abs(parseFloat(getComputedStyle(topItem).fontSize) - cellSize) < 0.1
     && Math.abs(parseFloat(getComputedStyle(nestedItem).fontSize) - cellSize) < 0.1,
@@ -354,11 +365,14 @@ After an additional blank line. {fragment=4}
   const paragraph = cell.querySelector("p");
   assert(Math.abs(parseFloat(getComputedStyle(paragraph).lineHeight) / cellSize - 1.4) < 0.02, "layout paragraphs use the normalized line height");
   const paragraphs = cell.querySelectorAll("p");
-  assert(parseFloat(getComputedStyle(paragraphs[2]).marginTop) > 0, "adjacent layout paragraphs use explicit block spacing");
+  assert(parseFloat(getComputedStyle(paragraphs[paragraphs.length - 1]).marginTop) > 0, "adjacent layout paragraphs use explicit block spacing");
   assert(cell.querySelectorAll(":scope > .slide-content-spacer").length === 1, "additional blank layout lines render as proportional vertical space");
   assert(cell.querySelector("pre").textContent.includes("code line one\n\n\ncode line two {fragment=9}"), "annotations and blank lines inside fenced code remain code content");
   assert(cell.querySelector("h3").matches(".fragment[data-fragment-index='0']"), "Markdown headings can be fragments");
   assert(paragraph.matches(".fragment[data-fragment-index='1']"), "Markdown paragraphs can be fragments");
+  const reachable = [...cell.querySelectorAll("p")].find(item => item.textContent.includes("Reachable:"));
+  assert(reachable?.matches(".fragment[data-fragment-index='5']") && reachable.querySelector("strong")?.textContent === "Reachable:",
+    "fragment annotations preserve bold text immediately before them");
   assert(topItem.matches(".fragment[data-fragment-index='2']")
     && nestedItem.matches(".fragment[data-fragment-index='3']"), "nested Markdown list items can be independent fragments");
   assert([cell.querySelector("h3"), paragraph, topItem, nestedItem].every(element => !element.textContent.includes("{fragment=")),
@@ -368,6 +382,15 @@ After an additional blank line. {fragment=4}
     "nested overlay lists retain the overlay body font size");
   assert(fixture.querySelectorAll(".overlay-markdown > .slide-content-spacer").length === 1, "additional blank overlay lines use the same spacer rendering");
   assert(fixture.querySelector(".overlay-markdown p").matches(".fragment[data-fragment-index='4']"), "positioned Markdown uses block fragments");
+  const reachableOverlay = fixture.querySelector('[data-object-id="reachable"]');
+  const reachableParagraph = reachableOverlay.querySelector("p");
+  const reachableList = reachableOverlay.querySelector("ul");
+  assert(reachableParagraph.querySelector("strong")?.textContent === "Reachable:"
+    && reachableParagraph.matches(".fragment[data-fragment-index='5']"),
+  "positioned Markdown preserves bold text immediately before a fragment annotation");
+  assert(getComputedStyle(reachableOverlay).display === "block"
+    && reachableList.getBoundingClientRect().top >= reachableParagraph.getBoundingClientRect().bottom,
+  "positioned Markdown stacks a fragment heading above its list");
   fixture.remove();
 }
 
