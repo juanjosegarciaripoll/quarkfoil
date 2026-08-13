@@ -16,6 +16,23 @@ Quarkfoil is a local editing tool, not a hardened multi-user web service.
   API writers cannot both save against the same base revision.
 - Asset uploads are size-limited and restricted to supported image and video extensions.
 
+## Desktop bundles
+
+The desktop launcher preserves the same server architecture. It always binds
+an available port on `127.0.0.1`, disables source-development reloading, and
+opens that loopback URL in the default browser. There is no desktop option to
+bind a network interface. Closing the launcher stops the server and releases
+the port; the launcher does not silently switch an existing process to a new
+project root.
+
+When a console is unavailable, startup and lifecycle diagnostics are written
+to `Quarkfoil/Logs/quarkfoil.log` below `%LOCALAPPDATA%` on Windows or to
+`~/Library/Logs/Quarkfoil/quarkfoil.log` on macOS. Linux uses
+`${XDG_STATE_HOME:-~/.local/state}/quarkfoil/quarkfoil.log`. Logs include deck
+paths and local URLs and should be reviewed before sharing. Development
+bundles are unsigned and must not be treated as authenticated release
+artifacts.
+
 ## User responsibilities
 
 - Treat imported Markdown and assets as untrusted until reviewed.

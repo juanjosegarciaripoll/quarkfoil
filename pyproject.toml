@@ -26,6 +26,9 @@ browser = [
 docs = [
   "mkdocs-material>=9.6,<10",
 ]
+desktop = [
+  "pyinstaller==6.21.0",
+]
 
 [project.scripts]
 quarkfoil = "scientific_slides:main"
@@ -50,6 +53,7 @@ include = [
   "/app",
   "/docs",
   "/example",
+  "/packaging",
   "/src",
   "/tests",
   "/tools",

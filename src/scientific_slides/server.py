@@ -817,6 +817,89 @@ def create_server(deck: Path, host: str, port: int, *, verbose: bool = False, re
     return server
 
 
+class ServerLifecycle:
+    """Own a Quarkfoil HTTP server and its optional source watcher."""
+
+    def __init__(
+        self,
+        deck: Path,
+        host: str = "127.0.0.1",
+        port: int = 8765,
+        *,
+        reload: bool = True,
+        open_browser: bool = False,
+        verbose: bool = False,
+    ) -> None:
+        self.server = create_server(deck, host, port, verbose=verbose, reload=reload)
+        address = self.server.server_address[0]
+        display_host = "127.0.0.1" if address in {"", "0.0.0.0"} else address
+        self.url = f"http://{display_host}:{self.server.server_port}/"
+        self.reload = reload
+        self.open_browser = open_browser
+        self.reload_requested = threading.Event()
+        self._watcher_stop = threading.Event()
+        self._watcher: threading.Thread | None = None
+        self._server_thread: threading.Thread | None = None
+        self._serving = threading.Event()
+        self._closed = False
+
+    def _prepare(self) -> None:
+        if self._closed:
+            raise RuntimeError("Server lifecycle has already been closed")
+        if self.reload and self._watcher is None:
+            self._watcher = threading.Thread(
+                target=_watch_python_changes,
+                args=(self.server, self._watcher_stop, self.reload_requested),
+                name="quarkfoil-source-watcher",
+                daemon=True,
+            )
+            self._watcher.start()
+        if self.open_browser:
+            threading.Timer(0.35, lambda: webbrowser.open(self.url)).start()
+            self.open_browser = False
+
+    def serve_forever(self) -> None:
+        self._prepare()
+        self._serving.set()
+        try:
+            self.server.serve_forever()
+        finally:
+            self._serving.clear()
+
+    def start(self) -> "ServerLifecycle":
+        if self._server_thread and self._server_thread.is_alive():
+            return self
+        self._server_thread = threading.Thread(
+            target=self.serve_forever,
+            name="quarkfoil-server",
+            daemon=True,
+        )
+        self._server_thread.start()
+        if not self._serving.wait(timeout=5):
+            self.stop()
+            raise RuntimeError("Quarkfoil server did not start")
+        return self
+
+    def stop(self) -> None:
+        if self._closed:
+            return
+        self._watcher_stop.set()
+        if self._serving.is_set():
+            self.server.shutdown()
+        if self._server_thread and self._server_thread is not threading.current_thread():
+            self._server_thread.join(timeout=5)
+        self.server.server_close()
+        if self._watcher:
+            self._watcher.join(timeout=2)
+        self._closed = True
+
+    def __enter__(self) -> "ServerLifecycle":
+        return self.start()
+
+    def __exit__(self, exc_type: object, exc_value: object, traceback: object) -> None:
+        self.stop()
+
+
 def _normalize_doi_bibtex(text: str) -> str:
     # DOI content negotiation sometimes returns nonstandard bare month names
     # such as ``month=Sept``. Bracing preserves the value and works with
@@ -886,30 +969,26 @@ def main(argv: list[str] | None = None) -> int:
     browser.add_argument("--open", dest="open_browser", action="store_true", default=True, help="Open the editor in a browser (default)")
     browser.add_argument("--no-open", dest="open_browser", action="store_false", help="Start the server without opening a browser")
     args = parser.parse_args(arguments)
-    server = create_server(args.deck, args.host, args.port, verbose=args.verbose, reload=args.reload)
-    url = f"http://{args.host}:{server.server_port}/"
+    lifecycle = ServerLifecycle(
+        args.deck,
+        args.host,
+        args.port,
+        verbose=args.verbose,
+        reload=args.reload,
+        open_browser=args.open_browser and os.environ.get("QUARKFOIL_RELOADED") != "1",
+    )
     print(f"Quarkfoil: {args.deck.resolve()}")
-    print(f"Open {url}")
-    if args.open_browser and os.environ.get("QUARKFOIL_RELOADED") != "1":
-        threading.Timer(0.35, lambda: webbrowser.open(url)).start()
-    reload_requested = threading.Event()
-    watcher_stop = threading.Event()
-    watcher = None
-    if args.reload:
-        watcher = threading.Thread(target=_watch_python_changes, args=(server, watcher_stop, reload_requested), daemon=True)
-        watcher.start()
+    print(f"Open {lifecycle.url}")
     try:
-        server.serve_forever()
+        lifecycle.serve_forever()
     except KeyboardInterrupt:
         pass
     finally:
-        watcher_stop.set()
-        server.server_close()
-        if watcher:
-            watcher.join(timeout=1)
-    if reload_requested.is_set():
+        lifecycle.stop()
+    if lifecycle.reload_requested.is_set():
         print("Quarkfoil changed; restarting…")
-        environment = os.environ.copy()
-        environment["QUARKFOIL_RELOADED"] = "1"
-        os.execve(sys.executable, [sys.executable, "-m", "scientific_slides", *arguments], environment)
+        if not getattr(sys, "frozen", False):
+            environment = os.environ.copy()
+            environment["QUARKFOIL_RELOADED"] = "1"
+            os.execve(sys.executable, [sys.executable, "-m", "scientific_slides", *arguments], environment)
     return 0

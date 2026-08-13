@@ -76,3 +76,36 @@ jobs:
           enable-cache: true
       - name: Build wheel and source archive
         run: uv build
+
+  desktop:
+    name: Unsigned desktop bundle · ${{ matrix.name }}
+    needs: [tests]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux x86-64
+            os: ubuntu-latest
+            bundle: dist/Quarkfoil
+          - name: Windows x86-64
+            os: windows-latest
+            bundle: dist/Quarkfoil
+          - name: macOS Apple Silicon
+            os: macos-14
+            bundle: dist/Quarkfoil.app
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: true
+      - name: Install Python
+        run: uv python install 3.11
+      - name: Build unsigned native bundle
+        run: uv run --frozen --group desktop --python 3.11 python tools/build_desktop.py
+      - name: Verify bundled assets and notices
+        run: uv run --frozen --no-group desktop --python 3.11 python tools/verify_desktop_bundle.py ${{ matrix.bundle }}
+      - name: Launch and stop frozen application
+        run: uv run --frozen --no-group desktop --python 3.11 python tools/smoke_desktop_bundle.py

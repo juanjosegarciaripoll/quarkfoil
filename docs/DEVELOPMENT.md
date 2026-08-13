@@ -68,6 +68,38 @@ The separate documentation workflow performs the strict site build, exports
 the live example, and deploys GitHub Pages from `main` without duplicating
 those tasks in CI.
 
+CI also builds unsigned PyInstaller one-directory bundles natively on Linux
+x86-64, Windows x86-64, and Apple Silicon macOS. It inventories their application assets,
+KaTeX fonts, and license notices, but does not upload or retain the bundles.
+
+## Build a desktop bundle
+
+Desktop builds run on their target operating system. With Python 3.11 and
+`uv` available, run:
+
+```console
+uv sync --group desktop
+uv run --no-sync python tools/build_desktop.py
+uv run --no-sync python tools/verify_desktop_bundle.py dist/Quarkfoil
+uv run --no-sync python tools/smoke_desktop_bundle.py
+```
+
+For the macOS inventory command, use `dist/Quarkfoil.app` as the bundle path.
+
+The build script reproducibly generates platform icon containers, then uses
+the pinned PyInstaller version and `packaging/quarkfoil.spec`. Linux gets a
+portable one-directory executable, Windows gets a no-console one-directory
+executable with version metadata, and macOS gets a windowed one-directory
+`.app` with document-role metadata. Editor assets and
+complete vendored notices are copied explicitly. Build products remain under
+ignored `build/` and `dist/` directories.
+
+Test the result from outside the checkout with paths containing spaces and
+non-ASCII characters. Record the OS, architecture, Python and PyInstaller
+versions, signing state, and manual tests. Native signing, notarization,
+installer/DMG creation, clean-machine checks, and public distribution are
+deliberate release steps and are not performed by this build command.
+
 ## Vendored browser dependencies
 
 Reveal.js, KaTeX, Marked, and js-yaml are pinned under `app/vendor/`. Refresh them without Node/npm:

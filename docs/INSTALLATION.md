@@ -9,6 +9,27 @@
 
 No Node.js or npm installation is required.
 
+## Desktop application
+
+Quarkfoil has an unsigned desktop launcher for Linux, Windows, and macOS development
+bundles. A frozen bundle includes Python and all editor assets, so the target
+computer does not need Python or `uv`. Signed installers, notarized macOS
+images, automatic updates, and public downloads are not available yet.
+
+Double-click Quarkfoil, then open an existing `.md`/`.markdown` deck or choose
+to create one. The small launcher window stays open while Quarkfoil serves the
+deck to the default browser. **Open editor** reopens the same address and
+**Quit** stops the local server. Opening a document from Finder or **Open
+with** starts one application process and one project root for that document.
+
+Development bundles are portable: extract the Linux directory and run
+`Quarkfoil/Quarkfoil`, extract the Windows directory before running
+`Quarkfoil.exe`, or copy `Quarkfoil.app` into `/Applications`. Remove that
+directory or app to uninstall it. Because these prototypes are unsigned,
+Windows SmartScreen or macOS Gatekeeper may refuse them; do not bypass an OS
+warning for a bundle whose origin and checksum you have not verified. The
+command-line `quarkfoil` program remains a separate `uv` installation.
+
 ## Install with uv
 
 Install a published release as an isolated command-line tool:

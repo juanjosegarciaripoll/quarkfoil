@@ -19,3 +19,10 @@ maintained in the repository's
 
 The full notices are included in both the Python wheel and source archive, not
 merely linked from this website.
+
+Native development bundles are built with PyInstaller 6.21.0. PyInstaller is
+a build tool rather than a wheel runtime dependency; its GPL-2.0-or-later
+license includes a special exception permitting distribution of generated
+bundles. See the pinned environment and the
+[upstream license](https://github.com/pyinstaller/pyinstaller/blob/v6.21.0/COPYING.txt)
+before redistributing a desktop artifact.

@@ -5,6 +5,19 @@ All notable changes to Quarkfoil are documented here. The project follows
 
 ## [Unreleased]
 
+### Added
+
+- Added a native desktop launcher that opens or creates one Markdown deck,
+  serves it on an ephemeral loopback port, opens the browser, and provides
+  **Open editor** and **Quit** controls with clean server shutdown.
+- Added pinned PyInstaller definitions and ephemeral CI builds for unsigned
+  Linux and Windows one-directory bundles and an Apple Silicon macOS `.app`.
+
+### Changed
+
+- Extracted a reusable server lifecycle with resolved URLs, background start,
+  deterministic shutdown, and development-only source reloading.
+
 ## [0.3.0] - 2026-08-12
 
 This release expands direct manipulation, media handling, plotting, and

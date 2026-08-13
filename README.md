@@ -31,6 +31,12 @@ Quarkfoil requires Python 3.11 or newer. The recommended installation uses [uv](
 uv tool install quarkfoil
 ```
 
+Unsigned Linux, Windows, and macOS desktop bundles can also be built from source. They
+launch the same local editor in the default browser and do not require Python
+on the destination computer. Public signed downloads are not available yet;
+see the [installation guide](docs/INSTALLATION.md#desktop-application) for the
+current scope.
+
 Until a package is published, install from a local checkout:
 
 ```powershell

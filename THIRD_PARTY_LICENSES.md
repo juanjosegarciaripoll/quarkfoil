@@ -21,3 +21,14 @@ notice requirements for the vendored copies.
 When updating a dependency, review the new release's license and copyright
 notice, update this document, and update the pinned checksum in
 [`tools/fetch_vendor.py`](tools/fetch_vendor.py).
+
+## Desktop build tooling
+
+Unsigned native development bundles are built with PyInstaller 6.21.0, pinned
+in the `desktop` dependency group and `uv.lock`. It is not a runtime dependency
+of the Quarkfoil wheel. PyInstaller is licensed under GPL-2.0-or-later with a
+special exception that permits distributing the programs it creates; review
+the exact [PyInstaller 6.21.0 notice](https://github.com/pyinstaller/pyinstaller/blob/v6.21.0/COPYING.txt)
+when preparing a desktop artifact. The generated bundle continues to carry
+Quarkfoil's `LICENSE` and this inventory alongside the complete notices for
+the vendored browser libraries.
