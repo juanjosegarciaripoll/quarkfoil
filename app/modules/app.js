@@ -302,6 +302,7 @@ function parseAndRender(source, { preserveSlide = true } = {}) {
   }
   state.source = source;
   state.deck = deck;
+  document.title = deck.metadata?.title ? String(deck.metadata.title) : "Quarkfoil";
   const matchingSlide = previousId ? deck.slides.findIndex(slide => slide.id === previousId) : -1;
   state.currentSlide = matchingSlide >= 0 ? matchingSlide : Math.min(previous, Math.max(0, deck.slides.length - 1));
   if (!deck.sections.some(section => section.id === state.selectedSection)) state.selectedSection = null;

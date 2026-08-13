@@ -50,6 +50,7 @@ def main() -> int:
     temporary = tempfile.TemporaryDirectory()
     deck = Path(temporary.name) / "deck.md"
     deck.write_text(
+        "---\ntitle: Browser title test\n---\n\n"
         "## Browser test {.layout-1}\n\nInitial content.\n\n"
         "::: overlay {#link-test type=\"citation\" key=\"test-link\" display=\"brief\" x=\"10\" y=\"70\" w=\"40\" h=\"8\"}\n:::\n",
         encoding="utf-8",
@@ -97,6 +98,8 @@ def main() -> int:
         WebDriverWait(driver, 30).until(
             lambda active_driver: active_driver.find_element(By.ID, "save-state").text == "Saved"
         )
+        if driver.title != "Browser title test":
+            raise RuntimeError(f"Browser title does not identify the slide deck: {driver.title!r}")
         driver.execute_script(
             "document.querySelector('.slide-overlay').dispatchEvent(new MouseEvent('click', {bubbles:true}));"
         )
