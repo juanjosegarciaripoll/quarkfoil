@@ -250,7 +250,7 @@ async function pollForExternalDeck({ force = false } = {}) {
       cache: "no-store",
       headers: observedHash ? { "If-None-Match": `"${observedHash}"` } : {},
     });
-    if (response.status === 304) return false;
+    if (response.status === 304) return await pollForExternalBibliography();
     if (!response.ok) {
       if (response.status === 400) {
         const result = await response.json().catch(() => ({}));
@@ -271,7 +271,10 @@ async function pollForExternalDeck({ force = false } = {}) {
       valid: !error,
     });
     if (action === "unchanged") return false;
-    if (action === "reload") applyExternalDeck(source, hash, "Reloaded external changes");
+    if (action === "reload") {
+      applyExternalDeck(source, hash, "Reloaded external changes");
+      await pollForExternalBibliography();
+    }
     else showExternalChange(source, hash, error);
     return true;
   } catch {
@@ -1095,6 +1098,16 @@ async function loadBibliography() {
   if (!response.ok) throw new Error(result.error || "Cannot load bibliography");
   state.bibliographySource = result.source;
   state.bibliographyHash = result.hash;
+}
+
+async function pollForExternalBibliography() {
+  if (document.querySelector("#bibliography-dialog[open]") || bibliographyOpenPending) return false;
+  const previousHash = state.bibliographyHash;
+  await loadBibliography();
+  if (state.bibliographyHash === previousHash) return false;
+  parseAndRender(state.source);
+  showStatus("Reloaded external bibliography changes");
+  return true;
 }
 
 function bibliographyMessage(message, error = false) {

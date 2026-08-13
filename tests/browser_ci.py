@@ -204,10 +204,23 @@ def main() -> int:
         if "First overlay line\n\n\nSecond overlay line" not in saved_source:
             raise RuntimeError("Saving changed whitespace inside an overlay")
         incoming = deck.with_suffix(".incoming")
-        incoming.write_text("## External reload {.layout-1}\n\nChanged outside Quarkfoil.\n", encoding="utf-8")
+        bibliography_path.write_text(
+            "@misc{external-reference, author={External, Editor}, year={2031}}\n",
+            encoding="utf-8",
+        )
+        incoming.write_text(
+            "## External reload {.layout-1}\n\nChanged outside Quarkfoil [@external-reference].\n",
+            encoding="utf-8",
+        )
         incoming.replace(deck)
         WebDriverWait(driver, 10).until(
             lambda active_driver: "External reload" in active_driver.find_element(By.ID, "slide-list").text
+        )
+        WebDriverWait(driver, 10).until(
+            lambda active_driver: active_driver.execute_script(
+                "return Boolean(document.querySelector('#slides .citation')) "
+                "&& !document.querySelector('#slides .citation-missing');"
+            )
         )
         driver.find_element(By.CSS_SELECTOR, '[data-mode="source"]').click()
         source_editor = driver.find_element(By.ID, "source-editor")
