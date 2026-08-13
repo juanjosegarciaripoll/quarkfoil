@@ -170,14 +170,24 @@ Thought
 \\(E=mc^2\\)
 :::`);
   renderDeck(parsed, slides, source => source);
+  slides.querySelector(".scientific-slide").classList.add("present");
   const cloud = fixture.querySelector('[data-object-id="cloud"]');
   assert(parsed.slides[0].overlays[0].shape === "cloud", "shape kind parses");
   assert(parsed.slides[0].overlays[0].fill === "#ffeecc80" && parsed.slides[0].overlays[0].strokeWidth === 3, "shape styles including alpha parse");
   assert(getComputedStyle(cloud.querySelector(".shape-surface")).fill.includes("0.5"), "shape color alpha renders");
   assert(parsed.slides[0].overlays[0].shadow && cloud.dataset.shadow === "true", "shape shadow parses and renders");
   assert(cloud.querySelector(".shape-background path") && cloud.querySelector(".shape-label").textContent.includes("Thought"), "cloud renders with a Markdown label");
-  assert(fixture.querySelector('[data-object-id="callout"] .katex'), "comic callout renders an equation label");
-  const calloutSurface = getComputedStyle(fixture.querySelector('[data-object-id="callout"] .shape-surface'));
+  const cloudRect = cloud.getBoundingClientRect();
+  const cloudLabelRect = cloud.querySelector(".shape-label").getBoundingClientRect();
+  assert(Math.abs(cloudLabelRect.width / cloudRect.width - 0.76) < 0.01 && Math.abs(cloudLabelRect.height / cloudRect.height - 0.75) < 0.01,
+    "shape metadata constrains the cloud label to its safe text region");
+  const callout = fixture.querySelector('[data-object-id="callout"]');
+  assert(callout.querySelector(".katex"), "comic callout renders an equation label");
+  const calloutRect = callout.getBoundingClientRect();
+  const calloutLabelRect = callout.querySelector(".shape-label").getBoundingClientRect();
+  assert(Math.abs(calloutLabelRect.height / calloutRect.height - 0.78) < 0.01 && Math.abs(calloutLabelRect.top - calloutRect.top) <= 1,
+    `comic callout centers its label within the rounded body above the tail (${calloutLabelRect.height.toFixed(1)} / ${calloutRect.height.toFixed(1)})`);
+  const calloutSurface = getComputedStyle(callout.querySelector(".shape-surface"));
   assert(calloutSurface.fill === "rgb(219, 239, 242)" && calloutSurface.stroke === "rgb(20, 108, 126)", "implicit shape colors inherit from the theme");
   fixture.remove();
 }

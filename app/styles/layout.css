@@ -343,20 +343,20 @@
   stroke-linejoin: round;
 }
 .shape-label {
-  position: relative;
+  position: absolute;
   z-index: 1;
+  inset: var(--shape-label-top, 0) var(--shape-label-right, 0) var(--shape-label-bottom, 0) var(--shape-label-left, 0);
   display: flex;
   align-items: center;
   justify-content: inherit;
-  width: 100%;
-  height: 100%;
+  width: auto;
+  height: auto;
   padding: 0;
   overflow: hidden;
 }
 .shape-label > :first-child { margin-top: 0; }
 .shape-label > :last-child { margin-bottom: 0; }
 .shape-label > * { width: 100%; }
-
 .slide-footer {
   grid-area: footer;
   box-sizing: border-box;

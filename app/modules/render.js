@@ -1,5 +1,5 @@
 import { escapeHtml, THEMES } from "./parser.js";
-import { makeShapeSvg } from "./shapes.js";
+import { makeShapeSvg, shapeLabelInsets } from "./shapes.js";
 import { attributionKeys, renderCitation } from "./bibliography.js";
 
 function preserveAdditionalBlankLines(source, spacers) {
@@ -241,6 +241,11 @@ function fillContent(container, item, assetResolver, bibliography, preserveLines
     if (item.fill) container.style.setProperty("--shape-fill", item.fill);
     if (item.stroke) container.style.setProperty("--shape-stroke", item.stroke);
     container.style.setProperty("--shape-stroke-width", String(item.strokeWidth));
+    const [top, right, bottom, left] = shapeLabelInsets(item.shape);
+    container.style.setProperty("--shape-label-top", `${top}%`);
+    container.style.setProperty("--shape-label-right", `${right}%`);
+    container.style.setProperty("--shape-label-bottom", `${bottom}%`);
+    container.style.setProperty("--shape-label-left", `${left}%`);
     const label = document.createElement("div");
     label.className = "shape-label";
     label.innerHTML = markdown(item.source, bibliography, { breaks: preserveLines, preserveBlankLines });

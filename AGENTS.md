@@ -76,6 +76,9 @@ The distribution and command-line tool are named `quarkfoil`.
   not its content or overlays.
 - Free slides have no visible frame; their organizational title remains
   editable from the slide list or Source mode.
+- Keep each shape's label-safe insets beside its SVG geometry in
+  `app/modules/shapes.js`. Render labels inside that region rather than adding
+  shape-specific positioning rules to CSS.
 - Images imported through the editor go into the presentation's `figures/`
   directory by default and are referenced with relative paths.
 - `assets.figures` in front matter selects the image-import directory;
