@@ -26,7 +26,7 @@ import {
   updateSlideNotes,
 } from "./parser.js";
 import { renderDeck, syncVideoPlayback } from "./render.js";
-import { arrowGeometry, bindRangeControl, buildShapePalette, canvasLinkTarget, canvasStartsMarquee, clipboardImageFile, deleteKey, DesignEditor, dialogDragPosition, initialImageGeometry, moveGeometryGroup, overlayPasteOffset, pageSlideIndex, projectAssetPage, rectanglesIntersect, renameClipboardImage, repeatedActivation, resolveImportDestination, videoFile } from "./editor.js";
+import { arrowGeometry, bindRangeControl, buildShapePalette, canvasLinkTarget, canvasStartsMarquee, clipboardImageFile, deleteKey, DesignEditor, dialogDragPosition, initialImageGeometry, moveGeometryGroup, overlayPasteOffset, pageSlideIndex, projectAssetPage, rectanglesIntersect, renameClipboardImage, repeatedActivation, resolveImportDestination, storeOverlayClipboard, storedOverlayClipboard, videoFile } from "./editor.js";
 import { briefReference, formatBibliography, parseBibliography, prepareBibliography, renameBibliographyEntry, uniqueCitationKey } from "./bibliography.js";
 import { compileExpression, createPlotSvg } from "./plot.js";
 import { externalDeckAction } from "./external.js";
@@ -407,6 +407,14 @@ try {
   assert(renameClipboardImage(pastedPng, "experiment-result").name === "experiment-result.png", "pasted images accept a chosen filename and infer its extension");
   assert(renameClipboardImage(pastedPng, "plots/result")?.name === "plots-result.png", "pasted image filenames cannot introduce directories");
   assert(renameClipboardImage(pastedPng, "  ") === null, "an empty pasted image filename cancels the import");
+  const clipboardStorage = new Map();
+  const storage = { getItem: key => clipboardStorage.get(key) || null, setItem: (key, value) => clipboardStorage.set(key, value) };
+  const overlayClipboard = { version: 1, sourceSlideId: "slide-a", source: "::: overlay {#shared}\nCross-window\n:::" };
+  assert(storeOverlayClipboard(overlayClipboard, storage) && storedOverlayClipboard("", storage)?.sourceSlideId === "slide-a",
+    "Quarkfoil windows share a fallback overlay clipboard");
+  assert(storedOverlayClipboard(overlayClipboard.source, storage)?.source === overlayClipboard.source
+    && storedOverlayClipboard("different system clipboard text", storage) === null,
+  "the shared overlay clipboard matches system text instead of replacing unrelated clipboard content");
   assert(videoFile(new File([], "recording.mkv")) && videoFile(new File([], "recording.avi")), "MKV and AVI drops are recognized without MIME metadata");
   assert(repeatedActivation({ key: "overlay:text-1", time: 100 }, "overlay:text-1", 300), "a repeated canvas click is recognized for editing");
   assert(repeatedActivation({ key: "cell:left", time: 100 }, "cell:left", 300), "a repeated layout-cell click is recognized for editing");

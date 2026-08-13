@@ -21,7 +21,19 @@ import { makeShapeSvg, SHAPES } from "./shapes.js";
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
 const round = value => Math.round(value * 10) / 10;
 const OVERLAY_CLIPBOARD_TYPE = "application/x-quarkfoil-overlays";
+const OVERLAY_CLIPBOARD_STORAGE_KEY = "quarkfoil-overlay-clipboard";
 export const overlayPasteOffset = (sourceSlideId, targetSlideId) => sourceSlideId && sourceSlideId !== targetSlideId ? 0 : 2;
+export function storeOverlayClipboard(payload, storage = window.localStorage) {
+  try { storage.setItem(OVERLAY_CLIPBOARD_STORAGE_KEY, JSON.stringify(payload)); return true; }
+  catch { return false; }
+}
+export function storedOverlayClipboard(source = "", storage = window.localStorage) {
+  try {
+    const payload = JSON.parse(storage.getItem(OVERLAY_CLIPBOARD_STORAGE_KEY) || "null");
+    if (payload?.version !== 1 || typeof payload.source !== "string") return null;
+    return !source || payload.source === source ? payload : null;
+  } catch { return null; }
+}
 export const videoFile = file => file?.type?.startsWith("video/") || /\.(?:avi|mkv|mp4|webm)$/i.test(file?.name || "");
 export const repeatedActivation = (previous, key, time, interval = 450) => Boolean(
   previous && previous.key === key && time - previous.time >= 0 && time - previous.time <= interval,
@@ -1514,7 +1526,9 @@ export class DesignEditor {
       const encoded = event.clipboardData?.getData(OVERLAY_CLIPBOARD_TYPE) || "";
       if (encoded) internal = JSON.parse(encoded);
     } catch { /* Some browsers expose only standard clipboard types. */ }
-    const source = internal?.source || event.clipboardData?.getData("text/plain");
+    const plainSource = event.clipboardData?.getData("text/plain") || "";
+    if (!internal) internal = storedOverlayClipboard(plainSource);
+    const source = internal?.source || plainSource;
     const offset = overlayPasteOffset(internal?.sourceSlideId, this.slide().id);
     const pasted = pasteOverlays(this.options.getDeck(), this.slideIndex(), source || "", offset);
     if (!pasted) return;
@@ -1533,11 +1547,13 @@ export class DesignEditor {
     const ids = this.selectedOverlayElements().map(element => element.dataset.objectId);
     if (!ids.length || !event.clipboardData) return;
     const source = serializeOverlays(this.options.getDeck(), this.slideIndex(), ids);
+    const payload = { version: 1, sourceSlideId: this.slide().id, source };
     event.preventDefault();
     event.clipboardData.setData("text/plain", source);
     try {
-      event.clipboardData.setData(OVERLAY_CLIPBOARD_TYPE, JSON.stringify({ version: 1, sourceSlideId: this.slide().id, source }));
+      event.clipboardData.setData(OVERLAY_CLIPBOARD_TYPE, JSON.stringify(payload));
     } catch { /* Plain text remains portable. */ }
+    storeOverlayClipboard(payload);
     if (cut) this.commit(deleteOverlays(this.options.getDeck(), this.slideIndex(), ids));
   }
 

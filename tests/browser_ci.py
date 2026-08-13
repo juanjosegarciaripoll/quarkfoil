@@ -52,6 +52,7 @@ def main() -> int:
     deck.write_text(
         "---\ntitle: Browser title test\n---\n\n"
         "## Browser test {.layout-1}\n\nInitial content.\n\n"
+        "::: overlay {#markdown-test type=\"markdown\" x=\"55\" y=\"20\" w=\"30\" h=\"15\"}\nEditable overlay.\n:::\n\n"
         "::: overlay {#link-test type=\"citation\" key=\"test-link\" display=\"brief\" x=\"10\" y=\"70\" w=\"40\" h=\"8\"}\n:::\n",
         encoding="utf-8",
     )
@@ -100,9 +101,29 @@ def main() -> int:
         )
         if driver.title != "Browser title test":
             raise RuntimeError(f"Browser title does not identify the slide deck: {driver.title!r}")
+        driver.find_element(By.CSS_SELECTOR, '[data-mode="source"]').click()
+        source_editor = driver.find_element(By.ID, "source-editor")
+        original_source = source_editor.get_attribute("value")
+        source_editor.send_keys(Keys.END, "Native source undo")
+        source_editor.send_keys(Keys.CONTROL, "z")
+        if source_editor.get_attribute("value") != original_source:
+            raise RuntimeError("Ctrl+Z in the Source textarea did not use native text undo")
+        driver.find_element(By.CSS_SELECTOR, '[data-mode="design"]').click()
         driver.execute_script(
-            "document.querySelector('.slide-overlay').dispatchEvent(new MouseEvent('click', {bubbles:true}));"
+            "document.querySelector('.overlay-markdown').dispatchEvent(new MouseEvent('click', {bubbles:true}));"
         )
+        driver.execute_script(
+            "document.querySelector('.overlay-markdown').dispatchEvent(new MouseEvent('dblclick', {bubbles:true}));"
+        )
+        content_dialog = driver.find_element(By.ID, "content-dialog")
+        WebDriverWait(driver, 5).until(lambda active_driver: content_dialog.get_attribute("open") is not None)
+        content_editor = driver.find_element(By.ID, "content-editor")
+        original_content = content_editor.get_attribute("value")
+        content_editor.send_keys(Keys.END, "Native dialog undo")
+        content_editor.send_keys(Keys.CONTROL, "z")
+        if content_editor.get_attribute("value") != original_content:
+            raise RuntimeError("Ctrl+Z in the content textarea did not use native text undo")
+        content_editor.send_keys(Keys.ESCAPE)
         position = driver.find_element(By.ID, "prop-x")
         position.send_keys(Keys.CONTROL, "a")
         position.send_keys("25", Keys.ENTER)

@@ -167,6 +167,10 @@ function browserHasUnsavedChanges() {
   return currentBrowserSource() !== state.savedSource;
 }
 
+function textEditingTarget(target) {
+  return target instanceof HTMLElement && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
+}
+
 function deckValidationError(source) {
   try {
     const deck = parseDeck(source);
@@ -1505,12 +1509,11 @@ function bindUi() {
   document.querySelector("#move-slide-up").addEventListener("click", () => moveSelectedSlide(-1));
   document.querySelector("#move-slide-down").addEventListener("click", () => moveSelectedSlide(1));
   document.addEventListener("keydown", event => {
+    const editing = textEditingTarget(event.target);
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") { event.preventDefault(); saveDeck(); }
-    if ((event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "z") { event.preventDefault(); undo(); }
-    if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "z") { event.preventDefault(); redo(); }
+    if (!editing && (event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "z") { event.preventDefault(); undo(); }
+    if (!editing && (event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "z") { event.preventDefault(); redo(); }
     if (event.key === "Escape" && state.mode === "present") setMode("design");
-    const target = event.target;
-    const editing = target instanceof HTMLElement && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
     if (state.mode === "design" && reveal && state.deck && !editing && !document.querySelector("dialog[open]") && !event.ctrlKey && !event.metaKey && !event.altKey && ["PageUp", "PageDown"].includes(event.key)) {
       event.preventDefault();
       reveal.slide(pageSlideIndex(state.currentSlide, state.deck.slides.length, event.key));
