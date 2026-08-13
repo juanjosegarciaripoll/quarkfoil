@@ -19,11 +19,11 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def parse_args() -> argparse.Namespace:
-    default_browser = "edge" if sys.platform == "win32" else "firefox"
+    default_browser = "edge" if sys.platform == "win32" else "safari" if sys.platform == "darwin" else "firefox"
     parser = argparse.ArgumentParser(description="Run the Quarkfoil browser self-test")
     parser.add_argument(
         "--browser",
-        choices=("edge", "firefox"),
+        choices=("edge", "firefox", "safari"),
         default=default_browser,
         help=f"browser engine to test (default: {default_browser})",
     )
@@ -38,15 +38,21 @@ def create_driver(browser: str) -> webdriver.Remote:
         options.add_argument("--window-size=1440,1200")
         return webdriver.Edge(options=options)
 
-    options = webdriver.FirefoxOptions()
-    options.add_argument("--headless")
-    options.add_argument("--width=1440")
-    options.add_argument("--height=1200")
-    return webdriver.Firefox(options=options)
+    if browser == "firefox":
+        options = webdriver.FirefoxOptions()
+        options.add_argument("--headless")
+        options.add_argument("--width=1440")
+        options.add_argument("--height=1200")
+        return webdriver.Firefox(options=options)
+
+    driver = webdriver.Safari()
+    driver.set_window_size(1440, 1200)
+    return driver
 
 
 def main() -> int:
     browser = parse_args().browser
+    shortcut = Keys.COMMAND if sys.platform == "darwin" else Keys.CONTROL
     temporary = tempfile.TemporaryDirectory()
     deck = Path(temporary.name) / "deck.md"
     deck.write_text(
@@ -105,7 +111,7 @@ def main() -> int:
         source_editor = driver.find_element(By.ID, "source-editor")
         original_source = source_editor.get_attribute("value")
         source_editor.send_keys(Keys.END, "x")
-        source_editor.send_keys(Keys.CONTROL, "z")
+        source_editor.send_keys(shortcut, "z")
         if source_editor.get_attribute("value") != original_source:
             raise RuntimeError("Ctrl+Z in the Source textarea did not use native text undo")
         driver.find_element(By.CSS_SELECTOR, '[data-mode="design"]').click()
@@ -122,12 +128,12 @@ def main() -> int:
             raise RuntimeError("Opening the content dialog did not focus its textarea")
         original_content = content_editor.get_attribute("value")
         content_editor.send_keys(Keys.END, "x")
-        content_editor.send_keys(Keys.CONTROL, "z")
+        content_editor.send_keys(shortcut, "z")
         if content_editor.get_attribute("value") != original_content:
             raise RuntimeError("Ctrl+Z in the content textarea did not use native text undo")
         content_editor.send_keys(Keys.ESCAPE)
         position = driver.find_element(By.ID, "prop-x")
-        position.send_keys(Keys.CONTROL, "a")
+        position.send_keys(shortcut, "a")
         position.send_keys("25", Keys.ENTER)
         WebDriverWait(driver, 5).until(
             lambda active_driver: 'x="25"' in active_driver.find_element(By.ID, "source-editor").get_attribute("value")
@@ -139,7 +145,7 @@ def main() -> int:
         content_editor = driver.find_element(By.ID, "content-editor")
         content_editor.send_keys(Keys.END, "x")
         dialog_draft = content_editor.get_attribute("value")
-        driver.find_element(By.CSS_SELECTOR, "#content-dialog button[value='cancel']").send_keys(Keys.CONTROL, "z")
+        driver.find_element(By.CSS_SELECTOR, "#content-dialog button[value='cancel']").send_keys(shortcut, "z")
         if content_editor.get_attribute("value") != dialog_draft or 'x="25"' not in driver.find_element(By.ID, "source-editor").get_attribute("value"):
             raise RuntimeError("Ctrl+Z outside the open content textarea changed global document history")
         driver.find_element(By.CSS_SELECTOR, "#content-dialog button[value='cancel']").send_keys(Keys.ESCAPE)

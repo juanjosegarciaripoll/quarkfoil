@@ -4,7 +4,8 @@
 
 - Windows, macOS, or Linux.
 - Python 3.11 or newer.
-- A modern browser. Quarkfoil is primarily developed with Microsoft Edge and Chromium-compatible browsers.
+- A modern browser. Quarkfoil's browser tests cover Safari on macOS, Microsoft
+  Edge on Windows, and Firefox on Linux.
 - Optional: `ffmpeg` and `ffprobe` on `PATH` to import AVI and MKV video. MP4 and WebM imports do not require them.
 
 No Node.js or npm installation is required.

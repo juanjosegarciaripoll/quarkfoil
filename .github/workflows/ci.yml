@@ -26,6 +26,8 @@ jobs:
             python-version: "3.14"
           - os: windows-latest
             python-version: "3.11"
+          - os: macos-latest
+            python-version: "3.11"
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -51,6 +53,9 @@ jobs:
           - name: Windows Edge
             os: windows-latest
             browser: edge
+          - name: macOS Safari
+            os: macos-latest
+            browser: safari
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -60,6 +65,9 @@ jobs:
           enable-cache: true
       - name: Install Python
         run: uv python install 3.11
+      - name: Enable Safari WebDriver
+        if: matrix.browser == 'safari'
+        run: sudo safaridriver --enable
       - name: Run browser self-test
         run: uv run --frozen --group browser --python 3.11 python tests/browser_ci.py --browser ${{ matrix.browser }}
 

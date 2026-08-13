@@ -176,6 +176,9 @@ Run the browser self-test on Windows with Microsoft Edge available:
 uv run python tests/browser_ci.py
 ```
 
+On macOS, enable Apple's bundled WebDriver once with `safaridriver --enable`,
+then run `uv run python tests/browser_ci.py --browser safari`.
+
 The browser self-test must finish with `data-status="passed"`; a successful
 HTTP response alone is not sufficient. When changing layout, selection,
 parsing, rendering, or source-edit behavior, extend `app/modules/selftest.js`
