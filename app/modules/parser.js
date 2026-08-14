@@ -599,14 +599,13 @@ export function insertSlide(deck, slideIndex) {
   return composeItems(deck, sources);
 }
 
-export function moveSlide(deck, fromIndex, toIndex) {
-  if (!deck.slides[fromIndex]) throw new Error("Unknown slide to move");
-  const destination = Math.max(0, Math.min(deck.slides.length - 1, toIndex));
+export function moveSlide(deck, slideIndex, direction) {
+  if (!deck.slides[slideIndex]) throw new Error("Unknown slide to move");
+  const position = slideItemPosition(deck, slideIndex);
+  const destination = position + Math.sign(direction);
+  if (destination < 0 || destination >= deck.items.length) return deck.source;
   const sources = itemSources(deck);
-  const reordered = deck.slides.map(slide => slide.raw);
-  const [moved] = reordered.splice(fromIndex, 1);
-  reordered.splice(destination, 0, moved);
-  deck.items.filter(item => item.kind === "slide").forEach((item, index) => { sources[slideItemPosition(deck, item.index)] = reordered[index]; });
+  [sources[position], sources[destination]] = [sources[destination], sources[position]];
   return composeItems(deck, sources);
 }
 

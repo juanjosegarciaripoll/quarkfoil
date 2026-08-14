@@ -442,13 +442,14 @@ function rebuildSlideList() {
   elements.slideList.replaceChildren(...entries);
   const selectedSection = state.deck.sections.find(section => section.id === state.selectedSection);
   const sectionPosition = selectedSection ? state.deck.items.indexOf(selectedSection) : -1;
+  const slidePosition = state.deck.items.indexOf(state.deck.slides[state.currentSlide]);
   document.querySelector("#duplicate-slide").disabled = Boolean(selectedSection) || !state.deck.slides.length;
   const deleteButton = document.querySelector("#delete-slide");
   deleteButton.disabled = !selectedSection && state.deck.slides.length <= 1;
   deleteButton.title = selectedSection ? "Delete selected section" : "Delete selected slide";
   deleteButton.setAttribute("aria-label", deleteButton.title);
-  document.querySelector("#move-slide-up").disabled = selectedSection ? sectionPosition <= 0 : state.currentSlide <= 0;
-  document.querySelector("#move-slide-down").disabled = selectedSection ? sectionPosition >= state.deck.items.length - 1 : state.currentSlide >= state.deck.slides.length - 1;
+  document.querySelector("#move-slide-up").disabled = selectedSection ? sectionPosition <= 0 : slidePosition <= 0;
+  document.querySelector("#move-slide-down").disabled = selectedSection ? sectionPosition >= state.deck.items.length - 1 : slidePosition >= state.deck.items.length - 1;
 }
 
 function duplicateSelectedSlide() {
@@ -553,10 +554,11 @@ function moveSelectedSlide(direction) {
     return;
   }
   const from = state.currentSlide;
-  const to = from + direction;
-  if (to < 0 || to >= state.deck.slides.length) return;
-  state.currentSlide = to;
-  commitSource(moveSlide(state.deck, from, to));
+  const position = state.deck.items.indexOf(state.deck.slides[from]);
+  const neighbor = state.deck.items[position + direction];
+  if (!neighbor) return;
+  if (neighbor.kind === "slide") state.currentSlide = from + direction;
+  commitSource(moveSlide(state.deck, from, direction));
 }
 
 function onSlideChanged(event) {

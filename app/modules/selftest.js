@@ -613,8 +613,19 @@ try {
   const movedSection = parseDeck(moveSection(sectioned, sectionId, 1));
   assert(movedSection.items[1].kind === "section" && movedSection.slides.map(slide => slide.title).join(" ") === "First Second", "section separators move independently of slides");
   assert(movedSection.sections[0].slideCount === 1, "section slide counts follow a moved boundary");
-  const slidesAcrossSection = parseDeck(moveSlide(sectioned, 0, 1));
-  assert(slidesAcrossSection.items[0].kind === "section" && slidesAcrossSection.slides.map(slide => slide.title).join(" ") === "Second First", "slides move across a stationary section boundary");
+  const firstAcrossSection = parseDeck(moveSlide(sectioned, 0, -1));
+  assert(firstAcrossSection.items.map(item => item.kind).join(" ") === "slide section slide"
+    && firstAcrossSection.slides.map(slide => slide.title).join(" ") === "First Second",
+  "the first slide in a section moves above its section marker");
+  const sectionBetweenSlides = parseDeck(insertSection(deck, 1, "Boundary"));
+  const previousAcrossSection = parseDeck(moveSlide(sectionBetweenSlides, 0, 1));
+  assert(previousAcrossSection.items.map(item => item.kind).join(" ") === "section slide slide"
+    && previousAcrossSection.slides.map(slide => slide.title).join(" ") === "First Second",
+  "the slide before a section moves below its section marker");
+  const nextAcrossSection = parseDeck(moveSlide(sectionBetweenSlides, 1, -1));
+  assert(nextAcrossSection.items.map(item => item.kind).join(" ") === "slide slide section"
+    && nextAcrossSection.slides.map(slide => slide.title).join(" ") === "First Second",
+  "the slide after a section moves above its section marker");
   const sectionFixture = document.createElement("div");
   renderDeck(sectioned, sectionFixture, source => source);
   assert(sectionFixture.querySelectorAll(".scientific-slide").length === 2, "section markers are omitted from presentation rendering");
