@@ -76,6 +76,7 @@ const state = {
   assetVersions: new Map(),
   bibliographySource: "",
   bibliographyHash: null,
+  bibliographyPdfs: {},
   bibliography: null,
   externalChange: null,
 };
@@ -1118,6 +1119,7 @@ async function loadBibliography() {
   if (!response.ok) throw new Error(result.error || "Cannot load bibliography");
   state.bibliographySource = result.source;
   state.bibliographyHash = result.hash;
+  state.bibliographyPdfs = result.pdfs || {};
 }
 
 async function pollForExternalBibliography() {
@@ -1163,7 +1165,19 @@ function rebuildBibliographyList(revealKey = null) {
     attribute.type = "button"; attribute.textContent = "Add attribution";
     attribute.title = "Save the bibliography draft and add an attribution to the current slide";
     attribute.addEventListener("click", () => insertCitationOverlay(entry.key));
-    row.append(description, cite, attribute);
+    row.append(description);
+    const pdf = state.bibliographyPdfs[entry.key];
+    if (pdf) {
+      const openPdf = document.createElement("a");
+      openPdf.className = "button bibliography-pdf";
+      openPdf.href = pdf;
+      openPdf.target = "_blank";
+      openPdf.rel = "noopener noreferrer";
+      openPdf.textContent = "PDF";
+      openPdf.title = "Open the attached PDF";
+      row.append(openPdf);
+    }
+    row.append(cite, attribute);
     target.append(row);
   }
   bibliographyMessage(`${entries.length} reference${entries.length === 1 ? "" : "s"}`);

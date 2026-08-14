@@ -258,6 +258,13 @@ more papers. Its generated reference text is not directly editable.
 Attributions do not display or consume citation numbers; inline citations keep
 deck-wide numbering.
 
+If an entry has a `file` or `pdf` field naming an existing PDF, its row also
+shows a **PDF** button. Relative paths are resolved beside the bibliography.
+Absolute paths are supported as well, including PDFs outside the presentation
+directory. Quarkfoil exposes those files only through unguessable links derived
+from the bibliography; ordinary project URLs remain confined to the selected
+presentation directory.
+
 ## Keyboard shortcuts
 
 - `Ctrl+S`: save.

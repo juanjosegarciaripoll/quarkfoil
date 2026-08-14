@@ -241,6 +241,89 @@ def _inside(root: Path, candidate: Path) -> bool:
         return False
 
 
+def _bibtex_entries(source: str) -> list[tuple[str, str]]:
+    """Return citation keys and entry bodies without trying to normalize BibTeX."""
+    entries = []
+    for match in re.finditer(r"(?i)@[a-z]+\s*\{\s*([^,\s]+)\s*,", source):
+        depth = 1
+        quoted = False
+        escaped = False
+        index = match.end()
+        while index < len(source) and depth:
+            character = source[index]
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif character == '"':
+                quoted = not quoted
+            elif not quoted and character == "{":
+                depth += 1
+            elif not quoted and character == "}":
+                depth -= 1
+            index += 1
+        if depth == 0:
+            entries.append((match.group(1), source[match.end() : index - 1]))
+    return entries
+
+
+def _bibtex_field(body: str, name: str) -> str | None:
+    match = re.search(rf"(?i)(?:^|,)\s*{re.escape(name)}\s*=\s*", body)
+    if not match:
+        return None
+    index = match.end()
+    if index >= len(body):
+        return None
+    opener = body[index]
+    if opener not in {'{', '"'}:
+        return body[index:].split(",", 1)[0].strip()
+    closer = "}" if opener == "{" else '"'
+    depth = 1
+    escaped = False
+    start = index + 1
+    index = start
+    while index < len(body):
+        character = body[index]
+        if escaped:
+            escaped = False
+        elif character == "\\":
+            escaped = True
+        elif opener == "{" and character == opener:
+            depth += 1
+        elif character == closer:
+            depth -= 1
+            if depth == 0:
+                return body[start:index].strip()
+        index += 1
+    return None
+
+
+def _bibliography_pdfs(source: str, bibliography: Path) -> dict[str, Path]:
+    result = {}
+    for key, body in _bibtex_entries(source):
+        value = _bibtex_field(body, "file") or _bibtex_field(body, "pdf")
+        if not value:
+            continue
+        for attachment in value.split(";"):
+            attachment = attachment.strip()
+            attachment = re.sub(r"(?i):(application/pdf|pdf)\s*$", "", attachment)
+            candidates = [attachment]
+            if attachment.lower().startswith("file://"):
+                candidates.insert(0, urllib.parse.unquote(urllib.parse.urlsplit(attachment).path))
+            if ":" in attachment and not re.match(r"^[A-Za-z]:[/\\]", attachment):
+                candidates.append(attachment.split(":", 1)[1])
+            for candidate in candidates:
+                path = Path(candidate).expanduser()
+                path = path if path.is_absolute() else bibliography.parent / path
+                path = path.resolve()
+                if path.suffix.lower() == ".pdf" and path.is_file():
+                    result[key] = path
+                    break
+            if key in result:
+                break
+    return result
+
+
 def _json_bytes(value: object) -> bytes:
     return json.dumps(value, ensure_ascii=False).encode("utf-8")
 
@@ -389,6 +472,14 @@ class SlideHandler(SimpleHTTPRequestHandler):
 
     def do_GET(self) -> None:
         parsed = urllib.parse.urlsplit(self.path)
+        if parsed.path.startswith("/api/bibliography-pdf/"):
+            token = parsed.path.rsplit("/", 1)[-1]
+            path = self.server.bibliography_pdfs.get(token)  # type: ignore[attr-defined]
+            if not path or not path.is_file():
+                self.send_error(HTTPStatus.NOT_FOUND)
+            else:
+                self._send_project_asset(path)
+            return
         if parsed.path.startswith("/api/video-conversion/"):
             job_id = parsed.path.rsplit("/", 1)[-1]
             job = self.server.video_jobs.get(job_id)  # type: ignore[attr-defined]
@@ -417,8 +508,13 @@ class SlideHandler(SimpleHTTPRequestHandler):
                 if path.suffix.lower() != ".bib":
                     raise ValueError("Bibliography must be a .bib file")
                 data = path.read_bytes() if path.is_file() else b""
-                data.decode("utf-8")
-                self._send_json({"source": data.decode("utf-8"), "hash": hashlib.sha256(data).hexdigest(), "path": path.relative_to(self.project_root).as_posix()})
+                source = data.decode("utf-8")
+                pdfs = {}
+                for key, pdf in _bibliography_pdfs(source, path).items():
+                    token = hashlib.sha256(self.server.bibliography_pdf_secret + os.fsencode(pdf)).hexdigest()  # type: ignore[attr-defined]
+                    self.server.bibliography_pdfs[token] = pdf  # type: ignore[attr-defined]
+                    pdfs[key] = f"/api/bibliography-pdf/{token}"
+                self._send_json({"source": source, "hash": hashlib.sha256(data).hexdigest(), "path": path.relative_to(self.project_root).as_posix(), "pdfs": pdfs})
             except (OSError, PermissionError, UnicodeDecodeError, ValueError) as error:
                 self._send_json({"error": str(error)}, HTTPStatus.BAD_REQUEST)
             return
@@ -559,6 +655,14 @@ class SlideHandler(SimpleHTTPRequestHandler):
 
     def do_HEAD(self) -> None:
         parsed = urllib.parse.urlsplit(self.path)
+        if parsed.path.startswith("/api/bibliography-pdf/"):
+            token = parsed.path.rsplit("/", 1)[-1]
+            path = self.server.bibliography_pdfs.get(token)  # type: ignore[attr-defined]
+            if not path or not path.is_file():
+                self.send_error(HTTPStatus.NOT_FOUND)
+            else:
+                self._send_project_asset(path, head_only=True)
+            return
         if parsed.path.startswith("/project/"):
             try:
                 path = self._project_file(parsed.path[len("/project/") :])
@@ -813,6 +917,8 @@ def create_server(deck: Path, host: str, port: int, *, verbose: bool = False, re
     server.verbose = verbose  # type: ignore[attr-defined]
     server.reload = reload  # type: ignore[attr-defined]
     server.video_jobs = {}  # type: ignore[attr-defined]
+    server.bibliography_pdfs = {}  # type: ignore[attr-defined]
+    server.bibliography_pdf_secret = os.urandom(32)  # type: ignore[attr-defined]
     server.deck_write_lock = threading.Lock()  # type: ignore[attr-defined]
     return server
 

@@ -274,9 +274,11 @@ dialog::backdrop { background: #000a; }
 .bibliography-tools { display: grid; grid-template-columns: 1fr 1fr auto; gap: 0.5rem; }
 .bibliography-tools input { min-width: 0; padding: 0.4rem; }
 .bibliography-list { min-width: 0; overflow: auto; border: 1px solid #56616d; }
-.bibliography-entry { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 0.5rem; padding: 0.45rem; border-bottom: 1px solid #3d454e; }
+.bibliography-entry { display: grid; grid-template-columns: 1fr auto auto auto; align-items: center; gap: 0.5rem; padding: 0.45rem; border-bottom: 1px solid #3d454e; }
 .bibliography-entry > div { display: grid; min-width: 0; }
 .bibliography-entry span { overflow: hidden; color: #b9c2ca; font-size: 0.8rem; text-overflow: ellipsis; white-space: nowrap; }
+.bibliography-pdf { padding: 0.36rem 0.65rem; color: inherit; background: #343b44; border: 1px solid #56616d; border-radius: 4px; text-decoration: none; }
+.bibliography-pdf:hover { background: #45515d; }
 .bibliography-source-label { display: grid; grid-template-rows: auto 1fr; gap: 0.3rem; min-width: 0; min-height: 0; }
 #bibliography-source { width: 100%; min-width: 0; min-height: 0; resize: none; padding: 0.7rem; color: #edf2f4; background: #111418; border: 1px solid #56616d; font: 13px/1.4 "Cascadia Mono", Consolas, monospace; }
 #bibliography-status { min-height: 1.2em; color: #b9c2ca; }

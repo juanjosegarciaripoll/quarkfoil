@@ -12,7 +12,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
-from scientific_slides.server import STARTER_DECK, SlideHandler, _normalize_doi_bibtex, _python_snapshot, _video_conversion_plan, _video_duration, _video_progress, create_server, initialize_deck
+from scientific_slides.server import STARTER_DECK, SlideHandler, _bibliography_pdfs, _normalize_doi_bibtex, _python_snapshot, _video_conversion_plan, _video_duration, _video_progress, create_server, initialize_deck
 
 
 class DeckInitializationTests(unittest.TestCase):
@@ -204,6 +204,35 @@ class ServerTests(unittest.TestCase):
         with self.assertRaises(urllib.error.HTTPError) as context:
             self.request("/api/bibliography?path=..%2Foutside.bib")
         self.assertEqual(context.exception.code, 400)
+
+    def test_external_bibliography_pdf_gets_scoped_link(self) -> None:
+        external = self.root.parent / f"{self.root.name}-paper.pdf"
+        external.write_bytes(b"%PDF-test")
+        self.addCleanup(external.unlink, missing_ok=True)
+        (self.root / "references.bib").write_text(
+            f"@article{{paper, title={{Paper}}, file={{{external}:application/pdf}}}}\n"
+            "@article{missing, title={Missing}, file={missing.pdf}}\n",
+            encoding="utf-8",
+        )
+        status, _, payload = self.request("/api/bibliography?path=references.bib")
+        result = json.loads(payload)
+        self.assertEqual(status, 200)
+        self.assertEqual(set(result["pdfs"]), {"paper"})
+        status, headers, payload = self.request(result["pdfs"]["paper"])
+        self.assertEqual(status, 200)
+        self.assertEqual(headers.get_content_type(), "application/pdf")
+        self.assertEqual(payload, b"%PDF-test")
+
+    def test_bibliography_pdf_fields_resolve_relative_and_zotero_paths(self) -> None:
+        bibliography = self.root / "references.bib"
+        relative = self.root / "papers" / "relative.pdf"
+        relative.parent.mkdir()
+        relative.write_bytes(b"pdf")
+        source = (
+            "@article{relative, file={papers/relative.pdf}}\n"
+            f"@article{{zotero, file={{Paper:{relative}:application/pdf}}}}\n"
+        )
+        self.assertEqual(_bibliography_pdfs(source, bibliography), {"relative": relative, "zotero": relative})
 
     def test_project_boundary(self) -> None:
         with self.assertRaises(urllib.error.HTTPError) as context:

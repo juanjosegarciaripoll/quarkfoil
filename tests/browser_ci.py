@@ -77,6 +77,8 @@ def main() -> int:
     shortcut = Keys.COMMAND if sys.platform == "darwin" else Keys.CONTROL
     temporary = tempfile.TemporaryDirectory()
     deck = Path(temporary.name) / "deck.md"
+    bibliography_pdf = Path(temporary.name).parent / f"{Path(temporary.name).name}-paper.pdf"
+    bibliography_pdf.write_bytes(b"%PDF-browser-test")
     deck.write_text(
         "---\ntitle: Browser title test\n---\n\n"
         "## Browser test {.layout-1}\n\nInitial content.\n\n"
@@ -192,7 +194,7 @@ def main() -> int:
         driver.switch_to.window(original_window)
         bibliography_path = Path(temporary.name) / "references.bib"
         bibliography_path.write_text(
-            "@misc{test-link, author={Tester, Alice}, year={2030}, url={about:blank#quarkfoil-attribution}}\n",
+            f"@misc{{test-link, author={{Tester, Alice}}, year={{2030}}, url={{about:blank#quarkfoil-attribution}}, file={{{bibliography_pdf}}}}}\n",
             encoding="utf-8",
         )
         driver.find_element(By.CSS_SELECTOR, '[data-mode="source"]').click()
@@ -204,6 +206,9 @@ def main() -> int:
         bibliography_source = driver.find_element(By.ID, "bibliography-source")
         if "2030" not in bibliography_source.get_attribute("value"):
             raise RuntimeError("Opening Bibliography did not reload an externally changed shared file")
+        pdf_link = driver.find_element(By.CSS_SELECTOR, ".bibliography-entry .bibliography-pdf")
+        if not pdf_link.get_attribute("href").startswith(f"http://127.0.0.1:{server.server_port}/api/bibliography-pdf/"):
+            raise RuntimeError("Bibliography PDF did not receive a server-scoped link")
         driver.execute_script(
             "arguments[0].value = arguments[0].value.replace('2030', '2027'); arguments[0].dispatchEvent(new Event('input', {bubbles:true}));",
             bibliography_source,
@@ -327,6 +332,7 @@ def main() -> int:
         print(f"Quarkfoil browser self-test passed in {browser}: {summary}; external editing passed")
         return 0
     finally:
+        bibliography_pdf.unlink(missing_ok=True)
         if driver is not None:
             driver.quit()
         server.shutdown()
