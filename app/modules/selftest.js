@@ -699,6 +699,8 @@ try {
   next = updateHeadingLayout(deck, 0, "1-1", [35, 65], [50, 50]);
   assert(next.includes(".layout-1-1"), "layout patches heading");
   assert(next.includes('columns="35 65"'), "layout ratios serialize");
+  assert(parseDeck(next).slides[0].cells.find(cell => cell.id === "right")?.source === deck.slides[0].cells.find(cell => cell.id === "core")?.source,
+    "1 to 1+1 preserves core content in the largest panel");
   deck = parseDeck(next);
 
   next = setCellContent(deck, 0, "right", "New cell");
@@ -751,6 +753,14 @@ Ordinary core content.
 Overlay content
 :::
 `);
+  const onePlusTwoFromCore = parseDeck(updateHeadingLayout(mixedCore, 0, "1-2", [40, 60], [30, 70]));
+  assert(onePlusTwoFromCore.slides[0].cells.find(cell => cell.id === "bottom-right")?.source === "Ordinary core content.",
+    "1 to 1+2 wraps ordinary core Markdown in the largest panel");
+  assert(onePlusTwoFromCore.slides[0].overlays.some(overlay => overlay.id === "ordinary-overlay"),
+    "moving ordinary core content retains adjacent overlays");
+  const twoPlusOneFromCore = parseDeck(updateHeadingLayout(mixedCore, 0, "2-1", [45, 55], [80, 20]));
+  assert(twoPlusOneFromCore.slides[0].cells.find(cell => cell.id === "right")?.source === "Ordinary core content.",
+    "1 to 2+1 preserves ordinary core Markdown in the largest panel");
   const mixedZero = parseDeck(updateHeadingLayout(mixedCore, 0, "0", [50, 50], [50, 50]));
   assert(!mixedZero.source.includes("Ordinary core content.") && mixedZero.source.includes("Overlay content"), "layout 0 removes ordinary core Markdown without removing adjacent directives");
 

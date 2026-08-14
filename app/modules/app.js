@@ -744,7 +744,21 @@ async function claimDeckWindow(path) {
 
 async function loadLocalDeck() {
   try {
-    const configResponse = await fetch("/api/config", { cache: "no-store" });
+    const fetchDuringRestart = async (url, options = {}) => {
+      let lastError;
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        try {
+          const response = await fetch(url, options);
+          if (response.status < 500) return response;
+          lastError = new Error(`${url} returned ${response.status}`);
+        } catch (error) {
+          lastError = error;
+        }
+        await new Promise(resolve => setTimeout(resolve, 250));
+      }
+      throw lastError || new Error(`Cannot load ${url}`);
+    };
+    const configResponse = await fetchDuringRestart("/api/config", { cache: "no-store" });
     if (!configResponse.ok) return false;
     state.config = await configResponse.json();
     state.local = state.config.mode === "local";
@@ -765,7 +779,7 @@ async function loadLocalDeck() {
       }
     }
     if (source === undefined) {
-      const response = await fetch("/api/deck", { cache: "no-store" });
+      const response = await fetchDuringRestart("/api/deck", { cache: "no-store" });
       if (!response.ok) throw new Error("Cannot load deck");
       source = await response.text();
       state.serverHash = await hashText(source);
@@ -1537,6 +1551,11 @@ async function initialize() {
   }
   if (state.local) bindExternalDeckChecks();
   if (!loaded) {
+    if (["http:", "https:"].includes(location.protocol)) {
+      elements.save.disabled = true;
+      showStatus("Cannot reconnect to the Quarkfoil server. The presentation on disk is unchanged; reload after restarting Quarkfoil.", true);
+      return;
+    }
     state.savedSource = "";
     parseAndRender(STARTER, { preserveSlide: true });
   }
