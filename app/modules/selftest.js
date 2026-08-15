@@ -148,6 +148,46 @@ function assertEmptyLayouts() {
   fixture.remove();
 }
 
+function assertPrintLayout() {
+  const fixture = document.createElement("div");
+  fixture.id = "layout-fixture";
+  fixture.className = "reveal";
+  fixture.style.setProperty("width", "1000px", "important");
+  fixture.style.setProperty("height", "700px", "important");
+  const slides = document.createElement("div");
+  slides.className = "slides";
+  fixture.append(slides);
+  document.body.append(fixture);
+  const parsed = parseDeck(`## Printed {.layout-1}\n\n::: core\nPrint content\n:::\n\n::: overlay {#print-overlay type="markdown" x="20" y="30" w="40" h="20"}\nOverlay\n:::`);
+  renderDeck(parsed, slides, source => source);
+  const section = fixture.querySelector(".scientific-slide");
+  section.classList.add("present");
+  const normal = getComputedStyle(section);
+  const expectedVariables = ["--slide-padding-top", "--slide-padding-x", "--slide-padding-bottom"]
+    .map(name => normal.getPropertyValue(name).trim());
+  const expectedBackground = normal.backgroundColor;
+  const expectedOverlayPosition = getComputedStyle(section.querySelector(".slide-overlay")).position;
+  document.documentElement.classList.add("reveal-print");
+  try {
+    const printed = getComputedStyle(section);
+    const printedPadding = [printed.paddingTop, printed.paddingRight, printed.paddingBottom, printed.paddingLeft];
+    const printedVariables = ["--slide-padding-top", "--slide-padding-x", "--slide-padding-bottom"]
+      .map(name => printed.getPropertyValue(name).trim());
+    assert(printedPadding.every(value => parseFloat(value) > 0)
+      && printedVariables.every((value, index) => value === expectedVariables[index]),
+    `PDF mode preserves the presentation slide insets (${printedPadding.join(" ")}; ${printedVariables.join(" ")})`);
+    assert(getComputedStyle(section.querySelector(".slide-frame")).display === "grid"
+      && getComputedStyle(section.querySelector(".slide-grid")).display === "grid",
+    "PDF mode preserves Quarkfoil frame and grid layouts");
+    assert(getComputedStyle(section.querySelector(".slide-overlay")).position === expectedOverlayPosition
+      && expectedOverlayPosition === "absolute" && printed.backgroundColor === expectedBackground,
+    "PDF mode preserves overlays and theme surfaces");
+  } finally {
+    document.documentElement.classList.remove("reveal-print");
+    fixture.remove();
+  }
+}
+
 function assertShapes() {
   const palette = document.createElement("div");
   let chosenShape = null;
@@ -723,6 +763,7 @@ try {
   assertCompoundLayout("2-1", ["top-left", "bottom-left", "right"], "right");
   assertFrontLayout();
   assertEmptyLayouts();
+  assertPrintLayout();
   assertShapes();
   assertArrows();
   assertCitations();

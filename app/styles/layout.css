@@ -32,6 +32,13 @@
   text-align: left;
 }
 
+/* Reveal's PDF layout resets every slide section to padding: 0 !important.
+   Restore Quarkfoil's slide box explicitly so print/PDF uses the same content
+   viewport as screen presentation mode. */
+html.reveal-print .reveal .slides section.scientific-slide {
+  padding: var(--slide-padding-top) var(--slide-padding-x) var(--slide-padding-bottom) !important;
+}
+
 /* Reveal's core stylesheet intentionally leaves document typography mostly
    untouched. Reset browser margins and padding inside slides so presentation
    spacing does not depend on the browser's user-agent stylesheet. */
