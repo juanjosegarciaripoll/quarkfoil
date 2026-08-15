@@ -254,7 +254,8 @@ class ServerTests(unittest.TestCase):
             "@article{relative, file={papers/relative.pdf}}\n"
             f"@article{{zotero, file={{Paper:{relative}:application/pdf}}}}\n"
         )
-        self.assertEqual(_bibliography_pdfs(source, bibliography), {"relative": relative, "zotero": relative})
+        canonical = relative.resolve()
+        self.assertEqual(_bibliography_pdfs(source, bibliography), {"relative": canonical, "zotero": canonical})
 
     def test_project_boundary(self) -> None:
         with self.assertRaises(urllib.error.HTTPError) as context:
