@@ -109,6 +109,8 @@ Image-only regions and image overlays support:
 - Fit: contain, crop/fill, stretch, fit width, fit height, or native size. Stretch
   reshapes raster images and SVG resources to the overlay's exact dimensions.
 - Horizontal and vertical crop focus.
+- Global opacity from fully transparent to fully opaque. This is applied by the
+  presentation without modifying the raster or SVG source file.
 - Upload replacement: import a new file from the browser's computer.
 - Choose project image: select an existing image from the configured figures
   folder. Both replacement actions retain the object's position, size, fit,

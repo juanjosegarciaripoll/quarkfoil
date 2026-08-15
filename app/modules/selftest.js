@@ -533,17 +533,18 @@ try {
   const mixedCoreDeck = parseDeck("## Mixed {.layout-1}\n\nOrdinary Markdown.\n\n::: overlay {#kept type=\"markdown\"}\nKeep this overlay.\n:::\n");
   const clearedMixedCore = setCellContent(mixedCoreDeck, 0, "core", "");
   assert(!clearedMixedCore.includes("Ordinary Markdown.") && clearedMixedCore.includes("Keep this overlay."), "clearing mixed core Markdown preserves slide directives");
-  const stretchDeck = parseDeck('## Stretch {.layout-1}\n\n::: core\n![](figures/stretch.svg){fit=stretch}\n:::\n');
+  const stretchDeck = parseDeck('## Stretch {.layout-1}\n\n::: core\n![](figures/stretch.svg){fit=stretch opacity="0.6"}\n:::\n');
   const stretchFixture = document.createElement("div");
   renderDeck(stretchDeck, stretchFixture, asset => `/test/${asset}`);
   const stretchWrapper = stretchFixture.querySelector('svg.slide-image[data-fit="stretch"]');
   const stretchedResource = stretchWrapper?.querySelector("image");
   assert(stretchWrapper?.getAttribute("preserveAspectRatio") === "none" && stretchedResource?.getAttribute("preserveAspectRatio") === "none", "stretch fit reshapes image resources without modifying their files");
   assert(stretchedResource?.getAttribute("href") === "/test/figures/stretch.svg", "stretched SVG resources remain external images");
+  assert(stretchWrapper.style.opacity === "0.6", "global opacity applies to stretched SVG image wrappers");
   const focusedDeck = parseDeck(`## Focused {.layout-1-1}
 
 ::: left
-![](figures/tall.png){fit=height focus="0 80"}
+![](figures/tall.png){fit=height focus="0 80" opacity="0.4"}
 :::
 
 ::: right
@@ -557,6 +558,7 @@ try {
   const heightFit = focusedFixture.querySelector('[data-fit="height"]');
   const widthFit = focusedFixture.querySelector('[data-fit="width"]');
   assert(heightFit.style.objectPosition === "0% 80%" && heightFit.style.getPropertyValue("--image-focus-x") === "0%", "zero is retained as a valid image focus coordinate");
+  assert(heightFit.style.opacity === "0.4", "global opacity applies to ordinary image elements");
   assert(getComputedStyle(heightFit).position === "absolute" && getComputedStyle(heightFit).transform !== "none", "Focus X positions a height-fitted image within its viewport");
   assert(getComputedStyle(widthFit).position === "absolute" && getComputedStyle(widthFit).transform !== "none", "Focus Y positions a width-fitted image within its viewport");
   focusedFixture.remove();

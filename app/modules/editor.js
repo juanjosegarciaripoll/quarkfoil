@@ -323,7 +323,7 @@ export class DesignEditor {
     document.addEventListener("copy", event => this.onCopy(event));
     document.addEventListener("cut", event => this.onCopy(event, { cut: true }));
     document.addEventListener("paste", event => this.onPaste(event));
-    for (const id of ["prop-focus-x", "prop-focus-y", "prop-font-size"]) bindRangeControl(id);
+    for (const id of ["prop-focus-x", "prop-focus-y", "prop-image-opacity", "prop-font-size"]) bindRangeControl(id);
     document.querySelector("#layout-select").addEventListener("change", event => this.changeLayout(event.target.value));
     document.querySelector("#prop-slide-theme").addEventListener("change", event => this.applySlideProperties({ theme: event.target.value || null }));
     for (const name of ["background", "foreground"]) {
@@ -440,6 +440,7 @@ export class DesignEditor {
     document.querySelector("#prop-fit").addEventListener("change", () => this.applyImageProperties());
     document.querySelector("#prop-focus-x").addEventListener("change", () => this.applyImageProperties());
     document.querySelector("#prop-focus-y").addEventListener("change", () => this.applyImageProperties());
+    document.querySelector("#prop-image-opacity").addEventListener("change", () => this.applyImageProperties());
     for (const id of ["video-fit", "video-controls", "video-autoplay", "video-loop", "video-muted", "video-poster"]) {
       document.querySelector(`#prop-${id}`).addEventListener("change", () => this.applyVideoProperties());
     }
@@ -658,6 +659,7 @@ export class DesignEditor {
       const focus = (cell.image.attrs.values.focus || "50 50").split(/[\s,]+/);
       setRangeControl("prop-focus-x", focus[0] || 50);
       setRangeControl("prop-focus-y", focus[1] || 50);
+      setRangeControl("prop-image-opacity", 100 * Number(cell.image.attrs.values.opacity ?? 1));
       this.loadPlotProperties(cell.image.source);
     } else if (cell?.type === "video") {
       this.noSelection.textContent = "Video cell properties must currently be edited in Source mode.";
@@ -722,6 +724,7 @@ export class DesignEditor {
       const focus = (object.image.attrs.values.focus || "50 50").split(/[\s,]+/);
       setRangeControl("prop-focus-x", focus[0] || 50);
       setRangeControl("prop-focus-y", focus[1] || 50);
+      setRangeControl("prop-image-opacity", 100 * Number(object.image.attrs.values.opacity ?? 1));
       this.loadPlotProperties(object.image.source);
     } else if (object.type === "video" && object.video) {
       this.fillVideoProperties(object.video);
@@ -1077,7 +1080,10 @@ export class DesignEditor {
     if (!object?.image) return;
     const fit = document.querySelector("#prop-fit").value;
     const focus = `${document.querySelector("#prop-focus-x").value} ${document.querySelector("#prop-focus-y").value}`;
-    const body = `![${object.image.alt}](${object.image.source}){fit=${JSON.stringify(fit)} focus=${JSON.stringify(focus)}}`;
+    const opacity = Math.min(100, Math.max(0, Number(document.querySelector("#prop-image-opacity").value) || 0)) / 100;
+    const title = object.image.title ? ` ${JSON.stringify(object.image.title)}` : "";
+    const opacityAttribute = opacity === 1 ? "" : ` opacity=${JSON.stringify(String(opacity))}`;
+    const body = `![${object.image.alt}](${object.image.source}${title}){fit=${JSON.stringify(fit)} focus=${JSON.stringify(focus)}${opacityAttribute}}`;
     if (this.selected) this.commit(updateBlockContent(this.options.getDeck(), this.slideIndex(), object.id, body));
     else this.commit(setCellContent(this.options.getDeck(), this.slideIndex(), object.id, body));
   }
@@ -1453,8 +1459,10 @@ export class DesignEditor {
     if (!object?.image || !path) return;
     const fit = object.image.attrs.values.fit || "contain";
     const focus = object.image.attrs.values.focus || "50 50";
+    const opacity = object.image.attrs.values.opacity;
     const title = object.image.title ? ` ${JSON.stringify(object.image.title)}` : "";
-    const body = `![${object.image.alt}](${path}${title}){fit=${JSON.stringify(fit)} focus=${JSON.stringify(focus)}}`;
+    const opacityAttribute = opacity === undefined ? "" : ` opacity=${JSON.stringify(opacity)}`;
+    const body = `![${object.image.alt}](${path}${title}){fit=${JSON.stringify(fit)} focus=${JSON.stringify(focus)}${opacityAttribute}}`;
     if (this.selected) this.commit(updateBlockContent(this.options.getDeck(), this.slideIndex(), object.id, body));
     else this.commit(setCellContent(this.options.getDeck(), this.slideIndex(), object.id, body));
   }

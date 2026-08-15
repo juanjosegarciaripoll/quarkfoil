@@ -205,7 +205,7 @@ rules, alternating rows, and colors:
 ## Images
 
 ```markdown
-![](figures/example.svg){fit=contain focus="50 50"}
+![](figures/example.svg){fit=contain focus="50 50" opacity="0.65"}
 ```
 
 Supported `fit` values:
@@ -217,6 +217,9 @@ Supported `fit` values:
 - `native`: retain intrinsic size within region bounds.
 
 `focus="X Y"` gives the crop focus as percentages.
+`opacity` sets the opacity of the complete image from `0` (transparent) to `1`
+(opaque, the default). It applies without modifying raster or SVG source files
+and multiplies any transparency already present in the image.
 
 Clipboard paste preserves JPEG, GIF, PNG, WebP, or SVG bytes when the browser
 provides that original file representation. Some browsers expose copied

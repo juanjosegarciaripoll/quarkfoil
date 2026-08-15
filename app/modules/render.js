@@ -115,12 +115,15 @@ function titleMarkdown(source) {
 function makeImage(image, assetResolver) {
   const resolved = assetResolver(image.source);
   const fit = image.attrs.values.fit || "contain";
+  const parsedOpacity = Number(image.attrs.values.opacity ?? 1);
+  const opacity = Number.isFinite(parsedOpacity) ? Math.min(1, Math.max(0, parsedOpacity)) : 1;
   const source = resolved || safeAssetPath(image.source);
   if (fit === "stretch") {
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.classList.add("slide-image");
     svg.dataset.fit = fit;
     svg.dataset.source = image.source;
+    svg.style.opacity = String(opacity);
     svg.setAttribute("viewBox", "0 0 1 1");
     svg.setAttribute("preserveAspectRatio", "none");
     svg.setAttribute("role", "img");
@@ -144,6 +147,7 @@ function makeImage(image, assetResolver) {
   const img = document.createElement("img");
   img.className = "slide-image";
   img.dataset.source = image.source;
+  img.style.opacity = String(opacity);
   img.alt = image.alt || "";
   img.src = source;
   if (image.title) img.title = image.title;
