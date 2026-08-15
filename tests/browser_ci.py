@@ -130,6 +130,15 @@ def main() -> int:
         WebDriverWait(driver, 30).until(
             lambda active_driver: active_driver.find_element(By.ID, "save-state").text == "Saved"
         )
+        toolbar_layout = driver.execute_script(
+            "const bar=document.querySelector('.slide-sidebar-actions');"
+            "const buttons=[...bar.querySelectorAll('button')].filter(button => !button.hidden);"
+            "const box=bar.getBoundingClientRect(); const widths=buttons.map(button => button.getBoundingClientRect().width);"
+            "return {count:buttons.length, spread:Math.max(...widths)-Math.min(...widths),"
+            "left:buttons[0].getBoundingClientRect().left-box.left,right:box.right-buttons.at(-1).getBoundingClientRect().right};"
+        )
+        if toolbar_layout["count"] != 5 or toolbar_layout["spread"] > 1 or toolbar_layout["left"] > 1 or toolbar_layout["right"] > 1:
+            raise RuntimeError(f"Visible slide actions do not evenly fill their toolbar: {toolbar_layout}")
         slide_buttons = driver.find_elements(By.CSS_SELECTOR, "#slide-list li:not(.section-entry) button")
         slide_buttons[1].click()
         WebDriverWait(driver, 5).until(lambda active_driver: "slide=2" in active_driver.current_url)
@@ -161,6 +170,12 @@ def main() -> int:
         )
         driver.find_element(By.CSS_SELECTOR, "#slide-list .trashed-slide button").click()
         WebDriverWait(driver, 5).until(lambda active_driver: active_driver.find_element(By.ID, "restore-slide").is_displayed())
+        restored_toolbar_layout = driver.execute_script(
+            "const buttons=[...document.querySelectorAll('.slide-sidebar-actions button')].filter(button => !button.hidden);"
+            "return {count:buttons.length,spread:Math.max(...buttons.map(button => button.getBoundingClientRect().width))-Math.min(...buttons.map(button => button.getBoundingClientRect().width))};"
+        )
+        if restored_toolbar_layout["count"] != 6 or restored_toolbar_layout["spread"] > 1:
+            raise RuntimeError(f"Restore action does not share the full toolbar evenly: {restored_toolbar_layout}")
         driver.find_element(By.ID, "restore-slide").click()
         WebDriverWait(driver, 5).until(lambda active_driver: not active_driver.find_elements(By.CSS_SELECTOR, "#slide-list .trash-section"))
         if driver.title != "Browser title test":
@@ -178,6 +193,17 @@ def main() -> int:
         )
         content_dialog = driver.find_element(By.ID, "content-dialog")
         WebDriverWait(driver, 5).until(lambda active_driver: content_dialog.get_attribute("open") is not None)
+        content_dialog_layout = driver.execute_script(
+            "const dialog=document.querySelector('#content-dialog'); const form=dialog.querySelector('form');"
+            "const actions=dialog.querySelector('.dialog-actions'); const box=dialog.getBoundingClientRect();"
+            "const formBox=form.getBoundingClientRect(); const actionBox=actions.getBoundingClientRect();"
+            "return {top:box.top,bottom:box.bottom,viewport:innerHeight,overflow:form.scrollHeight-form.clientHeight,"
+            "tail:formBox.bottom-actionBox.bottom,dialogTail:box.bottom-formBox.bottom};"
+        )
+        if (content_dialog_layout["top"] < -1 or content_dialog_layout["bottom"] > content_dialog_layout["viewport"] + 1
+                or content_dialog_layout["overflow"] > 1 or content_dialog_layout["tail"] > 20
+                or content_dialog_layout["dialogTail"] > 2):
+            raise RuntimeError(f"Content editor does not fit its dialog cleanly: {content_dialog_layout}")
         content_editor = driver.find_element(By.ID, "content-editor")
         if driver.switch_to.active_element != content_editor:
             raise RuntimeError("Opening the content dialog did not focus its textarea")
