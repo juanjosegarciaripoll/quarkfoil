@@ -197,11 +197,15 @@ Second thought
   assert(getComputedStyle(cloud.querySelector(".shape-surface")).fill.includes("0.5"), "shape color alpha renders");
   assert(parsed.slides[0].overlays[0].shadow && cloud.dataset.shadow === "true", "shape shadow parses and renders");
   assert(cloud.querySelector(".shape-background path") && cloud.querySelector(".shape-label").textContent.includes("Thought"), "cloud renders with a Markdown label");
+  const cloudRect = cloud.getBoundingClientRect();
+  const cloudLabelRect = cloud.querySelector(".shape-label").getBoundingClientRect();
   const cloudParagraphs = cloud.querySelectorAll(".shape-label > p");
   assert(cloudParagraphs.length === 2 && cloudParagraphs[1].getBoundingClientRect().top > cloudParagraphs[0].getBoundingClientRect().bottom,
     "multiple shape-label paragraphs flow vertically");
-  const cloudRect = cloud.getBoundingClientRect();
-  const cloudLabelRect = cloud.querySelector(".shape-label").getBoundingClientRect();
+  const paragraphTop = cloudParagraphs[0].getBoundingClientRect().top;
+  const paragraphBottom = cloudParagraphs[1].getBoundingClientRect().bottom;
+  assert(Math.abs((paragraphTop + paragraphBottom) / 2 - (cloudLabelRect.top + cloudLabelRect.bottom) / 2) < 1,
+    "multiple shape-label paragraphs remain vertically centered");
   assert(Math.abs(cloudLabelRect.width / cloudRect.width - 0.76) < 0.01 && Math.abs(cloudLabelRect.height / cloudRect.height - 0.75) < 0.01,
     "shape metadata constrains the cloud label to its safe text region");
   const callout = fixture.querySelector('[data-object-id="callout"]');

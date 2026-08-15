@@ -355,8 +355,8 @@
   inset: var(--shape-label-top, 0) var(--shape-label-right, 0) var(--shape-label-bottom, 0) var(--shape-label-left, 0);
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: inherit;
+  align-items: stretch;
+  justify-content: center;
   width: auto;
   height: auto;
   padding: 0;
