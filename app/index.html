@@ -307,7 +307,9 @@
   <dialog id="plot-dialog">
     <form method="dialog" class="plot-dialog__form">
       <h2>Create plot</h2>
-      <label>Expression <input id="plot-expression" type="text" value="Math.sin(x)" spellcheck="false"></label>
+      <label>Y = f(x) / X(t) <textarea id="plot-expression" rows="2" spellcheck="false">Math.sin(x)</textarea></label>
+      <label>Y(t), optional <textarea id="plot-expression-y" rows="2" spellcheck="false" placeholder="Fill both expressions for a parametric plot"></textarea></label>
+      <small>Leave Y(t) empty for Y = f(x). Fill both expressions to plot (X(t), Y(t)).</small>
       <div class="plot-domain">
         <label>Start <input id="plot-start" type="number" value="0" step="any"></label>
         <label>End <input id="plot-end" type="number" value="6.283185307179586" step="any"></label>

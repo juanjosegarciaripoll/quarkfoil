@@ -35,9 +35,9 @@ export function compileExpression(source) {
   const primary = () => {
     if (peek("number")) { const value = take("number").value; return () => value; }
     if (peek("(")) { take("("); const value = expression(); take(")"); return value; }
-    if (!peek("identifier")) throw new Error("Expected a number, x, or function");
+    if (!peek("identifier")) throw new Error("Expected a number, x, t, or function");
     const name = take("identifier").value;
-    if (name === "x") return x => x;
+    if (["x", "t"].includes(name)) return x => x;
     if (["PI", "E"].includes(name) && !peek("(")) { const value = Math[name]; return () => value; }
     const fn = FUNCTIONS[name];
     if (!fn) throw new Error(`Unknown function or value '${name}'`);
@@ -126,31 +126,37 @@ function splineGeometry(points) {
   return { path, bounds, first: points[0], last: points.at(-1) };
 }
 
-export function createPlotSvg(expression, start, end, pointCount, axes) {
+export function createPlotSvg(expression, start, end, pointCount, axes, yExpression = "") {
   if (!Number.isFinite(start) || !Number.isFinite(end) || start === end) throw new Error("Start and end must be different finite numbers");
-  const evaluate = compileExpression(expression);
+  const parametric = Boolean(String(yExpression).trim());
+  const evaluateX = parametric ? compileExpression(expression) : value => value;
+  const evaluateY = compileExpression(parametric ? yExpression : expression);
   const samples = Array.from({ length: pointCount }, (_, index) => {
-    const x = start + (end - start) * index / (pointCount - 1);
-    const y = Number(evaluate(x));
-    return { x, y };
+    const parameter = start + (end - start) * index / (pointCount - 1);
+    return { x: Number(evaluateX(parameter)), y: Number(evaluateY(parameter)) };
   });
-  const finite = samples.filter(point => Number.isFinite(point.y));
-  if (finite.length < 2) throw new Error("The expression produces fewer than two finite points");
+  const finite = samples.filter(point => Number.isFinite(point.x) && Number.isFinite(point.y));
+  if (finite.length < 2) throw new Error(`${parametric ? "The expressions produce" : "The expression produces"} fewer than two finite points`);
+  let coordinateMinimumX = parametric ? Math.min(...finite.map(point => point.x)) : Math.min(start, end);
+  let coordinateMaximumX = parametric ? Math.max(...finite.map(point => point.x)) : Math.max(start, end);
   let minimumY = Math.min(...finite.map(point => point.y));
   let maximumY = Math.max(...finite.map(point => point.y));
+  if (coordinateMinimumX === coordinateMaximumX) { coordinateMinimumX -= 0.5; coordinateMaximumX += 0.5; }
   if (minimumY === maximumY) { minimumY -= 0.5; maximumY += 0.5; }
   const width = 800, height = 450;
   const padding = axes ? { left: 58, right: 22, top: 22, bottom: 42 } : { left: 0, right: 0, top: 0, bottom: 0 };
   const plotWidth = width - padding.left - padding.right;
   const plotHeight = height - padding.top - padding.bottom;
+  const horizontalStart = parametric ? coordinateMinimumX : start;
+  const horizontalEnd = parametric ? coordinateMaximumX : end;
   const scale = point => [
-    padding.left + (point.x - start) / (end - start) * plotWidth,
+    padding.left + (point.x - horizontalStart) / (horizontalEnd - horizontalStart) * plotWidth,
     padding.top + (maximumY - point.y) / (maximumY - minimumY) * plotHeight,
   ];
   const segments = [];
   let segment = [];
   for (const point of samples) {
-    if (Number.isFinite(point.y)) segment.push(scale(point));
+    if (Number.isFinite(point.x) && Number.isFinite(point.y)) segment.push(scale(point));
     else if (segment.length) { segments.push(segment); segment = []; }
   }
   if (segment.length) segments.push(segment);
@@ -160,7 +166,7 @@ export function createPlotSvg(expression, start, end, pointCount, axes) {
   const areas = geometries.map(item => `<path d="${item.path} L${item.last[0].toFixed(2)} ${baselineY.toFixed(2)} L${item.first[0].toFixed(2)} ${baselineY.toFixed(2)} Z"/>`).join("");
   let axisMarkup = "";
   if (axes) {
-    const yAxisX = padding.left + (Math.max(Math.min(start, end), Math.min(Math.max(start, end), 0)) - start) / (end - start) * plotWidth;
+    const yAxisX = padding.left + (Math.max(Math.min(horizontalStart, horizontalEnd), Math.min(Math.max(horizontalStart, horizontalEnd), 0)) - horizontalStart) / (horizontalEnd - horizontalStart) * plotWidth;
     axisMarkup = `<g class="axes" fill="none" stroke="#61717b" stroke-width="1.5"><path d="M${padding.left} ${baselineY.toFixed(2)}H${width - padding.right}"/><path d="M${yAxisX.toFixed(2)} ${padding.top}V${height - padding.bottom}"/></g>`;
   }
   const strokeAllowance = 1.5;
@@ -174,5 +180,5 @@ export function createPlotSvg(expression, start, end, pointCount, axes) {
   const maximumViewY = plotMaximumY + strokeAllowance;
   const viewBox = `${minimumX.toFixed(2)} ${minimumViewY.toFixed(2)} ${(maximumX - minimumX).toFixed(2)} ${(maximumViewY - minimumViewY).toFixed(2)}`;
   const bounds = `${plotMinimumX.toFixed(4)} ${plotMinimumY.toFixed(4)} ${(plotMaximumX - plotMinimumX).toFixed(4)} ${(plotMaximumY - plotMinimumY).toFixed(4)}`;
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" data-quarkfoil-plot="1" data-plot-bounds="${bounds}" data-area-baseline="${baselineY.toFixed(2)}"><rect class="plot-background" x="${minimumX.toFixed(2)}" y="${minimumViewY.toFixed(2)}" width="${(maximumX - minimumX).toFixed(2)}" height="${(maximumViewY - minimumViewY).toFixed(2)}" fill="none"/><g class="area" fill="none" stroke="none">${areas}</g>${axisMarkup}<g class="curve" fill="none" stroke="#146c7e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">${paths}</g></svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" data-quarkfoil-plot="1" data-plot-kind="${parametric ? "parametric" : "function"}" data-plot-bounds="${bounds}" data-area-baseline="${baselineY.toFixed(2)}"><rect class="plot-background" x="${minimumX.toFixed(2)}" y="${minimumViewY.toFixed(2)}" width="${(maximumX - minimumX).toFixed(2)}" height="${(maximumViewY - minimumViewY).toFixed(2)}" fill="none"/><g class="area" fill="none" stroke="none">${areas}</g>${axisMarkup}<g class="curve" fill="none" stroke="#146c7e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">${paths}</g></svg>`;
 }

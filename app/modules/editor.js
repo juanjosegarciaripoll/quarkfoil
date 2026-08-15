@@ -394,7 +394,7 @@ export class DesignEditor {
       if (!this.shapePicker.contains(event.target)) this.closeShapePalette();
     });
     document.querySelector("#add-arrow").addEventListener("click", () => this.addShape("arrow"));
-    for (const id of ["plot-expression", "plot-start", "plot-end", "plot-axes"]) {
+    for (const id of ["plot-expression", "plot-expression-y", "plot-start", "plot-end", "plot-axes"]) {
       document.querySelector(`#${id}`).addEventListener("input", () => this.updatePlotPreview());
     }
     document.querySelector("#plot-points").addEventListener("input", event => {
@@ -1266,6 +1266,7 @@ export class DesignEditor {
       Number(document.querySelector("#plot-end").value),
       Number(document.querySelector("#plot-points").value),
       document.querySelector("#plot-axes").checked,
+      document.querySelector("#plot-expression-y").value.trim(),
     );
   }
 

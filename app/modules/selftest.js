@@ -514,11 +514,15 @@ try {
   "dirty browser drafts and invalid external decks require explicit reconciliation");
   const expression = compileExpression("Math.sin(x) + x ** 2");
   assert(Math.abs(expression(2) - (Math.sin(2) + 4)) < 1e-10, "plot expressions support JavaScript-style Math functions and operators");
+  assert(Math.abs(compileExpression("cos(t)")(Math.PI) + 1) < 1e-10, "plot expressions accept t as a parametric variable");
   const barePlot = createPlotSvg("sin(x)", 0, 2 * Math.PI, 40, false);
   assert(barePlot.includes('<svg xmlns="http://www.w3.org/2000/svg"') && barePlot.includes('data-quarkfoil-plot="1"') && !barePlot.includes('class="axes"'), "axis-free plots serialize as identifiable standalone SVG without axes");
   assert(/<path d="M0\.00 /.test(barePlot) && barePlot.includes("800.00"), "axis-free plot curves use the full SVG width without padding");
   const plotViewBox = barePlot.match(/viewBox="([^"]+)"/)[1].split(/\s+/).map(Number);
   assert(plotViewBox[0] < 0 && plotViewBox[1] < 0 && plotViewBox[0] + plotViewBox[2] > 800 && plotViewBox[1] + plotViewBox[3] > 450, "plot viewports include spline overshoot and stroke instead of clipping at the data bounds");
+  const parametricPlot = createPlotSvg("cos(t)", 0, 2 * Math.PI, 80, true, "sin(t)");
+  assert(parametricPlot.includes('data-plot-kind="parametric"') && parametricPlot.includes('class="axes"')
+    && /<path d="M[\d.]+ [\d.]+ C/.test(parametricPlot), "two expressions create a parametric SVG curve with optional axes");
   const axesPlot = createPlotSvg("x", -1, 1, 20, true);
   assert(axesPlot.includes('class="axes"') && axesPlot.includes(" C"), "plots optionally include axes and spline interpolation");
   assert(axesPlot.includes('class="area" fill="none"') && /class="area"[^>]*><path d="[^"]+ Z"/.test(axesPlot), "plots include a closed, independently fillable area to the zero baseline");

@@ -291,7 +291,8 @@ dialog::backdrop { background: #000a; }
 .plot-dialog__form h2 { margin: 0; }
 .plot-dialog__form > label { display: grid; grid-template-columns: 100px minmax(0, 1fr); align-items: center; gap: 0.6rem; }
 .plot-dialog__form label.check { display: flex; }
-.plot-dialog__form input { min-width: 0; padding: 0.4rem; }
+.plot-dialog__form input, .plot-dialog__form textarea { min-width: 0; padding: 0.4rem; }
+.plot-dialog__form textarea { resize: vertical; color: inherit; background: #343b44; border: 1px solid #56616d; border-radius: 4px; font-family: "Cascadia Mono", Consolas, monospace; }
 .plot-domain { display: grid; grid-template-columns: 1fr 1fr; gap: 0.7rem; }
 .plot-domain label { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 0.5rem; }
 .plot-preview { display: grid; place-items: center; height: min(300px, 36vh); overflow: hidden; background: #f6f7f8; border: 1px solid #56616d; }

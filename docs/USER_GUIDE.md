@@ -167,9 +167,11 @@ dash, dash-dot, or dotted style, plus whether the start, end, both, or neither
 endpoint has an arrowhead. Use the
 plot tool to create spline-interpolated SVG graphs from mathematical expressions.
 
-The plot dialog accepts a JavaScript-style expression in the independent variable
-`x`, a start and end value, and the number of sampled points. It previews a cubic
-spline through the samples. Enable axes for a padded plot with horizontal and
+The plot dialog accepts one or two JavaScript-style expressions. Leave the
+second expression empty for an ordinary `Y = f(x)` graph. Fill both expression
+areas for a parametric `(X(t), Y(t))` curve. The start and end values define the
+domain of `x` or `t`, and the point count controls sampling. The dialog previews
+a cubic spline through the samples. Enable axes for a padded plot with horizontal and
 vertical axes, or disable them to make the curve occupy the full SVG viewport
 without padding. Choose the SVG filename before creating the plot; Quarkfoil saves
 the generated file in the configured figures folder and inserts it as an ordinary
