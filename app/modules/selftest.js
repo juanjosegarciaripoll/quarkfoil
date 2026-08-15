@@ -148,7 +148,7 @@ function assertShapes() {
   const palette = document.createElement("div");
   let chosenShape = null;
   const shapeButtons = buildShapePalette(palette, shape => { chosenShape = shape; });
-  assert(shapeButtons.length === 11 && shapeButtons.every(button => button.querySelector(".shape-background .shape-surface")),
+  assert(shapeButtons.length === 12 && shapeButtons.every(button => button.querySelector(".shape-background .shape-surface")),
     "shape palette uses every insertable shape SVG as an icon");
   assert(shapeButtons.every(button => button.getAttribute("aria-label")?.startsWith("Add ")), "shape palette icons have accessible names");
   shapeButtons.find(button => button.dataset.shape === "diamond").click();
@@ -156,7 +156,7 @@ function assertShapes() {
   for (const name of ["cross", "x", "star"]) {
     assert(shapeButtons.find(button => button.dataset.shape === name)?.querySelector("polygon"), `${name} palette entry uses trusted polygon geometry`);
   }
-  for (const name of ["rectangle", "cross", "star"]) {
+  for (const name of ["rectangle", "cross", "star", "arc"]) {
     const geometry = initialShapeGeometry(name);
     assert(Math.abs(geometry.w * 1280 / 100 - geometry.h * 720 / 100) < 0.01, `${name} is inserted at a visual 1:1 aspect ratio`);
   }
@@ -177,6 +177,9 @@ Thought
 
 ::: overlay {#callout type="shape" shape="callout" x="35" y="5" w="25" h="20"}
 \\(E=mc^2\\)
+:::
+
+::: overlay {#arc type="shape" shape="arc" x="62" y="5" w="25" h="20" start-angle="45" end-angle="300" heads="both" stroke="#c92a2a"}
 :::`);
   renderDeck(parsed, slides, source => source);
   slides.querySelector(".scientific-slide").classList.add("present");
@@ -200,6 +203,18 @@ Thought
     `comic callout centers its label within the rounded body above the tail (${calloutLabelRect.height.toFixed(1)} / ${calloutRect.height.toFixed(1)})`);
   const calloutSurface = getComputedStyle(callout.querySelector(".shape-surface"));
   assert(calloutSurface.fill === "rgb(219, 239, 242)" && calloutSurface.stroke === "rgb(20, 108, 126)", "implicit shape colors inherit from the theme");
+  const arc = parsed.slides[0].overlays.find(item => item.id === "arc");
+  const arcElement = fixture.querySelector('[data-object-id="arc"]');
+  const arcPath = arcElement.querySelector(".shape-arc");
+  assert(arc.shapeParameters.startAngle === 45 && arc.shapeParameters.endAngle === 300 && arc.shapeParameters.heads === "both",
+    "arc angles and arrowheads parse");
+  assert(arcPath.getAttribute("d").includes("A 42 42 0 1 1") && arcPath.hasAttribute("marker-start") && arcPath.hasAttribute("marker-end"),
+    "parameterized arc geometry and optional arrowheads render");
+  assert(getComputedStyle(arcPath).fill === "none" && getComputedStyle(arcElement.querySelector(".shape-arrow-head")).fill === "rgb(201, 42, 42)",
+    "arc stays open and its arrowheads follow the line color");
+  const changedArc = parseDeck(updateOverlay(parsed, 0, "arc", { "start-angle": 90, "end-angle": 225, heads: "end" }));
+  assert(changedArc.slides[0].overlays.find(item => item.id === "arc").shapeParameters.endAngle === 225
+    && changedArc.slides[0].overlays.find(item => item.id === "arc").shapeParameters.heads === "end", "arc parameters serialize");
   fixture.remove();
 }
 

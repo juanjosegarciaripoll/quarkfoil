@@ -265,7 +265,7 @@ function fillContent(container, item, assetResolver, bibliography, preserveLines
     const label = document.createElement("div");
     label.className = "shape-label";
     label.innerHTML = markdown(item.source, bibliography, { breaks: preserveLines, preserveBlankLines });
-    container.append(makeShapeSvg(item.shape), label);
+    container.append(makeShapeSvg(item.shape, item.shapeParameters), label);
   }
   else if (item.type === "citation") {
     const brief = item.attrs.values.display !== "number";

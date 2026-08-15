@@ -184,6 +184,7 @@
             <option value="star">Five-pointed star</option>
             <option value="cloud">Cloud</option>
             <option value="callout">Comic callout</option>
+            <option value="arc">Arc</option>
           </select>
         </label>
         <label>Background <span class="color-with-alpha"><input id="prop-shape-fill" type="color" value="#dbeff2"><span class="alpha-symbol" aria-hidden="true">α</span><input id="prop-shape-fill-alpha" type="number" min="0" max="100" value="100" title="Background opacity percent" aria-label="Background opacity percent"></span></label>
@@ -193,6 +194,14 @@
           <select id="prop-shape-stroke-style"><option value="solid">Solid</option><option value="dash">Dash</option><option value="dash-dot">Dash-dot</option><option value="dotted">Dotted</option></select>
         </label>
         <label class="check"><input id="prop-shape-shadow" type="checkbox"> Shadow</label>
+        <fieldset id="arc-properties" hidden>
+          <legend>Arc</legend>
+          <label>Start angle <input id="prop-arc-start-angle" type="number" step="1" value="0"></label>
+          <label>End angle <input id="prop-arc-end-angle" type="number" step="1" value="180"></label>
+          <label>Arrowheads
+            <select id="prop-arc-heads"><option value="none">None</option><option value="start">Start</option><option value="end">End</option><option value="both">Both</option></select>
+          </label>
+        </fieldset>
       </form>
       <form id="attribution-properties" hidden>
         <label>References <input id="prop-attribution-keys" type="text" placeholder="key1 key2" aria-label="Attribution reference keys"></label>

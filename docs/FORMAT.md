@@ -310,7 +310,7 @@ E = mc^2
 ```
 
 The available shapes are `rectangle`, `rounded-rectangle`, `ellipse`, `circle`,
-`diamond`, `hexagon`, `cross`, `x`, `star`, `cloud`, and `callout`.
+`diamond`, `hexagon`, `cross`, `x`, `star`, `cloud`, `callout`, and `arc`.
 `fill` controls the background, `stroke` controls the outline, and `stroke-width` controls
 its width. `stroke-style` may be `solid` (the default), `dash`, `dash-dot`, or
 `dotted`; dash and gap lengths scale with the line width. Eight-digit colors can make either surface partly or fully
@@ -321,6 +321,19 @@ styles are normally omitted: rectangle, theme fill and stroke colors, line
 width `2`, centered label, and no shadow. Consequently, implicit shape colors
 follow the presentation theme while explicit `fill` and `stroke` values remain
 fixed.
+
+The `arc` template is parameterized:
+
+```markdown
+::: overlay {#orbit type="shape" shape="arc" x="20" y="25" w="40" h="30" start-angle="30" end-angle="300" heads="end"}
+:::
+```
+
+`start-angle` and `end-angle` are degrees measured clockwise from the right of
+the overlay. They default to `0` and `180`. Equal angles draw a complete circle.
+`heads` may be `none` (the default), `start`, `end`, or `both`. Arc arrowheads
+use the shape's line color and width. Because an arc is an open path, `fill`
+does not affect it.
 
 ### Arrows
 

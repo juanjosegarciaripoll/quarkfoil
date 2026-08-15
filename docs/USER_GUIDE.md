@@ -144,7 +144,7 @@ Markdown source as `.section` headings.
 Hover over, focus, or click the shape button in Design mode to open its palette,
 then choose a shape icon to insert it. The palette includes rectangles,
 ellipses, a circle, diamond, hexagon, cross, X, five-pointed star, thought cloud,
-and comic callout. Its
+comic callout, and a parameterized arc. Its
 monochrome previews use the same geometry as the inserted shapes. The arrow has
 its own adjacent toolbar button because it is an endpoint-based object. Drag
 either endpoint handle to change its direction or length, and drag the line to
@@ -171,7 +171,10 @@ presentation, image, video, or generated plot.
 
 Shapes resize and move like other overlays. Their Properties include the
 template, background color, line color, line width, line style, and an optional shadow.
-Rectangle, cross, and star shapes start with a visual 1:1 aspect ratio; resizing
+Selecting the arc reveals start and end angles, measured clockwise from the
+right, and optional arrowheads at either or both ends. Equal angles make a
+complete circle.
+Rectangle, cross, star, and arc shapes start with a visual 1:1 aspect ratio; resizing
 them remains unrestricted.
 Default-valued styles are omitted from the Markdown source. Double-click a
 shape to edit its label as Markdown or LaTeX; the label is rendered

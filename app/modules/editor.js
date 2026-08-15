@@ -446,6 +446,9 @@ export class DesignEditor {
     for (const id of ["shape", "shape-stroke-width", "shape-stroke-style", "shape-shadow"]) {
       document.querySelector(`#prop-${id}`).addEventListener("change", () => this.applyShapeProperties());
     }
+    for (const id of ["arc-start-angle", "arc-end-angle", "arc-heads"]) {
+      document.querySelector(`#prop-${id}`).addEventListener("change", () => this.applyShapeProperties());
+    }
     for (const name of ["fill", "stroke"]) bindColorControl(`prop-shape-${name}`, () => this.applyShapeProperties());
     document.querySelector("#prop-attribution-keys").addEventListener("change", () => this.applyAttributionKeys());
     document.querySelector("#prop-font-size").addEventListener("input", event => this.previewFontSize(event.target.value));
@@ -738,6 +741,13 @@ export class DesignEditor {
         document.querySelector("#prop-shape-stroke-width").value = object.strokeWidth;
         document.querySelector("#prop-shape-stroke-style").value = object.strokeStyle;
         document.querySelector("#prop-shape-shadow").checked = object.shadow;
+        const arcProperties = document.querySelector("#arc-properties");
+        arcProperties.hidden = object.shape !== "arc";
+        if (object.shape === "arc") {
+          document.querySelector("#prop-arc-start-angle").value = object.shapeParameters.startAngle;
+          document.querySelector("#prop-arc-end-angle").value = object.shapeParameters.endAngle;
+          document.querySelector("#prop-arc-heads").value = object.shapeParameters.heads;
+        }
       } else if (object.type === "citation") {
         this.attributionProperties.hidden = false;
         document.querySelector("#prop-attribution-keys").value = object.attrs.values.keys || object.attrs.values.key || "";
@@ -1109,6 +1119,9 @@ export class DesignEditor {
       "stroke-width": strokeWidth === 2 ? null : strokeWidth,
       "stroke-style": document.querySelector("#prop-shape-stroke-style").value === "solid" ? null : document.querySelector("#prop-shape-stroke-style").value,
       shadow: document.querySelector("#prop-shape-shadow").checked ? "true" : null,
+      "start-angle": shape === "arc" && Number(document.querySelector("#prop-arc-start-angle").value) !== 0 ? Number(document.querySelector("#prop-arc-start-angle").value) : null,
+      "end-angle": shape === "arc" && Number(document.querySelector("#prop-arc-end-angle").value) !== 180 ? Number(document.querySelector("#prop-arc-end-angle").value) : null,
+      heads: shape === "arc" && document.querySelector("#prop-arc-heads").value !== "none" ? document.querySelector("#prop-arc-heads").value : null,
     }));
   }
 

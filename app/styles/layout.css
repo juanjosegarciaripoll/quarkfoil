@@ -347,6 +347,8 @@
   stroke-linecap: var(--shape-stroke-linecap, butt);
   stroke-linejoin: round;
 }
+.shape-arc { fill: none; }
+.shape-arrow-head { fill: var(--shape-stroke, var(--shape-default-stroke)); stroke: none; }
 .shape-label {
   position: absolute;
   z-index: 1;

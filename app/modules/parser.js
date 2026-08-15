@@ -354,6 +354,11 @@ function parseSlide(source, range, index, diagnostics) {
         strokeWidth: Number(block.attrs.values["stroke-width"] ?? 2),
         strokeStyle: block.attrs.values["stroke-style"] || "solid",
         shadow: block.attrs.values.shadow === "true",
+        shapeParameters: shape === "arc" ? {
+          startAngle: Number(block.attrs.values["start-angle"] ?? 0),
+          endAngle: Number(block.attrs.values["end-angle"] ?? 180),
+          heads: block.attrs.values.heads || "none",
+        } : null,
         arrow,
       });
     } else if (block.name === "footer") footer = { source: block.body, range: block.range };
@@ -382,6 +387,8 @@ function parseSlide(source, range, index, diagnostics) {
     if (!Number.isFinite(overlay.fontSize) || overlay.fontSize <= 0) diagnostics.push({ level: "error", slide: index + 1, message: `Overlay '${overlay.id}' has invalid font size` });
     if (!["left", "center", "right"].includes(overlay.alignment)) diagnostics.push({ level: "error", slide: index + 1, message: `Overlay '${overlay.id}' has invalid alignment` });
     if (overlay.type === "shape" && !Object.hasOwn(SHAPES, overlay.shape)) diagnostics.push({ level: "error", slide: index + 1, message: `Overlay '${overlay.id}' has unknown shape '${overlay.shape}'` });
+    if (overlay.shape === "arc" && (!overlay.shapeParameters || !Number.isFinite(overlay.shapeParameters.startAngle) || !Number.isFinite(overlay.shapeParameters.endAngle))) diagnostics.push({ level: "error", slide: index + 1, message: `Arc '${overlay.id}' has invalid angles` });
+    if (overlay.shape === "arc" && !["none", "start", "end", "both"].includes(overlay.shapeParameters?.heads)) diagnostics.push({ level: "error", slide: index + 1, message: `Arc '${overlay.id}' has invalid arrowheads` });
     if (["shape", "arrow"].includes(overlay.type) && (!Number.isFinite(overlay.strokeWidth) || overlay.strokeWidth < 0)) diagnostics.push({ level: "error", slide: index + 1, message: `Overlay '${overlay.id}' has invalid stroke width` });
     if (["shape", "arrow"].includes(overlay.type) && !["solid", "dash", "dash-dot", "dotted"].includes(overlay.strokeStyle)) diagnostics.push({ level: "error", slide: index + 1, message: `Overlay '${overlay.id}' has invalid stroke style '${overlay.strokeStyle}'` });
     if (overlay.type === "arrow" && (!overlay.arrow || [overlay.arrow.x1, overlay.arrow.y1, overlay.arrow.x2, overlay.arrow.y2].some(value => !Number.isFinite(value)))) diagnostics.push({ level: "error", slide: index + 1, message: `Arrow '${overlay.id}' has invalid endpoints` });
