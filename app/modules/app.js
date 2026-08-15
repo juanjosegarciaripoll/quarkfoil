@@ -562,8 +562,15 @@ function moveSelectedSlide(direction) {
   commitSource(moveSlide(state.deck, from, direction));
 }
 
+function rememberCurrentSlide() {
+  const url = new URL(location.href);
+  url.searchParams.set("slide", String(state.currentSlide + 1));
+  history.replaceState(history.state, "", url);
+}
+
 function onSlideChanged(event) {
   state.currentSlide = event.indexh;
+  rememberCurrentSlide();
   elements.notes.value = state.deck.slides[state.currentSlide]?.notes || "";
   syncVideoPlayback(event.currentSlide, { autoplay: state.mode === "present" });
   rebuildSlideList();

@@ -83,7 +83,8 @@ def main() -> int:
         "---\ntitle: Browser title test\n---\n\n"
         "## Browser test {.layout-1}\n\nInitial content.\n\n"
         "::: overlay {#markdown-test type=\"markdown\" x=\"55\" y=\"20\" w=\"30\" h=\"15\"}\nEditable overlay.\n:::\n\n"
-        "::: overlay {#link-test type=\"citation\" key=\"test-link\" display=\"brief\" x=\"10\" y=\"70\" w=\"40\" h=\"8\"}\n:::\n",
+        "::: overlay {#link-test type=\"citation\" key=\"test-link\" display=\"brief\" x=\"10\" y=\"70\" w=\"40\" h=\"8\"}\n:::\n\n"
+        "---\n\n## Reload position {.layout-1}\n\nSecond slide.\n",
         encoding="utf-8",
     )
     (Path(temporary.name) / "references.bib").write_text(
@@ -129,6 +130,15 @@ def main() -> int:
         WebDriverWait(driver, 30).until(
             lambda active_driver: active_driver.find_element(By.ID, "save-state").text == "Saved"
         )
+        slide_buttons = driver.find_elements(By.CSS_SELECTOR, "#slide-list li:not(.section-entry) button")
+        slide_buttons[1].click()
+        WebDriverWait(driver, 5).until(lambda active_driver: "slide=2" in active_driver.current_url)
+        driver.refresh()
+        WebDriverWait(driver, 30).until(
+            lambda active_driver: active_driver.find_element(By.CSS_SELECTOR, "#slide-list button.current").text.startswith("2.")
+        )
+        driver.find_elements(By.CSS_SELECTOR, "#slide-list li:not(.section-entry) button")[0].click()
+        WebDriverWait(driver, 5).until(lambda active_driver: "slide=1" in active_driver.current_url)
         if driver.title != "Browser title test":
             raise RuntimeError(f"Browser title does not identify the slide deck: {driver.title!r}")
         driver.find_element(By.CSS_SELECTOR, '[data-mode="source"]').click()
