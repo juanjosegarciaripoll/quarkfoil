@@ -968,6 +968,12 @@ async function browseProjectFiles(kind, select, upload, { newFile: showNew = tru
   uploadButton.hidden = !showUpload;
   uploadButton.textContent = kind === "presentation" ? "Upload" : `Upload ${labels[kind]} from computer…`;
   uploadButton.onclick = upload;
+  const onlineButton = document.querySelector("#project-file-online-icons");
+  onlineButton.hidden = kind !== "image";
+  onlineButton.onclick = () => {
+    dialog.close();
+    openOnlineIcons(select);
+  };
   const newButton = document.querySelector("#project-file-new");
   newButton.hidden = kind !== "presentation" || !showNew;
   newButton.onclick = async () => {
@@ -1031,6 +1037,58 @@ async function browseProjectFiles(kind, select, upload, { newFile: showNew = tru
     render();
     search.focus();
   } catch (error) { status.textContent = error.message; }
+}
+
+function openOnlineIcons(select) {
+  const dialog = document.querySelector("#icon-dialog");
+  const search = document.querySelector("#icon-search");
+  const button = document.querySelector("#icon-search-button");
+  const gallery = document.querySelector("#icon-gallery");
+  const status = document.querySelector("#icon-status");
+  gallery.replaceChildren();
+  status.textContent = "Material Symbols, Tabler Icons, and IconPark · imported SVGs remain local";
+  const run = async () => {
+    const query = search.value.trim();
+    if (query.length < 2) { status.textContent = "Enter at least two characters"; return; }
+    button.disabled = true;
+    status.textContent = "Searching Iconify…";
+    gallery.replaceChildren();
+    try {
+      const response = await fetch(`/api/icons/search?q=${encodeURIComponent(query)}`);
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Icon search failed");
+      gallery.replaceChildren(...result.icons.map(icon => {
+        const choice = document.createElement("button");
+        choice.type = "button";
+        choice.className = "project-image-choice";
+        choice.title = `${icon.collection}: ${icon.name}`;
+        const preview = document.createElement("img");
+        preview.alt = "";
+        preview.src = `/api/icons/svg?prefix=${encodeURIComponent(icon.prefix)}&name=${encodeURIComponent(icon.name)}`;
+        const label = document.createElement("span");
+        label.textContent = `${icon.name}\n${icon.collection}`;
+        choice.append(preview, label);
+        choice.onclick = async () => {
+          choice.disabled = true;
+          status.textContent = `Importing ${icon.name}…`;
+          try {
+            const imported = await fetch(`/api/icons/import?folder=${encodeURIComponent(figureFolder())}&prefix=${encodeURIComponent(icon.prefix)}&name=${encodeURIComponent(icon.name)}`, { method: "POST" });
+            const payload = await imported.json();
+            if (!imported.ok) throw new Error(payload.error || "Icon import failed");
+            dialog.close();
+            select(payload.path);
+          } catch (error) { status.textContent = error.message; choice.disabled = false; }
+        };
+        return choice;
+      }));
+      status.textContent = result.icons.length ? `${result.icons.length} icons found` : "No icons found";
+    } catch (error) { status.textContent = error.message; }
+    finally { button.disabled = false; }
+  };
+  button.onclick = run;
+  search.onkeydown = event => { if (event.key === "Enter" && !event.isComposing) { event.preventDefault(); run(); } };
+  dialog.showModal();
+  search.focus();
 }
 
 async function nestedFileHandle(root, path, create = false) {

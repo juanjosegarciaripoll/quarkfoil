@@ -17,6 +17,10 @@ The destination must not already exist. Quarkfoil creates it atomically and
 copies the Markdown source, referenced project images, player files, pinned
 browser libraries, fonts, and complete third-party notices.
 
+When a referenced SVG was downloaded by the online icon picker, its collection
+notice and full license text are appended to `THIRD_PARTY_LICENSES.txt`. Unused
+icon records are omitted. No attribution is rendered on the slides.
+
 The configured `assets.figures` directory and all directories listed under
 `assets.include` in the YAML preface are copied recursively. See the
 [format reference](FORMAT.md#asset-folders) for configuration and path rules.

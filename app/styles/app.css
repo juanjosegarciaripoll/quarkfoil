@@ -284,7 +284,7 @@ dialog::backdrop { background: #000a; }
 #bibliography-source { width: 100%; min-width: 0; min-height: 0; resize: none; padding: 0.7rem; color: #edf2f4; background: #111418; border: 1px solid #56616d; font: 13px/1.4 "Cascadia Mono", Consolas, monospace; }
 #bibliography-status { min-height: 1.2em; color: #b9c2ca; }
 #bibliography-status.error { color: #ff8787; }
-#project-file-dialog { width: min(900px, 92vw); max-width: 92vw; }
+#project-file-dialog, #icon-dialog { width: min(900px, 92vw); max-width: 92vw; }
 #plot-dialog { width: min(760px, 92vw); max-width: 92vw; }
 #import-dialog { width: min(520px, 92vw); max-width: 92vw; }
 .plot-dialog__form { display: grid; gap: 0.7rem; min-width: min(680px, 82vw); padding: 1rem; }
@@ -318,6 +318,8 @@ dialog::backdrop { background: #000a; }
 .project-image-choice video { width: 100%; height: 100px; object-fit: contain; background: #111; pointer-events: none; }
 .project-image-choice span { overflow: hidden; font-size: 0.76rem; text-overflow: ellipsis; white-space: nowrap; }
 #project-file-status { min-height: 1.2em; color: #b9c2ca; }
+#icon-status { min-height: 1.2em; color: #b9c2ca; }
+#icon-dialog .project-image-choice span { white-space: normal; }
 .project-file-choice--document { grid-template-rows: 100px auto; }
 .project-file-icon { display: grid; place-items: center; height: 100px; color: #17202a; background: #f6f7f8; font-size: 2rem; font-weight: 700; }
 .project-slide-choice { grid-template-rows: 100px auto; }

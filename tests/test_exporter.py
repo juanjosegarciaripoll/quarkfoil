@@ -59,6 +59,34 @@ class ExporterTests(unittest.TestCase):
         player = (output / "quarkfoil/player.js").read_text(encoding="utf-8")
         self.assertNotIn("/api/", player)
 
+    def test_imported_icon_license_is_folded_into_export_notice(self) -> None:
+        icon = self.project / "figures/icons/tabler--car.svg"
+        icon.parent.mkdir()
+        icon.write_text("<svg/>", encoding="utf-8")
+        metadata = {
+            "version": 1,
+            "icons": {
+                "figures/icons/tabler--car.svg": {
+                    "prefix": "tabler", "name": "car", "collection": "Tabler Icons", "author": "Paweł Kuna",
+                    "source": "https://github.com/tabler/tabler-icons", "license": "MIT",
+                    "license_url": "https://github.com/tabler/tabler-icons/blob/main/LICENSE",
+                },
+                "figures/icons/tabler--unused.svg": {
+                    "prefix": "tabler", "name": "unused", "collection": "Tabler Icons", "author": "Paweł Kuna",
+                    "source": "https://github.com/tabler/tabler-icons", "license": "MIT",
+                    "license_url": "https://github.com/tabler/tabler-icons/blob/main/LICENSE",
+                },
+            },
+        }
+        (icon.parent / ".quarkfoil-icons.json").write_text(__import__("json").dumps(metadata), encoding="utf-8")
+        self.deck.write_text("## Icon\n\n![](figures/icons/tabler--car.svg)\n", encoding="utf-8")
+        output = export_presentation(self.deck, self.root / "icon-site")
+        notice = (output / "THIRD_PARTY_LICENSES.txt").read_text(encoding="utf-8")
+        self.assertIn("Imported icon collection: Tabler Icons", notice)
+        self.assertIn("figures/icons/tabler--car.svg", notice)
+        self.assertIn("Copyright (c) 2020-2026 Paweł Kuna", notice)
+        self.assertNotIn("unused", notice)
+
     def test_cdn_export_uses_pinned_integrity_checked_urls(self) -> None:
         output = export_presentation(self.deck, self.root / "cdn-site", assets="cdn")
         index = (output / "index.html").read_text(encoding="utf-8")

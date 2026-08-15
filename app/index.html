@@ -300,7 +300,20 @@
       </div>
       <div id="project-file-gallery" class="project-image-gallery"></div>
       <div id="project-file-status" role="status"></div>
-      <div class="dialog-actions"><button id="project-file-new" type="button" hidden>New</button><button id="project-file-upload" type="button">Upload</button><button value="cancel">Cancel</button></div>
+      <div class="dialog-actions"><button id="project-file-new" type="button" hidden>New</button><button id="project-file-online-icons" type="button" hidden>Online icons…</button><button id="project-file-upload" type="button">Upload</button><button value="cancel">Cancel</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="icon-dialog">
+    <form method="dialog" class="project-image-dialog__form">
+      <h2>Import an open-source icon</h2>
+      <div class="project-asset-tools">
+        <input id="icon-search" type="search" placeholder="Search person, car, computer…" aria-label="Search open-source icons">
+        <button id="icon-search-button" type="button">Search</button>
+      </div>
+      <div id="icon-gallery" class="project-image-gallery"></div>
+      <div id="icon-status" role="status">Searches use Iconify only when this dialog is open.</div>
+      <div class="dialog-actions"><a href="https://iconify.design/" target="_blank" rel="noreferrer">Powered by Iconify</a><button value="cancel">Cancel</button></div>
     </form>
   </dialog>
 

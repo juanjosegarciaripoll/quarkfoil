@@ -21,6 +21,8 @@ from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+from .icons import ICON_COLLECTIONS, fetch_icon_svg, import_icon, search_icons
+
 
 PACKAGE_APP_ROOT = Path(__file__).resolve().parent / "app"
 SOURCE_APP_ROOT = Path(__file__).resolve().parents[2] / "app"
@@ -547,6 +549,26 @@ class SlideHandler(SimpleHTTPRequestHandler):
             except (OSError, ValueError) as error:
                 self._send_json({"error": str(error)}, HTTPStatus.BAD_GATEWAY)
             return
+        if parsed.path == "/api/icons/search":
+            try:
+                query = urllib.parse.parse_qs(parsed.query).get("q", [""])[0]
+                self._send_json({"icons": search_icons(query), "collections": ICON_COLLECTIONS})
+            except (OSError, UnicodeDecodeError, ValueError, json.JSONDecodeError) as error:
+                self._send_json({"error": str(error)}, HTTPStatus.BAD_GATEWAY)
+            return
+        if parsed.path == "/api/icons/svg":
+            query = urllib.parse.parse_qs(parsed.query)
+            try:
+                data = fetch_icon_svg(query.get("prefix", [""])[0], query.get("name", [""])[0])
+                self.send_response(HTTPStatus.OK)
+                self.send_header("Content-Type", "image/svg+xml; charset=utf-8")
+                self.send_header("Content-Length", str(len(data)))
+                self.send_header("Cache-Control", "private, max-age=3600")
+                self.end_headers()
+                self.wfile.write(data)
+            except (OSError, UnicodeDecodeError, ValueError) as error:
+                self._send_json({"error": str(error)}, HTTPStatus.BAD_GATEWAY)
+            return
         if parsed.path == "/api/assets":
             try:
                 query = urllib.parse.parse_qs(parsed.query)
@@ -772,6 +794,18 @@ class SlideHandler(SimpleHTTPRequestHandler):
 
     def do_POST(self) -> None:
         parsed = urllib.parse.urlsplit(self.path)
+        if parsed.path == "/api/icons/import":
+            query = urllib.parse.parse_qs(parsed.query)
+            try:
+                folder = self._project_file(query.get("folder", ["figures"])[0])
+                if folder == self.project_root:
+                    raise PermissionError("Asset folder must not be the project root")
+                with self.server.deck_write_lock:  # type: ignore[attr-defined]
+                    relative = import_icon(self.project_root, folder, query.get("prefix", [""])[0], query.get("name", [""])[0])
+                self._send_json({"ok": True, "path": relative}, HTTPStatus.CREATED)
+            except (OSError, PermissionError, UnicodeDecodeError, ValueError, json.JSONDecodeError) as error:
+                self._send_json({"error": str(error)}, HTTPStatus.BAD_GATEWAY)
+            return
         if parsed.path == "/api/open":
             try:
                 relative = urllib.parse.parse_qs(parsed.query).get("path", [""])[0]

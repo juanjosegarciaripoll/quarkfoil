@@ -11,6 +11,7 @@ from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
 from .server import APP_ROOT, _inside
+from .icons import icon_notices
 
 
 EXPORT_FILES = {
@@ -187,7 +188,7 @@ def _copy_project_assets(deck: Path, source: str, destination: Path) -> None:
         _copy_entry(asset, target)
 
 
-def _third_party_notice() -> str:
+def _third_party_notice(project: Path | None = None, references: set[str] | None = None) -> str:
     inventory = APP_ROOT.parent / "THIRD_PARTY_LICENSES.md"
     sections = [inventory.read_text(encoding="utf-8").rstrip()] if inventory.is_file() else []
     for label, relative in (
@@ -198,6 +199,28 @@ def _third_party_notice() -> str:
         ("bibtexParseJs", "vendor/bibtex/LICENSE"),
     ):
         sections.append(f"# {label}\n\n{(APP_ROOT / relative).read_text(encoding='utf-8').rstrip()}")
+    if project is not None and references is not None:
+        imported = icon_notices(project, references)
+        used_licenses = set()
+        collections: dict[str, list[dict[str, str]]] = {}
+        for notice in imported:
+            collections.setdefault(notice.get("prefix", "unknown"), []).append(notice)
+        for notices in collections.values():
+            notice = notices[0]
+            files = "\n".join(f"- {item.get('path', item.get('name', 'Unknown icon'))}" for item in notices)
+            sections.append(
+                f"# Imported icon collection: {notice.get('collection', notice.get('prefix', 'Unknown'))}\n\n"
+                f"Author: {notice.get('author', 'Unknown')}\n\n"
+                f"Source: {notice.get('source', '')}\n\n"
+                f"License: {notice.get('license', 'Unknown')} ({notice.get('license_url', '')})\n\n"
+                f"Referenced imported SVG files:\n\n{files}\n\n"
+                "These SVGs are redistributed as unmodified image resources."
+            )
+            used_licenses.add(notice.get("license"))
+        license_root = Path(__file__).resolve().parent / "icon_licenses"
+        for identifier, filename in (("Apache-2.0", "Apache-2.0.txt"), ("MIT", "Tabler-MIT.txt")):
+            if identifier in used_licenses:
+                sections.append(f"# {identifier} license for imported icons\n\n{(license_root / filename).read_text(encoding='utf-8').rstrip()}")
     return "\n\n---\n\n".join(sections) + "\n"
 
 
@@ -291,7 +314,9 @@ def export_presentation(deck: Path, output: Path, *, assets: str = "local") -> P
         if assets == "local":
             for source_name, target_name in LOCAL_FILES.items():
                 _copy_entry(APP_ROOT / source_name, temporary / target_name)
-        (temporary / "THIRD_PARTY_LICENSES.txt").write_text(_third_party_notice(), encoding="utf-8")
+        (temporary / "THIRD_PARTY_LICENSES.txt").write_text(
+            _third_party_notice(resolved.parent, _asset_references(source)), encoding="utf-8"
+        )
         (temporary / "index.html").write_text(_index_html(assets), encoding="utf-8")
         os.replace(temporary, destination)
     except Exception:

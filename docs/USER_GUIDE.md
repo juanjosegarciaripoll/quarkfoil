@@ -115,12 +115,21 @@ Image-only regions and image overlays support:
 - Choose project image: select an existing image from the configured figures
   folder. Both replacement actions retain the object's position, size, fit,
   focus, and stable ID.
+- Online icons: search the allowlisted Material Symbols, Tabler Icons, and
+  IconPark collections through Iconify. Quarkfoil downloads the chosen SVG into
+  `<figures>/icons/`; presentations never depend on Iconify at viewing time.
 
 New and pasted files are copied to the presentation project's `figures/`
 directory. Repeated clipboard filenames are made unique. Undo restores content
 replaced during the current editing session. Pasting while an image is selected
 replaces that image in place; otherwise it creates a new floating image or
 fills the selected grid region.
+
+Online icon imports also update `<figures>/icons/.quarkfoil-icons.json`. This
+hidden project file records the collection, original icon name, upstream source,
+author, and SPDX license without adding attribution to a slide. Keep it with the
+project. Static export folds the applicable notices and complete license texts
+into its existing `THIRD_PARTY_LICENSES.txt`.
 
 New floating images preserve their intrinsic aspect ratio. Their initial box is
 centered and limited to 35% of the slide in its larger dimension; dropped

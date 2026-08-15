@@ -130,6 +130,8 @@ def main() -> int:
         WebDriverWait(driver, 30).until(
             lambda active_driver: active_driver.find_element(By.ID, "save-state").text == "Saved"
         )
+        if not driver.find_elements(By.ID, "project-file-online-icons") or not driver.find_elements(By.CSS_SELECTOR, "#icon-dialog #icon-gallery"):
+            raise RuntimeError("The project image picker does not expose the isolated online icon importer")
         toolbar_layout = driver.execute_script(
             "const bar=document.querySelector('.slide-sidebar-actions');"
             "const buttons=[...bar.querySelectorAll('button')].filter(button => !button.hidden);"
