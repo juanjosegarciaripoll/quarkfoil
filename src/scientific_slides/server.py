@@ -355,11 +355,33 @@ def _app_reload_token() -> str:
 def _watch_python_changes(server: ThreadingHTTPServer, stop: threading.Event, reload_requested: threading.Event) -> None:
     root = Path(__file__).resolve().parent
     baseline = _python_snapshot(root)
+    candidate = baseline
     while not stop.wait(0.5):
-        if _python_snapshot(root) != baseline:
-            reload_requested.set()
-            server.shutdown()
-            return
+        current = _python_snapshot(root)
+        if current == baseline:
+            candidate = baseline
+            continue
+        # ``uv tool install --reinstall`` temporarily removes the environment
+        # containing this process. Keep serving until the replacement package
+        # and an executable capable of starting it are both available.
+        if not current or not (Path(sys.executable).is_file() or shutil.which("quarkfoil")):
+            candidate = current
+            continue
+        if current != candidate:
+            candidate = current
+            continue
+        reload_requested.set()
+        server.shutdown()
+        return
+
+
+def _restart_executable() -> tuple[str, list[str]]:
+    if Path(sys.executable).is_file():
+        return sys.executable, [sys.executable, "-m", "scientific_slides"]
+    launcher = shutil.which("quarkfoil")
+    if launcher:
+        return launcher, [launcher]
+    raise FileNotFoundError("Quarkfoil was changed, but no replacement executable is available")
 
 
 def initialize_deck(deck: Path) -> Path:
@@ -1017,5 +1039,6 @@ def main(argv: list[str] | None = None) -> int:
         print("Quarkfoil changed; restarting…")
         environment = os.environ.copy()
         environment["QUARKFOIL_RELOADED"] = "1"
-        os.execve(sys.executable, [sys.executable, "-m", "scientific_slides", *arguments], environment)
+        executable, restart_arguments = _restart_executable()
+        os.execve(executable, [*restart_arguments, *arguments], environment)
     return 0
