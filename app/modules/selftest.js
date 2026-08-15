@@ -30,7 +30,7 @@ import {
   updateSlideNotes,
 } from "./parser.js";
 import { renderDeck, syncVideoPlayback } from "./render.js";
-import { arrowGeometry, bindRangeControl, buildShapePalette, canvasLinkTarget, canvasStartsMarquee, clipboardImageFile, deleteKey, DesignEditor, dialogDragPosition, initialImageGeometry, moveGeometryGroup, overlayPasteOffset, pageSlideIndex, projectAssetPage, rectanglesIntersect, renameClipboardImage, repeatedActivation, resolveImportDestination, storeOverlayClipboard, storedOverlayClipboard, videoFile } from "./editor.js";
+import { applyMarkdownStyle, arrowGeometry, bindRangeControl, buildShapePalette, canvasLinkTarget, canvasStartsMarquee, clipboardImageFile, deleteKey, DesignEditor, dialogDragPosition, initialImageGeometry, moveGeometryGroup, overlayPasteOffset, pageSlideIndex, projectAssetPage, rectanglesIntersect, renameClipboardImage, repeatedActivation, resolveImportDestination, storeOverlayClipboard, storedOverlayClipboard, videoFile } from "./editor.js";
 import { briefReference, formatBibliography, parseBibliography, prepareBibliography, renameBibliographyEntry, uniqueCitationKey } from "./bibliography.js";
 import { compileExpression, createPlotSvg } from "./plot.js";
 import { externalDeckAction } from "./external.js";
@@ -493,6 +493,18 @@ try {
     () => Promise.resolve({ name: "figure.svg", overwrite: true }));
   assert(overwriteDestination.name === "figure.svg" && overwriteDestination.overwrite === true, "collision imports await the editable overwrite destination");
   assert(deleteKey("Delete") && deleteKey("Del") && deleteKey("Backspace"), "Delete-key variants remove selected canvas content");
+  const markdownTextarea = document.createElement("textarea");
+  markdownTextarea.value = "format me";
+  markdownTextarea.setSelectionRange(0, 6);
+  applyMarkdownStyle(markdownTextarea, "**");
+  assert(markdownTextarea.value === "**format** me" && markdownTextarea.selectionStart === 2 && markdownTextarea.selectionEnd === 8,
+    "Markdown bold wraps the selected textarea text and retains its selection");
+  applyMarkdownStyle(markdownTextarea, "**");
+  assert(markdownTextarea.value === "format me", "repeating Markdown bold removes the surrounding markers");
+  markdownTextarea.setSelectionRange(7, 7);
+  applyMarkdownStyle(markdownTextarea, "*");
+  assert(markdownTextarea.value === "format **me" && markdownTextarea.selectionStart === 8,
+    "Markdown italic inserts paired markers and places an empty caret between them");
   assert(externalDeckAction({ knownHash: "a", diskHash: "a", dirty: false, valid: true }) === "unchanged",
     "unchanged external deck revisions require no editor action");
   assert(externalDeckAction({ knownHash: "a", diskHash: "b", dirty: false, valid: true }) === "reload",

@@ -1,6 +1,6 @@
 import { deleteSection, duplicateSlide, emptyTrash, importSlide, insertOverlay, insertSection, insertSlide, moveSection, moveSlide, normalizeDeck, parseDeck, permanentlyDeleteSlide, restoreSlide, trashSlide, updateSectionTitle, updateSlideNotes } from "./parser.js";
 import { renderDeck, syncVideoPlayback } from "./render.js";
-import { DesignEditor, pageSlideIndex, projectAssetPage, resolveImportDestination } from "./editor.js";
+import { DesignEditor, handleMarkdownShortcut, pageSlideIndex, projectAssetPage, resolveImportDestination } from "./editor.js";
 import { saveSnapshot } from "./storage.js";
 import { briefReference, formatBibliography, parseBibliography, prepareBibliography, renameBibliographyEntry, uniqueCitationKey } from "./bibliography.js";
 import { externalDeckAction, responseRevision } from "./external.js";
@@ -1531,6 +1531,8 @@ function bindUi() {
   elements.notes.addEventListener("change", updateNotes);
   elements.notesResizer.addEventListener("pointerdown", resizeNotes);
   elements.notesResizer.addEventListener("keydown", resizeNotesByKeyboard);
+  elements.source.addEventListener("keydown", handleMarkdownShortcut);
+  elements.notes.addEventListener("keydown", handleMarkdownShortcut);
   document.querySelector("#file-input").addEventListener("change", async event => {
     const file = event.target.files?.[0];
     if (!file) return;

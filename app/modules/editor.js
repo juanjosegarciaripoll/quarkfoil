@@ -39,6 +39,35 @@ export const repeatedActivation = (previous, key, time, interval = 450) => Boole
   previous && previous.key === key && time - previous.time >= 0 && time - previous.time <= interval,
 );
 export const deleteKey = key => key === "Delete" || key === "Del" || key === "Backspace";
+export function applyMarkdownStyle(textarea, marker) {
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const selected = textarea.value.slice(start, end);
+  const wrappedOutside = textarea.value.slice(start - marker.length, start) === marker
+    && textarea.value.slice(end, end + marker.length) === marker;
+  const wrappedInside = selected.startsWith(marker) && selected.endsWith(marker) && selected.length >= marker.length * 2;
+  if (wrappedOutside) {
+    textarea.setRangeText(selected, start - marker.length, end + marker.length, "select");
+    textarea.setSelectionRange(start - marker.length, end - marker.length);
+  } else if (wrappedInside) {
+    const content = selected.slice(marker.length, -marker.length);
+    textarea.setRangeText(content, start, end, "select");
+  } else {
+    textarea.setRangeText(`${marker}${selected}${marker}`, start, end, "select");
+    if (start === end) textarea.setSelectionRange(start + marker.length, start + marker.length);
+    else textarea.setSelectionRange(start + marker.length, end + marker.length);
+  }
+  textarea.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+export function handleMarkdownShortcut(event) {
+  if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey || !(event.currentTarget instanceof HTMLTextAreaElement)) return false;
+  const marker = event.key.toLowerCase() === "b" ? "**" : event.key.toLowerCase() === "i" ? "*" : null;
+  if (!marker) return false;
+  event.preventDefault();
+  applyMarkdownStyle(event.currentTarget, marker);
+  return true;
+}
 export const canvasStartsMarquee = ({ overlay, cell, title }) => !overlay && !cell && !title;
 export const canvasLinkTarget = target => target?.closest?.("a[href]") || null;
 export function buildShapePalette(target, choose) {
@@ -413,9 +442,11 @@ export class DesignEditor {
     document.querySelector("#choose-project-image").addEventListener("click", () => this.openProjectImageDialog("replace"));
     document.querySelector("#choose-project-video").addEventListener("click", () => this.openProjectVideoDialog("replace"));
     this.contentEditor.addEventListener("input", () => this.updateContentPreview());
+    this.contentEditor.addEventListener("keydown", handleMarkdownShortcut);
     this.dialog.addEventListener("keydown", event => {
       if (event.key === "Escape") {
         event.preventDefault();
+        event.stopPropagation();
         this.dialogTarget = null;
         this.dialog.close("cancel");
         return;
@@ -1605,7 +1636,9 @@ export class DesignEditor {
   }
 
   onKeyDown(event) {
-    if (!this.active() || (!this.selected && !this.selectedCell) || ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) return;
+    if (!this.active() || (!this.selected && !this.selectedCell)) return;
+    if (event.key === "Escape" && !event.target.closest("dialog[open]")) { event.preventDefault(); this.clearSelection(); return; }
+    if (["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) return;
     if (deleteKey(event.key)) { event.preventDefault(); this.remove(); return; }
     if (!this.selected) return;
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "d") { event.preventDefault(); this.duplicate(); return; }

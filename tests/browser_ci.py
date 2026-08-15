@@ -183,8 +183,21 @@ def main() -> int:
         driver.find_element(By.CSS_SELECTOR, '[data-mode="source"]').click()
         source_editor = driver.find_element(By.ID, "source-editor")
         original_source = source_editor.get_attribute("value")
+        driver.execute_script("const start=arguments[0].value.indexOf('Browser'); arguments[0].focus(); arguments[0].setSelectionRange(start, start + 7);", source_editor)
+        source_editor.send_keys(shortcut, "b")
+        if "**Browser**" not in source_editor.get_attribute("value"):
+            raise RuntimeError("Ctrl/Cmd-B did not apply Markdown bold in the Source editor")
+        source_editor.send_keys(shortcut, "b")
+        if source_editor.get_attribute("value") != original_source:
+            raise RuntimeError("Repeating Ctrl/Cmd-B did not toggle Markdown bold off")
         assert_text_undo(driver, source_editor, original_source, browser, "Source", shortcut)
         driver.find_element(By.CSS_SELECTOR, '[data-mode="design"]').click()
+        driver.execute_script(
+            "document.querySelector('.overlay-markdown').dispatchEvent(new MouseEvent('click', {bubbles:true}));"
+        )
+        driver.switch_to.active_element.send_keys(Keys.ESCAPE)
+        if driver.find_elements(By.CSS_SELECTOR, ".slide-overlay.selected-object, .slide-cell.selected-cell"):
+            raise RuntimeError("Escape did not clear the Design selection")
         driver.execute_script(
             "document.querySelector('.overlay-markdown').dispatchEvent(new MouseEvent('click', {bubbles:true}));"
         )
@@ -208,6 +221,13 @@ def main() -> int:
         if driver.switch_to.active_element != content_editor:
             raise RuntimeError("Opening the content dialog did not focus its textarea")
         original_content = content_editor.get_attribute("value")
+        driver.execute_script("arguments[0].setSelectionRange(0, 8);", content_editor)
+        content_editor.send_keys(shortcut, "i")
+        if not content_editor.get_attribute("value").startswith("*Editable*"):
+            raise RuntimeError("Ctrl/Cmd-I did not apply Markdown italic in the content editor")
+        content_editor.send_keys(shortcut, "i")
+        if content_editor.get_attribute("value") != original_content:
+            raise RuntimeError("Repeating Ctrl/Cmd-I did not toggle Markdown italic off")
         assert_text_undo(driver, content_editor, original_content, browser, "content", shortcut)
         content_editor.send_keys(Keys.ESCAPE)
         position = driver.find_element(By.ID, "prop-x")

@@ -293,8 +293,11 @@ the paper in a new tab.
 - `Ctrl+S`: save.
 - `Ctrl+Z`: undo.
 - `Ctrl+Shift+Z`: redo.
+- `Ctrl+B` / `Command+B`: toggle Markdown bold around the selection in Source,
+  content, and speaker-notes editors.
+- `Ctrl+I` / `Command+I`: toggle Markdown italic in those editors.
 - `Ctrl+Enter`: accept a content-editing dialog.
-- `Escape`: cancel a dialog or leave Present mode.
+- `Escape`: cancel a dialog, clear the Design selection, or leave Present mode.
 - `Page Up` / `Page Down`: select the previous or next slide in Design mode.
 - Arrow keys: nudge the selected overlay or group by `0.1%`.
 - `Shift` + arrow keys: nudge the selected overlay or group by `1%`.
