@@ -4,6 +4,7 @@ import {
   deleteSection,
   deleteSlide,
   duplicateSlide,
+  emptyTrash,
   importSlide,
   insertArrow,
   insertOverlay,
@@ -11,12 +12,15 @@ import {
   insertSlide,
   moveSection,
   moveSlide,
+  permanentlyDeleteSlide,
   duplicateOverlay,
   normalizeDeck,
   parseDeck,
+  restoreSlide,
   pasteOverlays,
   serializeOverlays,
   setCellContent,
+  trashSlide,
   updateBlockContent,
   updateHeadingLayout,
   updateOverlay,
@@ -626,6 +630,29 @@ try {
   let finalDeleteRejected = false;
   try { deleteSlide(deleted, 0); } catch (error) { finalDeleteRejected = /at least one slide/.test(error.message); }
   assert(finalDeleteRejected, "final slide cannot be deleted");
+  const trashedDeck = parseDeck(trashSlide(deck, 0));
+  assert(trashedDeck.items.map(item => item.kind).join(" ") === "slide section slide"
+    && trashedDeck.sections[0].isTrash && trashedDeck.slides[1].trashed && trashedDeck.slides[1].title === "First",
+  "trashing marks a slide readably and moves it beneath the final Trash section");
+  const activeOnlyFixture = document.createElement("div");
+  renderDeck(trashedDeck, activeOnlyFixture, source => source, null, { includeTrashed: false });
+  assert(activeOnlyFixture.querySelectorAll(".scientific-slide").length === 1
+    && activeOnlyFixture.querySelector(".scientific-slide").dataset.slideId === trashedDeck.slides[0].id,
+  "presentation rendering excludes trashed slides");
+  let finalActiveTrashRejected = false;
+  try { trashSlide(trashedDeck, 0); } catch (error) { finalActiveTrashRejected = /at least one active slide/.test(error.message); }
+  assert(finalActiveTrashRejected, "the final active slide cannot be trashed");
+  const restoredDeck = parseDeck(restoreSlide(trashedDeck, 1));
+  assert(restoredDeck.slides.length === 2 && restoredDeck.slides.every(slide => !slide.trashed)
+    && !restoredDeck.sections.some(section => section.isTrash) && restoredDeck.slides[1].title === "First",
+  "restoring returns a slide to the active deck and removes an empty Trash section");
+  const emptiedTrash = parseDeck(permanentlyDeleteSlide(trashedDeck, 1));
+  assert(emptiedTrash.slides.length === 1 && !emptiedTrash.sections.some(section => section.isTrash),
+    "permanent deletion removes the trashed slide and its empty Trash section");
+  const bulkEmptiedTrash = parseDeck(emptyTrash(trashedDeck));
+  assert(bulkEmptiedTrash.slides.length === 1 && !bulkEmptiedTrash.sections.some(section => section.isTrash),
+    "emptying Trash permanently removes every trashed slide and the Trash section");
+  assert(moveSlide(trashedDeck, 0, 1) === trashedDeck.source, "active slides cannot move across the Trash boundary");
   const inserted = parseDeck(insertSlide(deck, 0));
   assert(inserted.slides.length === 3 && inserted.slides[1].title === "New slide", "blank slide inserts after selection");
   assert(inserted.slides[1].layout === "1-2", "new slide copies the previous layout");

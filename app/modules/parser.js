@@ -145,6 +145,7 @@ function parseSection(source, range, index, diagnostics) {
     range,
     headingRange: { start: range.start + heading.index, end: range.start + heading.index + heading[0].replace(/\r?\n$/, "").length },
     hashes: heading[1],
+    isTrash: attrs.classes.includes("trash"),
   };
 }
 
@@ -407,6 +408,7 @@ function parseSlide(source, range, index, diagnostics) {
     titleRange,
     titleSource,
     headingAttrs,
+    trashed: headingAttrs.classes.includes("trashed"),
     layout,
     columns: parseRatio(headingAttrs.values.columns),
     rows: parseRatio(headingAttrs.values.rows),
@@ -610,9 +612,11 @@ export function insertSlide(deck, slideIndex) {
 
 export function moveSlide(deck, slideIndex, direction) {
   if (!deck.slides[slideIndex]) throw new Error("Unknown slide to move");
+  if (deck.slides[slideIndex].trashed) return deck.source;
   const position = slideItemPosition(deck, slideIndex);
   const destination = position + Math.sign(direction);
   if (destination < 0 || destination >= deck.items.length) return deck.source;
+  if (deck.items[destination].isTrash || deck.items[destination].trashed) return deck.source;
   const sources = itemSources(deck);
   [sources[position], sources[destination]] = [sources[destination], sources[position]];
   return composeItems(deck, sources);
@@ -643,6 +647,61 @@ export function deleteSlide(deck, slideIndex) {
   return composeItems(deck, deck.items.filter(item => item.kind !== "slide" || item.index !== slideIndex).map(item => item.raw));
 }
 
+function slideSourceWithClass(slide, className, enabled) {
+  const attrs = structuredClone(slide.headingAttrs);
+  attrs.classes = attrs.classes.filter(name => name !== className);
+  if (enabled) attrs.classes.push(className);
+  const hashes = slide.raw.match(/^\s*(#{1,6})/)?.[1] || "##";
+  const heading = `${hashes} ${slide.title} {${serializeAttributes(attrs)}}`;
+  return patchRange(slide.raw, slide.headingRange.start - slide.range.start, slide.headingRange.end - slide.range.start, heading);
+}
+
+function trashParts(deck, discardedIndex = null) {
+  const active = [];
+  const trashed = [];
+  for (const item of deck.items) {
+    if (item.kind === "section" && item.isTrash) continue;
+    if (item.kind === "slide" && item.index === discardedIndex) continue;
+    if (item.kind === "slide" && item.trashed) trashed.push(item.raw);
+    else active.push(item.raw);
+  }
+  return { active, trashed };
+}
+
+function composeWithTrash(deck, active, trashed) {
+  const marker = "# Trash {#quarkfoil-trash .section .trash}";
+  return composeItems(deck, trashed.length ? [...active, marker, ...trashed] : active);
+}
+
+export function trashSlide(deck, slideIndex) {
+  const slide = deck.slides[slideIndex];
+  if (!slide || slide.trashed) throw new Error("Unknown active slide to trash");
+  if (deck.slides.filter(item => !item.trashed).length === 1) throw new Error("A presentation must contain at least one active slide");
+  const { active, trashed } = trashParts(deck, slideIndex);
+  trashed.push(slideSourceWithClass(slide, "trashed", true));
+  return composeWithTrash(deck, active, trashed);
+}
+
+export function restoreSlide(deck, slideIndex) {
+  const slide = deck.slides[slideIndex];
+  if (!slide?.trashed) throw new Error("Unknown trashed slide to restore");
+  const { active, trashed } = trashParts(deck, slideIndex);
+  active.push(slideSourceWithClass(slide, "trashed", false));
+  return composeWithTrash(deck, active, trashed);
+}
+
+export function permanentlyDeleteSlide(deck, slideIndex) {
+  const slide = deck.slides[slideIndex];
+  if (!slide?.trashed) throw new Error("Only trashed slides can be permanently deleted");
+  const { active, trashed } = trashParts(deck, slideIndex);
+  return composeWithTrash(deck, active, trashed);
+}
+
+export function emptyTrash(deck) {
+  const { active } = trashParts(deck);
+  return composeWithTrash(deck, active, []);
+}
+
 export function insertSection(deck, slideIndex, title = "New section") {
   const position = slideItemPosition(deck, slideIndex);
   if (position < 0) throw new Error("Unknown slide for section insertion");
@@ -671,6 +730,7 @@ export function moveSection(deck, sectionId, direction) {
   const destination = position + Math.sign(direction);
   if (position < 0) throw new Error(`Unknown section '${sectionId}'`);
   if (destination < 0 || destination >= deck.items.length) return deck.source;
+  if (deck.sections.find(section => section.id === sectionId)?.isTrash || deck.items[destination].isTrash || deck.items[destination].trashed) return deck.source;
   const sources = itemSources(deck);
   [sources[position], sources[destination]] = [sources[destination], sources[position]];
   return composeItems(deck, sources);

@@ -141,6 +141,18 @@ Sections organize the editor only; they are not displayed during the
 presentation or static export. Their names and stable IDs remain visible in the
 Markdown source as `.section` headings.
 
+## Slide Trash
+
+The slide toolbar trashcan moves the selected slide to a collapsible Trash
+section at the end of the deck. Trashed slides remain available in Design and
+Source modes, but Present mode and static exports omit them. Select a trashed
+slide to restore it or delete it permanently. A restored slide returns to the
+end of the active deck, where it can be reordered normally. Undo can reverse
+these actions during the current editing session, and Quarkfoil will not trash
+the final active slide. Select the Trash section itself and use the trashcan to
+empty it after confirming permanent deletion. The Trash section disappears
+when it becomes empty.
+
 ## Shapes
 
 Hover over, focus, or click the shape button in Design mode to open its palette,

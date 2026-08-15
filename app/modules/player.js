@@ -28,7 +28,7 @@ async function initialize() {
     if (!bibliographyResponse.ok) throw new Error(`Bibliography returned HTTP ${bibliographyResponse.status}`);
     bibliographySource = await bibliographyResponse.text();
   }
-  renderDeck(deck, document.querySelector("#slides"), assetPath, prepareBibliography(bibliographySource, deck));
+  renderDeck(deck, document.querySelector("#slides"), assetPath, prepareBibliography(bibliographySource, deck), { includeTrashed: false });
   const reveal = new window.Reveal(document.querySelector(".reveal"), {
     controls: true,
     progress: true,

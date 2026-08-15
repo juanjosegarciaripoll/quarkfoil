@@ -245,6 +245,25 @@ markers may be collapsed, renamed, deleted, or moved in the sidebar. Moving a
 marker changes the boundary between neighboring groups; it does not reorder the
 slides themselves. Static and interactive presentations omit section markers.
 
+### Slide Trash
+
+The editor keeps discarded slides in a final, readable Trash section:
+
+```markdown
+# Trash {#quarkfoil-trash .section .trash}
+
+---
+
+## Superseded result {.layout-1 .trashed}
+```
+
+Slides carrying `.trashed` remain editable in Design and Source modes but are
+omitted from Present mode and static exports. Restoring a slide removes
+`.trashed` and places it immediately before the Trash section. When the last
+trashed slide is restored or permanently deleted, the empty Trash section is
+removed. Deleting the Trash section through the editor empties all of its
+slides after confirmation. At least one active slide must remain in every deck.
+
 ## Floating overlays
 
 ```markdown

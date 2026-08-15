@@ -139,6 +139,30 @@ def main() -> int:
         )
         driver.find_elements(By.CSS_SELECTOR, "#slide-list li:not(.section-entry) button")[0].click()
         WebDriverWait(driver, 5).until(lambda active_driver: "slide=1" in active_driver.current_url)
+        driver.find_element(By.ID, "delete-slide").click()
+        driver.switch_to.alert.accept()
+        WebDriverWait(driver, 5).until(
+            lambda active_driver: active_driver.find_element(By.CSS_SELECTOR, "#slide-list .trash-section")
+            and ".trashed" in active_driver.find_element(By.ID, "source-editor").get_attribute("value")
+        )
+        driver.find_element(By.CSS_SELECTOR, "#slide-list .trash-section .section-title").click()
+        WebDriverWait(driver, 5).until(lambda active_driver: active_driver.find_element(By.ID, "delete-slide").get_attribute("title") == "Empty Trash")
+        driver.find_element(By.ID, "delete-slide").click()
+        driver.switch_to.alert.dismiss()
+        if not driver.find_elements(By.CSS_SELECTOR, "#slide-list .trash-section"):
+            raise RuntimeError("Cancelling Empty Trash still removed its slides")
+        driver.find_element(By.CSS_SELECTOR, '[data-mode="present"]').click()
+        WebDriverWait(driver, 5).until(
+            lambda active_driver: active_driver.find_element(By.CSS_SELECTOR, '.scientific-slide[data-trashed="true"]').get_attribute("data-visibility") == "hidden"
+        )
+        driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
+        WebDriverWait(driver, 5).until(
+            lambda active_driver: active_driver.find_element(By.CSS_SELECTOR, '.scientific-slide[data-trashed="true"]').get_attribute("data-visibility") is None
+        )
+        driver.find_element(By.CSS_SELECTOR, "#slide-list .trashed-slide button").click()
+        WebDriverWait(driver, 5).until(lambda active_driver: active_driver.find_element(By.ID, "restore-slide").is_displayed())
+        driver.find_element(By.ID, "restore-slide").click()
+        WebDriverWait(driver, 5).until(lambda active_driver: not active_driver.find_elements(By.CSS_SELECTOR, "#slide-list .trash-section"))
         if driver.title != "Browser title test":
             raise RuntimeError(f"Browser title does not identify the slide deck: {driver.title!r}")
         driver.find_element(By.CSS_SELECTOR, '[data-mode="source"]').click()

@@ -299,6 +299,7 @@ function renderSlide(slide, metadata, assetResolver, bibliography) {
   section.className = `scientific-slide layout-${slide.layout} theme-${theme}`;
   section.dataset.slideIndex = String(slide.index);
   section.dataset.slideId = slide.id;
+  section.dataset.trashed = String(slide.trashed);
   section.style.setProperty("--column-a", `${slide.columns[0]}fr`);
   section.style.setProperty("--column-b", `${slide.columns[1]}fr`);
   section.style.setProperty("--row-a", `${slide.rows[0]}fr`);
@@ -385,9 +386,11 @@ function renderSlide(slide, metadata, assetResolver, bibliography) {
   return section;
 }
 
-export function renderDeck(deck, target, assetResolver = source => `/project/${safeAssetPath(source)}`, bibliography = null) {
+export function renderDeck(deck, target, assetResolver = source => `/project/${safeAssetPath(source)}`, bibliography = null, { includeTrashed = true } = {}) {
   const fragment = document.createDocumentFragment();
-  for (const slide of deck.slides) fragment.append(renderSlide(slide, deck.metadata, assetResolver, bibliography));
+  for (const slide of deck.slides) {
+    if (includeTrashed || !slide.trashed) fragment.append(renderSlide(slide, deck.metadata, assetResolver, bibliography));
+  }
   target.replaceChildren(fragment);
 }
 

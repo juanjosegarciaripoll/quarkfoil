@@ -122,7 +122,7 @@ button.active { background: #146c7e; border-color: #56cfe1; }
 .properties { overflow: auto; }
 .properties { border-left: 1px solid #3d454e; }
 .slide-sidebar ol, .slide-sidebar li { min-width: 0; max-width: 100%; }
-.slide-sidebar-actions { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.35rem; margin-bottom: 0.65rem; }
+.slide-sidebar-actions { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.35rem; margin-bottom: 0.65rem; }
 .slide-sidebar-move { display: grid; grid-template-columns: 1fr 1fr; gap: 0.35rem; margin-top: 0.65rem; }
 .slide-sidebar .slide-sidebar-actions button,
 .slide-sidebar .slide-sidebar-move button {

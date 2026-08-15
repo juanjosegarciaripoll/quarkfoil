@@ -1,4 +1,4 @@
-import { deleteSection, deleteSlide, duplicateSlide, importSlide, insertOverlay, insertSection, insertSlide, moveSection, moveSlide, normalizeDeck, parseDeck, updateSectionTitle, updateSlideNotes } from "./parser.js";
+import { deleteSection, duplicateSlide, emptyTrash, importSlide, insertOverlay, insertSection, insertSlide, moveSection, moveSlide, normalizeDeck, parseDeck, permanentlyDeleteSlide, restoreSlide, trashSlide, updateSectionTitle, updateSlideNotes } from "./parser.js";
 import { renderDeck, syncVideoPlayback } from "./render.js";
 import { DesignEditor, pageSlideIndex, projectAssetPage, resolveImportDestination } from "./editor.js";
 import { saveSnapshot } from "./storage.js";
@@ -384,6 +384,7 @@ function rebuildSlideList() {
       activeSection = item.id;
       const li = document.createElement("li");
       li.className = "section-entry";
+      li.classList.toggle("trash-section", item.isTrash);
       li.classList.toggle("section-selected", item.id === state.selectedSection);
       li.classList.toggle("contains-current", item.id === currentSection);
       const collapsed = state.collapsedSections.has(item.id);
@@ -403,25 +404,28 @@ function rebuildSlideList() {
       button.type = "button";
       button.className = "section-title";
       button.textContent = collapsed ? `${item.title} (${item.slideCount})` : item.title;
-      button.title = "Click to select; double-click to rename";
+      button.title = item.isTrash ? "Select Trash" : "Click to select; double-click to rename";
       button.addEventListener("click", () => {
         if (!requestMode(state.mode === "source" ? "design" : state.mode)) return;
         state.selectedSection = item.id;
         rebuildSlideList();
       });
-      button.addEventListener("dblclick", event => {
-        event.preventDefault();
-        renameSection(item.id);
-      });
+      if (!item.isTrash) {
+        button.addEventListener("dblclick", event => {
+          event.preventDefault();
+          renameSection(item.id);
+        });
+      }
       li.append(collapse, button);
       entries.push(li);
       continue;
     }
     if (activeSection && state.collapsedSections.has(activeSection)) continue;
     const li = document.createElement("li");
+    li.classList.toggle("trashed-slide", item.trashed);
     const button = document.createElement("button");
     button.type = "button";
-    button.textContent = `${item.index + 1}. ${item.title || "Untitled"}`;
+    button.textContent = `${item.trashed ? "↺" : `${item.index + 1}.`} ${item.title || "Untitled"}`;
     button.title = "Click to select; double-click to rename";
     button.classList.toggle("current", item.index === state.currentSlide);
     button.addEventListener("click", () => {
@@ -442,15 +446,21 @@ function rebuildSlideList() {
   }
   elements.slideList.replaceChildren(...entries);
   const selectedSection = state.deck.sections.find(section => section.id === state.selectedSection);
+  const selectedSlide = selectedSection ? null : state.deck.slides[state.currentSlide];
+  const trashed = Boolean(selectedSlide?.trashed);
+  const activeCount = state.deck.slides.filter(slide => !slide.trashed).length;
   const sectionPosition = selectedSection ? state.deck.items.indexOf(selectedSection) : -1;
   const slidePosition = state.deck.items.indexOf(state.deck.slides[state.currentSlide]);
-  document.querySelector("#duplicate-slide").disabled = Boolean(selectedSection) || !state.deck.slides.length;
+  for (const id of ["add-slide", "add-section", "import-slide", "duplicate-slide"]) document.querySelector(`#${id}`).disabled = Boolean(selectedSection) || trashed;
+  const restoreButton = document.querySelector("#restore-slide");
+  restoreButton.hidden = !trashed;
+  restoreButton.disabled = !trashed;
   const deleteButton = document.querySelector("#delete-slide");
-  deleteButton.disabled = !selectedSection && state.deck.slides.length <= 1;
-  deleteButton.title = selectedSection ? "Delete selected section" : "Delete selected slide";
+  deleteButton.disabled = !selectedSection && !trashed && activeCount <= 1;
+  deleteButton.title = selectedSection?.isTrash ? "Empty Trash" : selectedSection ? "Delete selected section" : trashed ? "Delete slide permanently" : "Move slide to Trash";
   deleteButton.setAttribute("aria-label", deleteButton.title);
-  document.querySelector("#move-slide-up").disabled = selectedSection ? sectionPosition <= 0 : slidePosition <= 0;
-  document.querySelector("#move-slide-down").disabled = selectedSection ? sectionPosition >= state.deck.items.length - 1 : slidePosition >= state.deck.items.length - 1;
+  document.querySelector("#move-slide-up").disabled = trashed || selectedSection?.isTrash || (selectedSection ? sectionPosition <= 0 : slidePosition <= 0);
+  document.querySelector("#move-slide-down").disabled = trashed || selectedSection?.isTrash || (selectedSection ? sectionPosition >= state.deck.items.length - 1 : slidePosition >= state.deck.items.length - 1);
 }
 
 function duplicateSelectedSlide() {
@@ -535,7 +545,15 @@ function importSlideFromPresentation() {
 function deleteSelectedSlide() {
   if (state.selectedSection) {
     const section = state.deck.sections.find(item => item.id === state.selectedSection);
-    if (!section || !confirm(`Delete section “${section.title}”? Its slides will remain.`)) return;
+    if (!section) return;
+    if (section.isTrash) {
+      const count = state.deck.slides.filter(slide => slide.trashed).length;
+      if (!confirm(`Permanently delete ${count} slide${count === 1 ? "" : "s"} from Trash? This cannot be undone after the editor is closed.`)) return;
+      state.selectedSection = null;
+      commitSource(emptyTrash(state.deck));
+      return;
+    }
+    if (!confirm(`Delete section “${section.title}”? Its slides will remain.`)) return;
     const id = state.selectedSection;
     state.selectedSection = null;
     state.collapsedSections.delete(id);
@@ -544,9 +562,24 @@ function deleteSelectedSlide() {
   }
   const index = state.currentSlide;
   const slide = state.deck.slides[index];
-  if (!slide || !confirm(`Delete slide ${index + 1}, “${slide.title || "Untitled"}”?`)) return;
-  state.currentSlide = Math.min(index, state.deck.slides.length - 2);
-  commitSource(deleteSlide(state.deck, index));
+  if (!slide) return;
+  if (slide.trashed) {
+    if (!confirm(`Permanently delete “${slide.title || "Untitled"}”? This cannot be undone after the editor is closed.`)) return;
+    const active = state.deck.slides.findIndex(item => !item.trashed);
+    state.currentSlide = Math.max(0, active);
+    commitSource(permanentlyDeleteSlide(state.deck, index));
+    return;
+  }
+  if (!confirm(`Move slide ${index + 1}, “${slide.title || "Untitled"}”, to Trash?`)) return;
+  const remaining = state.deck.slides.filter(item => !item.trashed && item.index !== index);
+  state.currentSlide = remaining[Math.min(index, remaining.length - 1)]?.index || 0;
+  commitSource(trashSlide(state.deck, index));
+}
+
+function restoreSelectedSlide() {
+  const slide = state.deck.slides[state.currentSlide];
+  if (!slide?.trashed) return;
+  commitSource(restoreSlide(state.deck, state.currentSlide));
 }
 
 function moveSelectedSlide(direction) {
@@ -626,6 +659,14 @@ function setMode(mode) {
   elements.sourcePane.hidden = mode !== "source";
   document.querySelectorAll("[data-mode]").forEach(button => button.classList.toggle("active", button.dataset.mode === mode));
   if (reveal) {
+    if (mode === "present" && state.deck.slides[state.currentSlide]?.trashed) {
+      state.currentSlide = Math.max(0, state.deck.slides.findIndex(slide => !slide.trashed));
+    }
+    document.querySelectorAll('.scientific-slide[data-trashed="true"]').forEach(slide => {
+      if (mode === "present") slide.dataset.visibility = "hidden";
+      else delete slide.dataset.visibility;
+    });
+    reveal.sync();
     syncVideoPlayback(reveal.getCurrentSlide(), { autoplay: mode === "present", pauseActive: mode !== "present" });
     reveal.configure({
       controls: mode === "present",
@@ -1542,6 +1583,7 @@ function bindUi() {
   document.querySelector("#add-section").addEventListener("click", addSectionAfterSelection);
   document.querySelector("#import-slide").addEventListener("click", importSlideFromPresentation);
   document.querySelector("#duplicate-slide").addEventListener("click", duplicateSelectedSlide);
+  document.querySelector("#restore-slide").addEventListener("click", restoreSelectedSlide);
   document.querySelector("#delete-slide").addEventListener("click", deleteSelectedSlide);
   document.querySelector("#move-slide-up").addEventListener("click", () => moveSelectedSlide(-1));
   document.querySelector("#move-slide-down").addEventListener("click", () => moveSelectedSlide(1));
