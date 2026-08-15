@@ -122,7 +122,7 @@ export function attributionKeys(overlay) {
   return [...new Set(String(value).split(/[\s,;]+/).filter(Boolean))];
 }
 
-export function prepareBibliography(source, deck) {
+export function prepareBibliography(source, deck, pdfs = {}) {
   let entries = [];
   let error = null;
   try { entries = parseBibliography(source); } catch (reason) { error = reason.message; }
@@ -143,7 +143,7 @@ export function prepareBibliography(source, deck) {
       for (const key of attributionKeys(overlay)) register(key);
     }
   }
-  return { source, entries, byKey, numbers, missing, error };
+  return { source, entries, byKey, numbers, missing, error, pdfs };
 }
 
 export function renderCitation(key, bibliography, { brief = false } = {}) {
@@ -154,5 +154,9 @@ export function renderCitation(key, bibliography, { brief = false } = {}) {
   const url = doi ? `https://doi.org/${encodeURI(doi)}` : entry.fields.url;
   const marker = `<span class="citation-number">[${number}]</span>`;
   const content = brief ? escapeHtml(briefReference(entry)) : marker;
-  return url ? `<a class="citation" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${content}</a>` : `<span class="citation">${content}</span>`;
+  const citation = url ? `<a class="citation" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${content}</a>` : `<span class="citation">${content}</span>`;
+  const pdf = brief && bibliography?.pdfs?.[key]
+    ? ` <a class="citation-pdf" href="${escapeHtml(bibliography.pdfs[key])}" target="_blank" rel="noopener noreferrer" title="Open attached PDF" aria-label="Open attached PDF for ${escapeHtml(key)}">📄</a>`
+    : "";
+  return citation + pdf;
 }

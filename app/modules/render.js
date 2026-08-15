@@ -180,6 +180,16 @@ function makeVideo(video, assetResolver) {
 
 let arrowMarkerSequence = 0;
 
+function strokePattern(style, width) {
+  const scale = Number(width) || 2;
+  const units = {
+    dash: [4, 3],
+    "dash-dot": [4, 2, 0, 2],
+    dotted: [0, 2.5],
+  }[style];
+  return units ? units.map(value => String(value * scale)).join(" ") : null;
+}
+
 function makeArrow(overlay) {
   const namespace = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(namespace, "svg");
@@ -214,7 +224,9 @@ function makeArrow(overlay) {
   for (const [name, value] of Object.entries(coordinates)) line.setAttribute(name, String(value));
   line.setAttribute("stroke", overlay.stroke || "var(--shape-default-stroke)");
   line.setAttribute("stroke-width", String(overlay.strokeWidth));
-  line.setAttribute("stroke-linecap", "butt");
+  const dashArray = strokePattern(overlay.strokeStyle, overlay.strokeWidth);
+  if (dashArray) line.setAttribute("stroke-dasharray", dashArray);
+  line.setAttribute("stroke-linecap", ["dash-dot", "dotted"].includes(overlay.strokeStyle) ? "round" : "butt");
   line.setAttribute("paint-order", "stroke markers");
   line.setAttribute("vector-effect", "non-scaling-stroke");
   if (["start", "both"].includes(arrow.heads)) line.setAttribute("marker-start", `url(#${markerId})`);
@@ -224,6 +236,8 @@ function makeArrow(overlay) {
   hitTarget.classList.add("arrow-hit");
   hitTarget.removeAttribute("marker-start");
   hitTarget.removeAttribute("marker-end");
+  hitTarget.removeAttribute("stroke-dasharray");
+  hitTarget.setAttribute("stroke-linecap", "round");
   hitTarget.setAttribute("stroke", "transparent");
   hitTarget.setAttribute("stroke-width", "12");
   hitTarget.setAttribute("pointer-events", "stroke");
@@ -241,6 +255,8 @@ function fillContent(container, item, assetResolver, bibliography, preserveLines
     if (item.fill) container.style.setProperty("--shape-fill", item.fill);
     if (item.stroke) container.style.setProperty("--shape-stroke", item.stroke);
     container.style.setProperty("--shape-stroke-width", String(item.strokeWidth));
+    container.style.setProperty("--shape-stroke-dasharray", strokePattern(item.strokeStyle, item.strokeWidth) || "none");
+    container.style.setProperty("--shape-stroke-linecap", ["dash-dot", "dotted"].includes(item.strokeStyle) ? "round" : "butt");
     const [top, right, bottom, left] = shapeLabelInsets(item.shape);
     container.style.setProperty("--shape-label-top", `${top}%`);
     container.style.setProperty("--shape-label-right", `${right}%`);

@@ -302,7 +302,7 @@ Shape overlays use trusted, scalable SVG templates with Markdown or KaTeX
 content rendered as a separate label:
 
 ```markdown
-::: overlay {#idea type="shape" shape="cloud" x="12" y="24" w="30" h="22" fill="#fff3bf" stroke="#e67700" stroke-width="2" align="center"}
+::: overlay {#idea type="shape" shape="cloud" x="12" y="24" w="30" h="22" fill="#fff3bf" stroke="#e67700" stroke-width="2" stroke-style="dash" align="center"}
 \[
 E = mc^2
 \]
@@ -310,9 +310,10 @@ E = mc^2
 ```
 
 The available shapes are `rectangle`, `rounded-rectangle`, `ellipse`, `circle`,
-`diamond`, `hexagon`, `cloud`, and `callout`.
+`diamond`, `hexagon`, `cross`, `x`, `star`, `cloud`, and `callout`.
 `fill` controls the background, `stroke` controls the outline, and `stroke-width` controls
-its width. Eight-digit colors can make either surface partly or fully
+its width. `stroke-style` may be `solid` (the default), `dash`, `dash-dot`, or
+`dotted`; dash and gap lengths scale with the line width. Eight-digit colors can make either surface partly or fully
 transparent; for example, `fill="#fff3bf00"` removes the visible background.
 Shape geometry and labels have no implicit padding, so an overlay at
 a slide boundary reaches that boundary. Set `shadow="true"` to enable a drop shadow. Default-valued shape
@@ -327,13 +328,14 @@ Arrows are dedicated editable overlays whose endpoints are stored directly as
 slide percentages:
 
 ```markdown
-::: overlay {#flow type="arrow" x1="20" y1="30" x2="75" y2="62" heads="end" stroke="#146c7e" stroke-width="2"}
+::: overlay {#flow type="arrow" x1="20" y1="30" x2="75" y2="62" heads="end" stroke="#146c7e" stroke-width="2" stroke-style="dash-dot"}
 :::
 ```
 
 `x1`, `y1`, `x2`, and `y2` define the two endpoints. `heads` may be `end`
 (the default), `start`, `both`, or `none`. `stroke` controls the line and head
-color, while `stroke-width` controls their thickness. Arrows also support the
+color, while `stroke-width` controls their thickness. `stroke-style` accepts the
+same thickness-scaled line patterns as shapes. Arrows also support the
 common `z`, `fragment`, and `locked` attributes. Their bounding box is derived
 from the endpoints and is not serialized as `x`, `y`, `w`, and `h`. An omitted
 `stroke` follows the presentation theme.
@@ -382,4 +384,6 @@ numbers and does not affect numbering. Its `key` attribute selects one paper;
 `keys` selects multiple space-separated papers. Both are editable from the
 attribution's Design properties. Attributions have a transparent background,
 without a border or shadow, so they can be placed over other slide content.
-DOI and URL fields become links. Missing keys are shown as visible errors.
+DOI and URL fields become links. In the local editor, an attribution also shows
+a small document link when its bibliography entry has an available `file` or
+`pdf` attachment. Missing keys are shown as visible errors.

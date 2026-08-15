@@ -352,6 +352,7 @@ function parseSlide(source, range, index, diagnostics) {
         fill: block.attrs.values.fill || null,
         stroke: block.attrs.values.stroke || null,
         strokeWidth: Number(block.attrs.values["stroke-width"] ?? 2),
+        strokeStyle: block.attrs.values["stroke-style"] || "solid",
         shadow: block.attrs.values.shadow === "true",
         arrow,
       });
@@ -382,6 +383,7 @@ function parseSlide(source, range, index, diagnostics) {
     if (!["left", "center", "right"].includes(overlay.alignment)) diagnostics.push({ level: "error", slide: index + 1, message: `Overlay '${overlay.id}' has invalid alignment` });
     if (overlay.type === "shape" && !Object.hasOwn(SHAPES, overlay.shape)) diagnostics.push({ level: "error", slide: index + 1, message: `Overlay '${overlay.id}' has unknown shape '${overlay.shape}'` });
     if (["shape", "arrow"].includes(overlay.type) && (!Number.isFinite(overlay.strokeWidth) || overlay.strokeWidth < 0)) diagnostics.push({ level: "error", slide: index + 1, message: `Overlay '${overlay.id}' has invalid stroke width` });
+    if (["shape", "arrow"].includes(overlay.type) && !["solid", "dash", "dash-dot", "dotted"].includes(overlay.strokeStyle)) diagnostics.push({ level: "error", slide: index + 1, message: `Overlay '${overlay.id}' has invalid stroke style '${overlay.strokeStyle}'` });
     if (overlay.type === "arrow" && (!overlay.arrow || [overlay.arrow.x1, overlay.arrow.y1, overlay.arrow.x2, overlay.arrow.y2].some(value => !Number.isFinite(value)))) diagnostics.push({ level: "error", slide: index + 1, message: `Arrow '${overlay.id}' has invalid endpoints` });
     if (overlay.type === "arrow" && !["none", "start", "end", "both"].includes(overlay.arrow?.heads)) diagnostics.push({ level: "error", slide: index + 1, message: `Arrow '${overlay.id}' has invalid arrowheads` });
     if (overlay.type === "video" && !overlay.video?.source) diagnostics.push({ level: "error", slide: index + 1, message: `Video overlay '${overlay.id}' has no src` });

@@ -30,6 +30,7 @@ import { arrowGeometry, bindRangeControl, buildShapePalette, canvasLinkTarget, c
 import { briefReference, formatBibliography, parseBibliography, prepareBibliography, renameBibliographyEntry, uniqueCitationKey } from "./bibliography.js";
 import { compileExpression, createPlotSvg } from "./plot.js";
 import { externalDeckAction } from "./external.js";
+import { initialShapeGeometry } from "./shapes.js";
 
 const source = `---
 title: Test deck
@@ -147,11 +148,19 @@ function assertShapes() {
   const palette = document.createElement("div");
   let chosenShape = null;
   const shapeButtons = buildShapePalette(palette, shape => { chosenShape = shape; });
-  assert(shapeButtons.length === 8 && shapeButtons.every(button => button.querySelector(".shape-background .shape-surface")),
+  assert(shapeButtons.length === 11 && shapeButtons.every(button => button.querySelector(".shape-background .shape-surface")),
     "shape palette uses every insertable shape SVG as an icon");
   assert(shapeButtons.every(button => button.getAttribute("aria-label")?.startsWith("Add ")), "shape palette icons have accessible names");
   shapeButtons.find(button => button.dataset.shape === "diamond").click();
   assert(chosenShape === "diamond", "shape palette icons choose their matching insertion template");
+  for (const name of ["cross", "x", "star"]) {
+    assert(shapeButtons.find(button => button.dataset.shape === name)?.querySelector("polygon"), `${name} palette entry uses trusted polygon geometry`);
+  }
+  for (const name of ["rectangle", "cross", "star"]) {
+    const geometry = initialShapeGeometry(name);
+    assert(Math.abs(geometry.w * 1280 / 100 - geometry.h * 720 / 100) < 0.01, `${name} is inserted at a visual 1:1 aspect ratio`);
+  }
+  assert(initialShapeGeometry("x").w === 30 && initialShapeGeometry("x").h === 20, "X retains the general resizable-shape insertion geometry");
 
   const fixture = document.createElement("div");
   fixture.id = "layout-fixture";
@@ -162,7 +171,7 @@ function assertShapes() {
   document.body.append(fixture);
   const parsed = parseDeck(`## Shapes {.layout-free}
 
-::: overlay {#cloud type="shape" shape="cloud" x="5" y="5" w="25" h="20" fill="#ffeecc80" stroke="#112233" stroke-width="3" shadow="true"}
+::: overlay {#cloud type="shape" shape="cloud" x="5" y="5" w="25" h="20" fill="#ffeecc80" stroke="#112233" stroke-width="3" stroke-style="dash" shadow="true"}
 Thought
 :::
 
@@ -173,7 +182,9 @@ Thought
   slides.querySelector(".scientific-slide").classList.add("present");
   const cloud = fixture.querySelector('[data-object-id="cloud"]');
   assert(parsed.slides[0].overlays[0].shape === "cloud", "shape kind parses");
-  assert(parsed.slides[0].overlays[0].fill === "#ffeecc80" && parsed.slides[0].overlays[0].strokeWidth === 3, "shape styles including alpha parse");
+  assert(parsed.slides[0].overlays[0].fill === "#ffeecc80" && parsed.slides[0].overlays[0].strokeWidth === 3
+    && parsed.slides[0].overlays[0].strokeStyle === "dash", "shape styles including alpha and line pattern parse");
+  assert(cloud.style.getPropertyValue("--shape-stroke-dasharray") === "12 9", "shape dash spacing scales with line width");
   assert(getComputedStyle(cloud.querySelector(".shape-surface")).fill.includes("0.5"), "shape color alpha renders");
   assert(parsed.slides[0].overlays[0].shadow && cloud.dataset.shadow === "true", "shape shadow parses and renders");
   assert(cloud.querySelector(".shape-background path") && cloud.querySelector(".shape-label").textContent.includes("Thought"), "cloud renders with a Markdown label");
@@ -196,11 +207,12 @@ function assertArrows() {
   let deck = parseDeck("## Arrows {.layout-free}\n");
   deck = parseDeck(insertArrow(deck, 0, {
     id: "flow", x1: 12, y1: 18, x2: 76, y2: 64,
-    attributes: { heads: "both", stroke: "#c92a2a", "stroke-width": 4 },
+    attributes: { heads: "both", stroke: "#c92a2a", "stroke-width": 4, "stroke-style": "dash-dot" },
   }));
   const arrow = deck.slides[0].overlays[0];
   assert(arrow.type === "arrow" && arrow.arrow.x1 === 12 && arrow.arrow.y2 === 64, "arrow endpoints parse");
-  assert(arrow.arrow.heads === "both" && arrow.stroke === "#c92a2a" && arrow.strokeWidth === 4, "arrow styles parse");
+  assert(arrow.arrow.heads === "both" && arrow.stroke === "#c92a2a" && arrow.strokeWidth === 4
+    && arrow.strokeStyle === "dash-dot", "arrow styles parse");
   assert(JSON.stringify(arrowGeometry(arrow.arrow)) === JSON.stringify({ x: 11, y: 17, w: 66, h: 48 }), "arrow endpoint geometry is derived consistently");
 
   const fixture = document.createElement("div");
@@ -214,16 +226,19 @@ function assertArrows() {
   const marker = fixture.querySelector(".arrow-svg .arrow-marker");
   assert(line && line.getAttribute("marker-start") && line.getAttribute("marker-end"), "two-headed arrow renders trusted SVG markers");
   assert(line.getAttribute("stroke") === "#c92a2a" && line.getAttribute("stroke-width") === "4", "arrow line styling renders");
+  assert(line.getAttribute("stroke-dasharray") === "16 8 0 8" && line.getAttribute("stroke-linecap") === "round",
+    "arrow dash-dot spacing scales with line width and renders round dots");
+  assert(!fixture.querySelector(".arrow-hit").hasAttribute("stroke-dasharray"), "dashed arrows retain a continuous editing hit target");
   assert(marker.getAttribute("refX") === "8" && marker.querySelector(".arrow-head").getAttribute("stroke") === "none",
     "arrow markers cover thick shafts before tapering to their tips");
-  assert(line.getAttribute("stroke-linecap") === "butt" && line.getAttribute("paint-order") === "stroke markers",
-    "arrow shafts stop cleanly beneath SVG markers painted on top");
+  assert(line.getAttribute("paint-order") === "stroke markers", "arrow shafts paint beneath SVG markers");
   assert(line.getAttribute("x1") === "12" && line.getAttribute("y2") === "64", "arrow SVG retains full-slide coordinates instead of squashing its endpoints");
   assert(getComputedStyle(fixture.querySelector(".arrow-hit")).pointerEvents === "stroke", "arrow editing hit target follows the line rather than its bounding box");
   fixture.remove();
 
-  deck = parseDeck(updateOverlay(deck, 0, "flow", { x2: 82, y2: 40, heads: "start", stroke: "#146c7e" }));
-  assert(deck.slides[0].overlays[0].arrow.x2 === 82 && deck.slides[0].overlays[0].arrow.heads === "start", "arrow endpoint and head changes serialize");
+  deck = parseDeck(updateOverlay(deck, 0, "flow", { x2: 82, y2: 40, heads: "start", stroke: "#146c7e", "stroke-style": "dotted" }));
+  assert(deck.slides[0].overlays[0].arrow.x2 === 82 && deck.slides[0].overlays[0].arrow.heads === "start"
+    && deck.slides[0].overlays[0].strokeStyle === "dotted", "arrow endpoint, head, and line-style changes serialize");
   const duplicated = parseDeck(duplicateOverlay(deck, 0, "flow", "flow-copy"));
   const copy = duplicated.slides[0].overlays.find(item => item.id === "flow-copy");
   assert(copy.arrow.x1 === 14 && copy.arrow.x2 === 84 && !copy.attrs.values.x, "duplicated arrow offsets both endpoints without box geometry");
@@ -236,7 +251,7 @@ function assertCitations() {
   const slides = document.createElement("div"); slides.className = "slides"; fixture.append(slides); document.body.append(fixture);
   const parsed = parseDeck(`## References {.layout-1}\n\nInline [@einstein1905], repeated [@einstein1905], and code \`[@ignored]\`.\n\n::: overlay {#source type="citation" keys="smith2024 einstein1905" display="brief" x="50" y="80" w="45" h="8"}\n\n:::`);
   const bib = `@article{einstein1905, author={Einstein, Albert}, journal={Annalen der Physik}, volume={17}, pages={891--921}, year={1905}, doi={10.1002/test}}\n@article{smith2024, author={Smith, Alice and Jones, Bob}, journal={Physical Review Letters}, volume={132}, number={123456}, year={2024}}`;
-  const bibliography = prepareBibliography(bib, parsed);
+  const bibliography = prepareBibliography(bib, parsed, { smith2024: "/api/bibliography-pdf/test-token" });
   const doiEntry = parseBibliography("@article{wallraff2004, month={Sept}, doi={10.1038/nature02851}}")[0];
   assert(doiEntry.key === "wallraff2004" && doiEntry.fields.month === "Sept" && doiEntry.fields.doi === "10.1038/nature02851", "normalized DOI BibTeX and citation key parse");
   const accentedEntry = parseBibliography(String.raw`@article{accents, author={M{\"u}ller, J{\'o}se and Pe{\~n}a, Ana}, title={The {\AA}ngstr{\"o}m and {\AE}ther}, year={2026}}`)[0];
@@ -264,6 +279,10 @@ function assertCitations() {
   assert(fixture.querySelectorAll(".citation-number").length === 2, "only inline citations display numbers while code remains literal");
   const attribution = fixture.querySelector(".overlay-citation").textContent;
   assert(attribution.includes("Smith et al.") && attribution.includes("Einstein"), "positioned attribution renders multiple selected references");
+  const attributionPdf = fixture.querySelector(".overlay-citation .citation-pdf");
+  assert(attributionPdf?.getAttribute("href") === "/api/bibliography-pdf/test-token"
+    && attributionPdf.getAttribute("aria-label").includes("smith2024"), "attributions link attached PDFs with an accessible document marker");
+  assert(!fixture.querySelector("p .citation-pdf"), "inline numbered citations do not add PDF links");
   const attributionStyle = getComputedStyle(fixture.querySelector(".overlay-citation"));
   assert(attributionStyle.backgroundColor === "rgba(0, 0, 0, 0)" && attributionStyle.boxShadow === "none", "attributions render without a background panel");
   fixture.remove();

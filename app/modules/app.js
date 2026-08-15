@@ -318,7 +318,7 @@ function parseAndRender(source, { preserveSlide = true } = {}) {
   elements.source.value = source;
   elements.notes.value = deck.slides[state.currentSlide]?.notes || "";
   updateDirtyState();
-  state.bibliography = prepareBibliography(state.bibliographySource, deck);
+  state.bibliography = prepareBibliography(state.bibliographySource, deck, state.local ? state.bibliographyPdfs : {});
   renderDeck(deck, elements.slides, assetResolver, state.bibliography);
   rebuildSlideList();
   if (reveal) {

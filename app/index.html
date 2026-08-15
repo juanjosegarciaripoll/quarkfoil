@@ -163,6 +163,9 @@
       <form id="arrow-properties" hidden>
         <label>Line <input id="prop-arrow-stroke" type="color" value="#146c7e"></label>
         <label>Line width <input id="prop-arrow-stroke-width" type="number" min="0.25" max="30" step="0.25" value="2"></label>
+        <label>Line style
+          <select id="prop-arrow-stroke-style"><option value="solid">Solid</option><option value="dash">Dash</option><option value="dash-dot">Dash-dot</option><option value="dotted">Dotted</option></select>
+        </label>
         <label>Arrowheads
           <select id="prop-arrow-heads"><option value="end">End</option><option value="start">Start</option><option value="both">Both</option><option value="none">None</option></select>
         </label>
@@ -176,6 +179,9 @@
             <option value="circle">Circle</option>
             <option value="diamond">Diamond</option>
             <option value="hexagon">Hexagon</option>
+            <option value="cross">Cross</option>
+            <option value="x">X</option>
+            <option value="star">Five-pointed star</option>
             <option value="cloud">Cloud</option>
             <option value="callout">Comic callout</option>
           </select>
@@ -183,6 +189,9 @@
         <label>Background <span class="color-with-alpha"><input id="prop-shape-fill" type="color" value="#dbeff2"><span class="alpha-symbol" aria-hidden="true">α</span><input id="prop-shape-fill-alpha" type="number" min="0" max="100" value="100" title="Background opacity percent" aria-label="Background opacity percent"></span></label>
         <label>Line <span class="color-with-alpha"><input id="prop-shape-stroke" type="color" value="#146c7e"><span class="alpha-symbol" aria-hidden="true">α</span><input id="prop-shape-stroke-alpha" type="number" min="0" max="100" value="100" title="Line opacity percent" aria-label="Line opacity percent"></span></label>
         <label>Line width <input id="prop-shape-stroke-width" type="number" min="0" max="20" step="0.5" value="2"></label>
+        <label>Line style
+          <select id="prop-shape-stroke-style"><option value="solid">Solid</option><option value="dash">Dash</option><option value="dash-dot">Dash-dot</option><option value="dotted">Dotted</option></select>
+        </label>
         <label class="check"><input id="prop-shape-shadow" type="checkbox"> Shadow</label>
       </form>
       <form id="attribution-properties" hidden>

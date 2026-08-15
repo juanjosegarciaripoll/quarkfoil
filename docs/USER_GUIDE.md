@@ -143,12 +143,14 @@ Markdown source as `.section` headings.
 
 Hover over, focus, or click the shape button in Design mode to open its palette,
 then choose a shape icon to insert it. The palette includes rectangles,
-ellipses, a circle, diamond, hexagon, thought cloud, and comic callout. Its
+ellipses, a circle, diamond, hexagon, cross, X, five-pointed star, thought cloud,
+and comic callout. Its
 monochrome previews use the same geometry as the inserted shapes. The arrow has
 its own adjacent toolbar button because it is an endpoint-based object. Drag
 either endpoint handle to change its direction or length, and drag the line to
-move the whole arrow. Its Properties select the line color and width and whether the start,
-end, both, or neither endpoint has an arrowhead. Use the
+move the whole arrow. Its Properties select the line color, width, and solid,
+dash, dash-dot, or dotted style, plus whether the start, end, both, or neither
+endpoint has an arrowhead. Use the
 plot tool to create spline-interpolated SVG graphs from mathematical expressions.
 
 The plot dialog accepts a JavaScript-style expression in the independent variable
@@ -168,7 +170,9 @@ cancel the import, or explicitly enable overwrite when replacing an existing
 presentation, image, video, or generated plot.
 
 Shapes resize and move like other overlays. Their Properties include the
-template, background color, line color, line width, and an optional shadow.
+template, background color, line color, line width, line style, and an optional shadow.
+Rectangle, cross, and star shapes start with a visual 1:1 aspect ratio; resizing
+them remains unrestricted.
 Default-valued styles are omitted from the Markdown source. Double-click a
 shape to edit its label as Markdown or LaTeX; the label is rendered
 independently of the SVG background so equations use the same KaTeX renderer as
@@ -263,7 +267,9 @@ shows a **PDF** button. Relative paths are resolved beside the bibliography.
 Absolute paths are supported as well, including PDFs outside the presentation
 directory. Quarkfoil exposes those files only through unguessable links derived
 from the bibliography; ordinary project URLs remain confined to the selected
-presentation directory.
+presentation directory. Brief attributions on slides show a small document
+marker after the reference when an attached PDF is available; select it to open
+the paper in a new tab.
 
 ## Keyboard shortcuts
 

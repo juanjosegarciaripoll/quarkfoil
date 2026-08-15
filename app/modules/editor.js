@@ -16,7 +16,7 @@ import {
 } from "./parser.js";
 import { renderMarkdownPreview } from "./render.js";
 import { createPlotSvg } from "./plot.js";
-import { makeShapeSvg, SHAPES } from "./shapes.js";
+import { initialShapeGeometry, makeShapeSvg, SHAPES } from "./shapes.js";
 
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
 const round = value => Math.round(value * 10) / 10;
@@ -387,7 +387,7 @@ export class DesignEditor {
       });
     }
     document.querySelector("#prop-plot-stroke-width").addEventListener("change", () => this.applyPlotProperties());
-    for (const id of ["prop-arrow-stroke-width", "prop-arrow-heads"]) {
+    for (const id of ["prop-arrow-stroke-width", "prop-arrow-stroke-style", "prop-arrow-heads"]) {
       document.querySelector(`#${id}`).addEventListener("change", () => this.applyArrowProperties());
     }
     document.querySelector("#prop-arrow-stroke").addEventListener("change", () => this.applyArrowProperties());
@@ -443,7 +443,7 @@ export class DesignEditor {
     for (const id of ["video-fit", "video-controls", "video-autoplay", "video-loop", "video-muted", "video-poster"]) {
       document.querySelector(`#prop-${id}`).addEventListener("change", () => this.applyVideoProperties());
     }
-    for (const id of ["shape", "shape-stroke-width", "shape-shadow"]) {
+    for (const id of ["shape", "shape-stroke-width", "shape-stroke-style", "shape-shadow"]) {
       document.querySelector(`#prop-${id}`).addEventListener("change", () => this.applyShapeProperties());
     }
     for (const name of ["fill", "stroke"]) bindColorControl(`prop-shape-${name}`, () => this.applyShapeProperties());
@@ -726,6 +726,7 @@ export class DesignEditor {
       this.arrowProperties.hidden = false;
       document.querySelector("#prop-arrow-stroke").value = colorInputValue(getComputedStyle(element.querySelector(".arrow-line")).stroke) || "#146c7e";
       document.querySelector("#prop-arrow-stroke-width").value = object.strokeWidth;
+      document.querySelector("#prop-arrow-stroke-style").value = object.strokeStyle;
       document.querySelector("#prop-arrow-heads").value = object.arrow.heads;
     } else {
       if (object.type === "shape") {
@@ -735,6 +736,7 @@ export class DesignEditor {
         setColorControl("prop-shape-fill", surfaceStyle.fill, "#dbeff2");
         setColorControl("prop-shape-stroke", surfaceStyle.stroke, "#146c7e");
         document.querySelector("#prop-shape-stroke-width").value = object.strokeWidth;
+        document.querySelector("#prop-shape-stroke-style").value = object.strokeStyle;
         document.querySelector("#prop-shape-shadow").checked = object.shadow;
       } else if (object.type === "citation") {
         this.attributionProperties.hidden = false;
@@ -1105,6 +1107,7 @@ export class DesignEditor {
       fill: fill === defaultFill ? null : fill,
       stroke: stroke === defaultStroke ? null : stroke,
       "stroke-width": strokeWidth === 2 ? null : strokeWidth,
+      "stroke-style": document.querySelector("#prop-shape-stroke-style").value === "solid" ? null : document.querySelector("#prop-shape-stroke-style").value,
       shadow: document.querySelector("#prop-shape-shadow").checked ? "true" : null,
     }));
   }
@@ -1117,6 +1120,7 @@ export class DesignEditor {
     this.commit(updateOverlay(this.options.getDeck(), this.slideIndex(), this.selected.dataset.objectId, {
       stroke: stroke === defaultStroke ? null : stroke,
       "stroke-width": strokeWidth === 2 ? null : strokeWidth,
+      "stroke-style": document.querySelector("#prop-arrow-stroke-style").value === "solid" ? null : document.querySelector("#prop-arrow-stroke-style").value,
       heads: document.querySelector("#prop-arrow-heads").value === "end" ? null : document.querySelector("#prop-arrow-heads").value,
     }));
   }
@@ -1195,14 +1199,12 @@ export class DesignEditor {
     }
     const id = this.uniqueId(`${shape}-${this.slideIndex() + 1}`);
     const content = "Editable **label**";
+    const geometry = initialShapeGeometry(shape);
     this.commit(insertOverlay(this.options.getDeck(), this.slideIndex(), {
       type: "shape",
       content,
       id,
-      x: 35,
-      y: 35,
-      w: 30,
-      h: 20,
+      ...geometry,
       attributes: shape === "rectangle" ? {} : { shape },
     }));
   }
