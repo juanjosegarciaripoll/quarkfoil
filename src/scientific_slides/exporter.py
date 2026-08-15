@@ -10,8 +10,8 @@ import tempfile
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
-from .server import APP_ROOT, _inside
 from .icons import icon_notices
+from .paths import APP_ROOT, inside as _inside
 
 
 EXPORT_FILES = {

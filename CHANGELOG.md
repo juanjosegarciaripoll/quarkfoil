@@ -36,6 +36,8 @@ plot creation, and adds an offline-safe workflow for reusable open-source icons.
 
 ### Changed
 
+- Keep static export independent of the editor server: export-only commands no
+  longer load source monitoring, browser launch, or restart machinery.
 - Preserve the selected slide in the URL and restore it after a page reload.
 - Preserve existing slide content more reliably when changing layouts and allow
   slides to move naturally across section boundaries.

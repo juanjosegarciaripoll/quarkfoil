@@ -22,11 +22,9 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from .icons import ICON_COLLECTIONS, fetch_icon_svg, import_icon, search_icons
+from .paths import APP_ROOT, inside as _inside
 
 
-PACKAGE_APP_ROOT = Path(__file__).resolve().parent / "app"
-SOURCE_APP_ROOT = Path(__file__).resolve().parents[2] / "app"
-APP_ROOT = PACKAGE_APP_ROOT if PACKAGE_APP_ROOT.is_dir() else SOURCE_APP_ROOT
 MAX_WRITE_BYTES = 20 * 1024 * 1024
 MAX_ASSET_BYTES = 100 * 1024 * 1024
 MAX_VIDEO_CONVERSION_BYTES = 2 * 1024 * 1024 * 1024
@@ -233,14 +231,6 @@ def _run_video_conversion(job: VideoConversionJob) -> None:
             complete = job.status == "complete"
         if not complete:
             job.poster.unlink(missing_ok=True)
-
-
-def _inside(root: Path, candidate: Path) -> bool:
-    try:
-        candidate.resolve().relative_to(root.resolve())
-        return True
-    except ValueError:
-        return False
 
 
 def _bibtex_entries(source: str) -> list[tuple[str, str]]:
@@ -1018,24 +1008,6 @@ def fetch_doi_bibtex(value: str) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     arguments = list(sys.argv[1:] if argv is None else argv)
-    if arguments[:1] == ["export"]:
-        from .exporter import export_presentation
-
-        export_parser = argparse.ArgumentParser(
-            prog="quarkfoil export",
-            description="Export a Quarkfoil presentation as a static website",
-        )
-        export_parser.add_argument("deck", type=Path, help="Markdown presentation to export")
-        export_parser.add_argument("--output", "-o", type=Path, required=True, help="New directory to create")
-        assets = export_parser.add_mutually_exclusive_group()
-        assets.add_argument("--assets", choices=("local", "cdn"), default="local", help="Dependency source (default: local)")
-        assets.add_argument("--cdn", dest="assets", action="store_const", const="cdn", help="Use pinned jsDelivr dependencies")
-        export_args = export_parser.parse_args(arguments[1:])
-        destination = export_presentation(export_args.deck, export_args.output, assets=export_args.assets)
-        print(f"Exported Quarkfoil presentation to {destination}")
-        print(f"Serve {destination / 'index.html'} from any static web server")
-        return 0
-
     parser = argparse.ArgumentParser(description="Open a scientific Markdown presentation in Quarkfoil")
     parser.add_argument("deck", type=Path, help="Markdown presentation to open")
     parser.add_argument("--host", default="127.0.0.1", help="Address to bind (default: 127.0.0.1)")

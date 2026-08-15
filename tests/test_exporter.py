@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+import subprocess
+import sys
 from pathlib import Path
 
+from scientific_slides import main
 from scientific_slides.exporter import _asset_references, export_presentation
-from scientific_slides.server import main
 
 
 class ExporterTests(unittest.TestCase):
@@ -151,6 +153,16 @@ class ExporterTests(unittest.TestCase):
         output = self.root / "cli-site"
         result = main(["export", str(self.deck), "--output", str(output), "--cdn"])
         self.assertEqual(result, 0)
+        self.assertTrue((output / "index.html").is_file())
+
+    def test_cli_export_does_not_load_server_or_reload_monitor(self) -> None:
+        output = self.root / "isolated-cli-site"
+        script = (
+            "import sys; from scientific_slides import main; "
+            f"result=main(['export',{str(self.deck)!r},'--output',{str(output)!r}]); "
+            "assert result == 0; assert 'scientific_slides.server' not in sys.modules"
+        )
+        subprocess.run([sys.executable, "-c", script], check=True, capture_output=True, text=True)
         self.assertTrue((output / "index.html").is_file())
 
 
