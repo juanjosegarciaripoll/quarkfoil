@@ -58,7 +58,8 @@ plot creation, and adds an offline-safe workflow for reusable open-source icons.
   fragment annotation.
 - Keep shape labels vertically centered when they contain multiple paragraphs.
 - Preserve the same slide-edge insets in PDF exports as in presentation mode,
-  despite Reveal's print-specific section reset.
+  despite Reveal's print-specific section reset, and retain assets assigned to
+  negative layers when Reveal removes its normal slide transform.
 - Resolve macOS temporary-directory aliases consistently when locating
   bibliography attachments.
 - Make repeated Markdown formatting shortcuts toggle reliably in Safari.

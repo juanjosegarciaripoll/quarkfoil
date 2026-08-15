@@ -25,6 +25,7 @@
 .reveal .slides section.scientific-slide {
   box-sizing: border-box;
   height: 100%;
+  isolation: isolate;
   padding: var(--slide-padding-top) var(--slide-padding-x) var(--slide-padding-bottom);
   color: var(--slide-foreground);
   background: var(--slide-background);

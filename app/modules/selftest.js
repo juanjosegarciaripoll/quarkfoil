@@ -158,7 +158,7 @@ function assertPrintLayout() {
   slides.className = "slides";
   fixture.append(slides);
   document.body.append(fixture);
-  const parsed = parseDeck(`## Printed {.layout-1}\n\n::: core\nPrint content\n:::\n\n::: overlay {#print-overlay type="markdown" x="20" y="30" w="40" h="20"}\nOverlay\n:::`);
+  const parsed = parseDeck(`## Printed {.layout-1}\n\n::: core\nPrint content\n:::\n\n::: overlay {#print-overlay type="markdown" x="20" y="30" w="40" h="20" z="-2"}\nOverlay\n:::`);
   renderDeck(parsed, slides, source => source);
   const section = fixture.querySelector(".scientific-slide");
   section.classList.add("present");
@@ -182,6 +182,8 @@ function assertPrintLayout() {
     assert(getComputedStyle(section.querySelector(".slide-overlay")).position === expectedOverlayPosition
       && expectedOverlayPosition === "absolute" && printed.backgroundColor === expectedBackground,
     "PDF mode preserves overlays and theme surfaces");
+    assert(printed.isolation === "isolate" && section.querySelector(".slide-overlay").style.zIndex === "-2",
+      "PDF mode keeps negative overlay layers inside the slide stacking context");
   } finally {
     document.documentElement.classList.remove("reveal-print");
     fixture.remove();
