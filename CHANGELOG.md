@@ -3,7 +3,65 @@
 All notable changes to Quarkfoil are documented here. The project follows
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.4.0] - Unreleased
+
+This release strengthens day-to-day editing and recovery, expands diagram and
+plot creation, and adds an offline-safe workflow for reusable open-source icons.
+
+### Added
+
+- Move unwanted slides to a collapsible Trash section, restore them later, or
+  empty the trash with confirmation. Trashed slides remain in readable Markdown
+  but are omitted from presentations.
+- Create parameterized arc shapes with editable start and end angles and
+  optional arrowheads. New arcs start with a 1:1 aspect ratio.
+- Generate two-dimensional parametric SVG plots from separate `X(t)` and `Y(t)`
+  expressions in the existing plot dialog.
+- Apply global opacity to raster and SVG images without modifying the source
+  asset or its own alpha channel.
+- Search allowlisted Material Symbols, Tabler Icons, and IconPark collections
+  through Iconify. Imported SVGs are stored locally, reused without downloading
+  when already present, and never require a network connection during playback.
+- Track imported-icon provenance outside the slide source and merge the notices
+  and complete Apache 2.0 or MIT license text into exported
+  `THIRD_PARTY_LICENSES.txt` files.
+- Open relative, absolute, and Zotero-style bibliography PDF attachments from
+  the bibliography editor and from brief slide attributions.
+- Add cross, X, and star diagram shapes plus solid, dashed, dash-dot, and dotted
+  line styles for shapes and arrows.
+- Toggle Markdown bold and italic with `Ctrl+B`/`Command+B` and
+  `Ctrl+I`/`Command+I` in Source, content, and speaker-notes editors. Escape now
+  also clears the active Design selection.
+- Run the browser integration suite with Safari on macOS in CI.
+
+### Changed
+
+- Preserve the selected slide in the URL and restore it after a page reload.
+- Preserve existing slide content more reliably when changing layouts and allow
+  slides to move naturally across section boundaries.
+- Define label-safe regions alongside each shape's SVG geometry and support
+  centered multiline Markdown labels without changing horizontal alignment.
+- Use deck metadata for the browser-window title.
+- Keep bibliography drafts synchronized with files changed outside the editor.
+- Fit the slide-list controls and content-editing dialogs within their available
+  width and height, including compact windows.
+
+### Fixed
+
+- Keep a running Quarkfoil process alive across forced `uv tool` reinstalls by
+  waiting for installed files to stabilize and restarting through a valid
+  launcher when the original interpreter has been replaced.
+- Keep cross-window clipboard operations and textarea undo/redo isolated from
+  Quarkfoil's structural history, with consistent behavior across browsers and
+  operating systems.
+- Render Markdown fragments correctly when bold text immediately precedes a
+  fragment annotation.
+- Keep shape labels vertically centered when they contain multiple paragraphs.
+- Preserve the same slide-edge insets in PDF exports as in presentation mode,
+  despite Reveal's print-specific section reset.
+- Resolve macOS temporary-directory aliases consistently when locating
+  bibliography attachments.
+- Make repeated Markdown formatting shortcuts toggle reliably in Safari.
 
 ## [0.3.0] - 2026-08-12
 
@@ -131,7 +189,7 @@ substantially expanding visual editing and scientific-presentation support.
   static exporter, scientific layouts, image objects, equations, documentation,
   packaging, and CI workflow.
 
+[0.4.0]: https://github.com/juanjosegarciaripoll/quarkfoil/compare/v0.3.0...HEAD
 [0.3.0]: https://github.com/juanjosegarciaripoll/quarkfoil/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/juanjosegarciaripoll/quarkfoil/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/juanjosegarciaripoll/quarkfoil/releases/tag/v0.1.0
-[Unreleased]: https://github.com/juanjosegarciaripoll/quarkfoil/compare/v0.3.0...HEAD
