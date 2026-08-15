@@ -177,6 +177,8 @@ function assertShapes() {
 
 ::: overlay {#cloud type="shape" shape="cloud" x="5" y="5" w="25" h="20" fill="#ffeecc80" stroke="#112233" stroke-width="3" stroke-style="dash" shadow="true"}
 Thought
+
+Second thought
 :::
 
 ::: overlay {#callout type="shape" shape="callout" x="35" y="5" w="25" h="20"}
@@ -195,6 +197,9 @@ Thought
   assert(getComputedStyle(cloud.querySelector(".shape-surface")).fill.includes("0.5"), "shape color alpha renders");
   assert(parsed.slides[0].overlays[0].shadow && cloud.dataset.shadow === "true", "shape shadow parses and renders");
   assert(cloud.querySelector(".shape-background path") && cloud.querySelector(".shape-label").textContent.includes("Thought"), "cloud renders with a Markdown label");
+  const cloudParagraphs = cloud.querySelectorAll(".shape-label > p");
+  assert(cloudParagraphs.length === 2 && cloudParagraphs[1].getBoundingClientRect().top > cloudParagraphs[0].getBoundingClientRect().bottom,
+    "multiple shape-label paragraphs flow vertically");
   const cloudRect = cloud.getBoundingClientRect();
   const cloudLabelRect = cloud.querySelector(".shape-label").getBoundingClientRect();
   assert(Math.abs(cloudLabelRect.width / cloudRect.width - 0.76) < 0.01 && Math.abs(cloudLabelRect.height / cloudRect.height - 0.75) < 0.01,
