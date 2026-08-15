@@ -187,6 +187,7 @@ def main() -> int:
         source_editor.send_keys(shortcut, "b")
         if "**Browser**" not in source_editor.get_attribute("value"):
             raise RuntimeError("Ctrl/Cmd-B did not apply Markdown bold in the Source editor")
+        driver.execute_script("const start=arguments[0].value.indexOf('Browser'); arguments[0].setSelectionRange(start, start + 7);", source_editor)
         source_editor.send_keys(shortcut, "b")
         if source_editor.get_attribute("value") != original_source:
             raise RuntimeError("Repeating Ctrl/Cmd-B did not toggle Markdown bold off")
@@ -225,6 +226,7 @@ def main() -> int:
         content_editor.send_keys(shortcut, "i")
         if not content_editor.get_attribute("value").startswith("*Editable*"):
             raise RuntimeError("Ctrl/Cmd-I did not apply Markdown italic in the content editor")
+        driver.execute_script("arguments[0].setSelectionRange(1, 9);", content_editor)
         content_editor.send_keys(shortcut, "i")
         if content_editor.get_attribute("value") != original_content:
             raise RuntimeError("Repeating Ctrl/Cmd-I did not toggle Markdown italic off")
