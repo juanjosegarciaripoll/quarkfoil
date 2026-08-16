@@ -553,15 +553,13 @@ try {
   applyMarkdownStyle(markdownTextarea, "**");
   assert(markdownTextarea.value === "format me", "repeating Markdown bold removes the surrounding markers");
   markdownTextarea.setSelectionRange(0, 6);
-  markdownTextarea.addEventListener("keydown", handleMarkdownShortcut);
-  const commandBold = new Event("keydown", { bubbles: true, cancelable: true });
-  Object.defineProperties(commandBold, {
-    key: { value: "b" }, metaKey: { value: true }, ctrlKey: { value: false },
-    altKey: { value: false }, shiftKey: { value: false },
+  let commandBoldPrevented = false;
+  const commandBoldHandled = handleMarkdownShortcut({
+    key: "b", metaKey: true, ctrlKey: false, altKey: false, shiftKey: false,
+    currentTarget: markdownTextarea, preventDefault: () => { commandBoldPrevented = true; },
   });
-  markdownTextarea.dispatchEvent(commandBold);
-  assert(commandBold.defaultPrevented && markdownTextarea.value === "**format** me",
-    "synthetic Command-B reaches the Markdown shortcut handler in Safari-compatible tests");
+  assert(commandBoldHandled && commandBoldPrevented && markdownTextarea.value === "**format** me",
+    "Command-B invokes Markdown bold and prevents the browser default");
   applyMarkdownStyle(markdownTextarea, "**");
   markdownTextarea.setSelectionRange(7, 7);
   applyMarkdownStyle(markdownTextarea, "*");
