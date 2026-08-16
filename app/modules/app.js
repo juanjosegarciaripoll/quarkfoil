@@ -395,6 +395,7 @@ function rebuildSlideList() {
       collapse.className = "section-collapse";
       collapse.textContent = collapsed ? "▸" : "▾";
       collapse.title = collapsed ? `Expand ${item.title}` : `Collapse ${item.title}`;
+      collapse.setAttribute("aria-label", collapse.title);
       collapse.setAttribute("aria-expanded", String(!collapsed));
       collapse.addEventListener("click", event => {
         event.stopPropagation();
@@ -406,7 +407,8 @@ function rebuildSlideList() {
       button.type = "button";
       button.className = "section-title";
       button.textContent = collapsed ? `${item.title} (${item.slideCount})` : item.title;
-      button.title = item.isTrash ? "Select Trash" : "Click to select; double-click to rename";
+      button.title = button.textContent;
+      button.setAttribute("aria-label", button.textContent);
       button.addEventListener("click", () => {
         if (!requestMode(state.mode === "source" ? "design" : state.mode)) return;
         state.selectedSection = item.id;
@@ -428,7 +430,8 @@ function rebuildSlideList() {
     const button = document.createElement("button");
     button.type = "button";
     button.textContent = `${item.trashed ? "↺" : `${item.index + 1}.`} ${item.title || "Untitled"}`;
-    button.title = "Click to select; double-click to rename";
+    button.title = button.textContent;
+    button.setAttribute("aria-label", button.textContent);
     button.classList.toggle("current", item.index === state.currentSlide);
     button.addEventListener("click", () => {
       state.selectedSection = null;
