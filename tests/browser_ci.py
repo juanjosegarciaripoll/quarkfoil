@@ -72,6 +72,18 @@ def assert_text_undo(driver: webdriver.Remote, editor, original: str, browser: s
         raise RuntimeError(f"Ctrl+Z in the {context} textarea did not use native text undo")
 
 
+def send_markdown_shortcut(driver: webdriver.Remote, editor, browser: str, shortcut: str, key: str) -> None:
+    if browser == "safari":
+        driver.execute_script(
+            "arguments[0].dispatchEvent(new KeyboardEvent('keydown', "
+            "{key:arguments[1], code:'Key' + arguments[1].toUpperCase(), metaKey:true, bubbles:true, cancelable:true}));",
+            editor,
+            key,
+        )
+        return
+    editor.send_keys(shortcut, key)
+
+
 def main() -> int:
     browser = parse_args().browser
     shortcut = Keys.COMMAND if sys.platform == "darwin" else Keys.CONTROL
@@ -186,11 +198,11 @@ def main() -> int:
         source_editor = driver.find_element(By.ID, "source-editor")
         original_source = source_editor.get_attribute("value")
         driver.execute_script("const start=arguments[0].value.indexOf('Browser'); arguments[0].focus(); arguments[0].setSelectionRange(start, start + 7);", source_editor)
-        source_editor.send_keys(shortcut, "b")
+        send_markdown_shortcut(driver, source_editor, browser, shortcut, "b")
         if "**Browser**" not in source_editor.get_attribute("value"):
             raise RuntimeError("Ctrl/Cmd-B did not apply Markdown bold in the Source editor")
         driver.execute_script("const start=arguments[0].value.indexOf('Browser'); arguments[0].setSelectionRange(start, start + 7);", source_editor)
-        source_editor.send_keys(shortcut, "b")
+        send_markdown_shortcut(driver, source_editor, browser, shortcut, "b")
         if source_editor.get_attribute("value") != original_source:
             raise RuntimeError("Repeating Ctrl/Cmd-B did not toggle Markdown bold off")
         assert_text_undo(driver, source_editor, original_source, browser, "Source", shortcut)
@@ -225,11 +237,11 @@ def main() -> int:
             raise RuntimeError("Opening the content dialog did not focus its textarea")
         original_content = content_editor.get_attribute("value")
         driver.execute_script("arguments[0].setSelectionRange(0, 8);", content_editor)
-        content_editor.send_keys(shortcut, "i")
+        send_markdown_shortcut(driver, content_editor, browser, shortcut, "i")
         if not content_editor.get_attribute("value").startswith("*Editable*"):
             raise RuntimeError("Ctrl/Cmd-I did not apply Markdown italic in the content editor")
         driver.execute_script("arguments[0].setSelectionRange(1, 9);", content_editor)
-        content_editor.send_keys(shortcut, "i")
+        send_markdown_shortcut(driver, content_editor, browser, shortcut, "i")
         if content_editor.get_attribute("value") != original_content:
             raise RuntimeError("Repeating Ctrl/Cmd-I did not toggle Markdown italic off")
         assert_text_undo(driver, content_editor, original_content, browser, "content", shortcut)
