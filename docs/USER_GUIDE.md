@@ -316,6 +316,9 @@ the paper in a new tab.
 - `Ctrl+Enter`: accept a content-editing dialog.
 - `Escape`: cancel a dialog, clear the Design selection, or leave Present mode.
 - `Page Up` / `Page Down`: select the previous or next slide in Design mode.
+- `Ctrl+Home` / `Ctrl+End` (`Command+Home` / `Command+End` on macOS): select
+  the first or last slide in Design mode when focus is in the editing pane and
+  outside a text editor.
 - Arrow keys: nudge the selected overlay or group by `0.1%`.
 - `Shift` + arrow keys: nudge the selected overlay or group by `1%`.
 - `Delete`: delete a selected overlay.

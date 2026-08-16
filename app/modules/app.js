@@ -1,6 +1,6 @@
 import { deleteSection, duplicateSlide, emptyTrash, importSlide, insertOverlay, insertSection, insertSlide, moveSection, moveSlide, normalizeDeck, parseDeck, permanentlyDeleteSlide, restoreSlide, trashSlide, updateSectionTitle, updateSlideNotes } from "./parser.js";
 import { renderDeck, syncVideoPlayback } from "./render.js";
-import { DesignEditor, handleMarkdownShortcut, pageSlideIndex, projectAssetPage, resolveImportDestination } from "./editor.js";
+import { boundarySlideShortcut, DesignEditor, handleMarkdownShortcut, pageSlideIndex, projectAssetPage, resolveImportDestination } from "./editor.js";
 import { saveSnapshot } from "./storage.js";
 import { briefReference, formatBibliography, parseBibliography, prepareBibliography, renameBibliographyEntry, uniqueCitationKey } from "./bibliography.js";
 import { externalDeckAction, responseRevision } from "./external.js";
@@ -1695,7 +1695,9 @@ function bindUi() {
     if (!editing && !draftEditorOpen && undoShortcut && !event.shiftKey) { event.preventDefault(); undo(); }
     if (!editing && !draftEditorOpen && undoShortcut && event.shiftKey) { event.preventDefault(); redo(); }
     if (event.key === "Escape" && state.mode === "present") setMode("design");
-    if (state.mode === "design" && reveal && state.deck && !editing && !document.querySelector("dialog[open]") && !event.ctrlKey && !event.metaKey && !event.altKey && ["PageUp", "PageDown"].includes(event.key)) {
+    const adjacentSlideShortcut = !event.ctrlKey && !event.metaKey && ["PageUp", "PageDown"].includes(event.key);
+    const deckBoundaryShortcut = boundarySlideShortcut(event, document.querySelector("#stage"));
+    if (state.mode === "design" && reveal && state.deck && !editing && !document.querySelector("dialog[open]") && !event.altKey && (adjacentSlideShortcut || deckBoundaryShortcut)) {
       event.preventDefault();
       reveal.slide(pageSlideIndex(state.currentSlide, state.deck.slides.length, event.key));
     }

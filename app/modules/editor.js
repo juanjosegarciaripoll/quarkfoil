@@ -98,8 +98,15 @@ export const projectAssetPage = (assets, query, page, pageSize = 24) => {
 };
 
 export function pageSlideIndex(current, count, key) {
+  if (key === "Home") return 0;
+  if (key === "End") return Math.max(0, count - 1);
   const direction = key === "PageUp" ? -1 : key === "PageDown" ? 1 : 0;
   return direction ? clamp(current + direction, 0, Math.max(0, count - 1)) : current;
+}
+
+export function boundarySlideShortcut(event, editingPane) {
+  return (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey
+    && ["Home", "End"].includes(event.key) && editingPane.contains(event.target);
 }
 
 export function moveGeometryGroup(geometries, dx, dy) {

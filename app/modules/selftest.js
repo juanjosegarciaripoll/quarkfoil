@@ -30,7 +30,7 @@ import {
   updateSlideNotes,
 } from "./parser.js";
 import { renderDeck, syncVideoPlayback } from "./render.js";
-import { applyMarkdownStyle, arrowGeometry, bindRangeControl, buildShapePalette, canvasLinkTarget, canvasStartsMarquee, clipboardImageFile, deleteKey, DesignEditor, dialogDragPosition, handleMarkdownShortcut, initialImageGeometry, moveGeometryGroup, overlayPasteOffset, pageSlideIndex, projectAssetPage, rectanglesIntersect, renameClipboardImage, repeatedActivation, resolveImportDestination, storeOverlayClipboard, storedOverlayClipboard, videoFile } from "./editor.js";
+import { applyMarkdownStyle, arrowGeometry, bindRangeControl, boundarySlideShortcut, buildShapePalette, canvasLinkTarget, canvasStartsMarquee, clipboardImageFile, deleteKey, DesignEditor, dialogDragPosition, handleMarkdownShortcut, initialImageGeometry, moveGeometryGroup, overlayPasteOffset, pageSlideIndex, projectAssetPage, rectanglesIntersect, renameClipboardImage, repeatedActivation, resolveImportDestination, storeOverlayClipboard, storedOverlayClipboard, videoFile } from "./editor.js";
 import { briefReference, formatBibliography, parseBibliography, prepareBibliography, renameBibliographyEntry, uniqueCitationKey } from "./bibliography.js";
 import { compileExpression, createPlotSvg } from "./plot.js";
 import { externalDeckAction } from "./external.js";
@@ -510,6 +510,13 @@ try {
 
   assert(pageSlideIndex(2, 5, "PageUp") === 1 && pageSlideIndex(2, 5, "PageDown") === 3, "page keys navigate to adjacent editor slides");
   assert(pageSlideIndex(0, 5, "PageUp") === 0 && pageSlideIndex(4, 5, "PageDown") === 4, "page-key slide navigation stays within deck bounds");
+  assert(pageSlideIndex(2, 5, "Home") === 0 && pageSlideIndex(2, 5, "End") === 4, "home and end keys navigate to the editor deck boundaries");
+  const editingPane = document.createElement("section");
+  const editingPaneTarget = editingPane.appendChild(document.createElement("div"));
+  const sidebarTarget = document.createElement("button");
+  assert(boundarySlideShortcut({ key: "Home", ctrlKey: true, metaKey: false, altKey: false, shiftKey: false, target: editingPaneTarget }, editingPane)
+    && !boundarySlideShortcut({ key: "End", ctrlKey: true, metaKey: false, altKey: false, shiftKey: false, target: sidebarTarget }, editingPane),
+  "deck-boundary shortcuts require focus in the editing pane");
   const movedGroup = moveGeometryGroup([{ x: 5, y: 10, w: 20, h: 10 }, { x: 40, y: 30, w: 30, h: 20 }], -10, 60);
   assert(movedGroup[0].x === 0 && movedGroup[0].y === 60 && movedGroup[1].x === 35 && movedGroup[1].y === 80, "group movement preserves spacing and stays inside the slide");
   assert(rectanglesIntersect({ left: 0, top: 0, right: 20, bottom: 20 }, { left: 20, top: 10, right: 30, bottom: 30 }), "marquee selection includes objects touching its boundary");
