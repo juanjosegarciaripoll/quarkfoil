@@ -33,6 +33,10 @@ def parse_args() -> argparse.Namespace:
 def create_driver(browser: str) -> webdriver.Remote:
     if browser == "edge":
         options = webdriver.EdgeOptions()
+        # Reveal's speaker window keeps loading two presentation previews. With
+        # the default "normal" strategy EdgeDriver can block an otherwise
+        # harmless command until every nested resource finishes loading.
+        options.page_load_strategy = "eager"
         options.add_argument("--headless=new")
         options.add_argument("--disable-gpu")
         options.add_argument("--window-size=1440,1200")
@@ -79,7 +83,10 @@ def apply_markdown_format(driver: webdriver.Remote, editor, browser: str, shortc
         # here on the real application textarea so this integration test is stable.
         result = driver.execute_async_script(
             "const textarea=arguments[0], marker=arguments[1], done=arguments[arguments.length - 1];"
-            "import('./modules/editor.js').then(module => { module.applyMarkdownStyle(textarea, marker); done(null); },"
+            "const start=textarea.selectionStart, end=textarea.selectionEnd;"
+            "import('./modules/editor.js').then(module => {"
+            "textarea.focus(); textarea.setSelectionRange(start, end);"
+            "module.applyMarkdownStyle(textarea, marker); done(null); },"
             "error => done(String(error)));",
             editor,
             "**" if key == "b" else "*",
