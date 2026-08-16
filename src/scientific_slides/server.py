@@ -427,11 +427,14 @@ class SlideHandler(SimpleHTTPRequestHandler):
         return self.server.deck_path  # type: ignore[attr-defined]
 
     def end_headers(self) -> None:
+        # Reveal's notes plugin writes this pinned inline speaker-controller
+        # script into its popup; the hash avoids enabling arbitrary inline JS.
         self.send_header(
             "Content-Security-Policy",
-            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+            "default-src 'self'; script-src 'self' 'sha256-wfrJpa7dmlxqHmakgJIolYIQ+LOJmVS3HKfvdaO3GDE='; "
+            "style-src 'self' 'unsafe-inline'; "
             "img-src 'self' blob: data:; font-src 'self'; connect-src 'self'; "
-            "object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'",
+            "object-src 'none'; frame-src 'self'; base-uri 'none'; form-action 'none'",
         )
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "no-referrer")

@@ -78,6 +78,12 @@ In Design mode, edit optional speaker notes in the pane below the slide. Drag
 the divider to give the notes more or less room. Notes are stored as Markdown
 in the slide's `::: notes` block and remain available in Reveal's speaker view.
 
+The mode toolbar has two presentation controls. The screen button enters the
+ordinary single-window Present mode. The screen-and-person button enters
+Present mode and opens a synchronized speaker window with the current slide,
+next-slide preview, notes, clock, and timer. Allow the popup when prompted,
+then place the presentation and speaker windows on the desired displays.
+
 Inside a layout region, one empty line separates Markdown blocks normally.
 Additional consecutive empty lines add visible vertical space. This also works
 in positioned Markdown and shape labels without altering fenced code blocks.

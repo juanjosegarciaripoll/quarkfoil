@@ -18,7 +18,10 @@ function showError(error) {
 }
 
 async function initialize() {
-  const deckUrl = localPlayer ? "/api/deck" : "presentation.md";
+  const requestedDeck = new URLSearchParams(location.search).get("deck");
+  const deckUrl = localPlayer
+    ? `/api/deck${requestedDeck ? `?path=${encodeURIComponent(requestedDeck)}` : ""}`
+    : "presentation.md";
   const response = await fetch(deckUrl, { cache: "no-store" });
   if (!response.ok) throw new Error(`${deckUrl} returned HTTP ${response.status}`);
   const deck = parseDeck(await response.text());

@@ -149,30 +149,36 @@ def main() -> int:
             lambda active_driver: active_driver.find_element(By.ID, "save-state").text == "Saved"
         )
         editor_window = driver.current_window_handle
-        driver.find_element(By.ID, "print-button").click()
+        driver.find_element(By.ID, "presenter-button").click()
         try:
-            WebDriverWait(driver, 30).until(
+            WebDriverWait(driver, 10).until(
                 lambda active_driver: len(active_driver.window_handles) == 2
             )
         except TimeoutException as error:
-            raise RuntimeError("Editor Print / PDF did not open a new window") from error
-        print_window = next(handle for handle in driver.window_handles if handle != editor_window)
-        driver.switch_to.window(print_window)
+            raise RuntimeError(
+                f"Presenter view did not open a speaker window; status={driver.find_element(By.ID, 'save-state').text!r}; "
+                f"body={driver.find_element(By.TAG_NAME, 'body').get_attribute('class')!r}"
+            ) from error
+        speaker_window = next(handle for handle in driver.window_handles if handle != editor_window)
+        driver.switch_to.window(speaker_window)
         try:
-            WebDriverWait(driver, 30).until(
-                lambda active_driver: "/print.html?" in active_driver.current_url
-            )
-            WebDriverWait(driver, 30).until(
-                lambda active_driver: not active_driver.find_elements(By.ID, "loading")
+            WebDriverWait(driver, 10).until(
+                lambda active_driver: active_driver.title == "reveal.js - Speaker View"
             )
         except TimeoutException as error:
-            raise RuntimeError(f"Editor print window did not finish loading; URL={driver.current_url!r}") from error
-        if "/print.html?" not in driver.current_url:
-            raise RuntimeError(f"Editor print window opened an unexpected URL: {driver.current_url!r}")
-        if driver.find_elements(By.ID, "workspace"):
-            raise RuntimeError("Local PDF printing reused the editor workspace instead of the presentation-only player")
+            raise RuntimeError(
+                f"Speaker window did not initialize; URL={driver.current_url!r}; source={driver.page_source[:200]!r}"
+            ) from error
+        WebDriverWait(driver, 10).until(
+            lambda active_driver: len(active_driver.find_elements(By.CSS_SELECTOR, "iframe")) == 2
+        )
+        preview_sources = [frame.get_attribute("src") for frame in driver.find_elements(By.CSS_SELECTOR, "iframe")]
+        if not preview_sources or not all("/print.html?deck=" in source for source in preview_sources):
+            raise RuntimeError(f"Presenter previews did not use the presentation-only player: {preview_sources}")
         driver.close()
         driver.switch_to.window(editor_window)
+        WebDriverWait(driver, 5).until(lambda active_driver: active_driver.window_handles == [editor_window])
+        driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
         if not driver.find_elements(By.ID, "project-file-online-icons") or not driver.find_elements(By.CSS_SELECTOR, "#icon-dialog #icon-gallery"):
             raise RuntimeError("The project image picker does not expose the isolated online icon importer")
         toolbar_layout = driver.execute_script(

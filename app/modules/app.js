@@ -695,6 +695,16 @@ function requestMode(mode) {
   return true;
 }
 
+function requestPresenterMode() {
+  if (state.mode === "source" && elements.source.value !== state.source && !commitSource(elements.source.value)) return;
+  if (!reveal || !window.RevealNotes) {
+    showStatus("Presenter view is unavailable because the speaker-notes plugin did not load", true);
+    return;
+  }
+  reveal.triggerKey(83);
+  setMode("present");
+}
+
 function focusSourceOnCurrentSlide() {
   const slide = state.deck?.slides[state.currentSlide];
   if (!slide) return;
@@ -1594,6 +1604,7 @@ async function monitorVideoConversion(jobId) {
 
 function bindUi() {
   document.querySelectorAll("[data-mode]").forEach(button => button.addEventListener("click", () => requestMode(button.dataset.mode)));
+  document.querySelector("#presenter-button").addEventListener("click", requestPresenterMode);
   document.querySelector("#open-button").addEventListener("click", () => (state.local
     ? browseProjectFiles("presentation", path => {
       try { openProjectWindow(path); } catch (error) { showStatus(error.message, true); }
@@ -1727,6 +1738,7 @@ async function initialize() {
     maxScale: 3,
     pdfMaxPagesPerSlide: 1,
     pdfSeparateFragments: false,
+    ...(state.local ? { url: `/print.html?deck=${encodeURIComponent(state.config.deck)}` } : {}),
     plugins: window.RevealNotes ? [window.RevealNotes] : [],
   });
   await reveal.initialize();

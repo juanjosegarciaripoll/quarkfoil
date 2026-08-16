@@ -261,11 +261,14 @@ def _resource_tags(assets: str) -> tuple[str, str, str]:
 
 def _index_html(assets: str) -> str:
     styles, scripts, external = _resource_tags(assets)
+    # Reveal's notes plugin writes this pinned inline speaker-controller script
+    # into its popup; the hash avoids enabling arbitrary inline JS.
     policy = (
         "default-src 'self'; "
-        f"script-src {external}; style-src {external} 'unsafe-inline'; "
+        f"script-src {external} 'sha256-wfrJpa7dmlxqHmakgJIolYIQ+LOJmVS3HKfvdaO3GDE='; "
+        f"style-src {external} 'unsafe-inline'; "
         f"font-src {external}; img-src 'self' data:; connect-src 'self'; "
-        "object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'"
+        "object-src 'none'; frame-src 'self'; base-uri 'none'; form-action 'none'"
     )
     return f"""<!doctype html>
 <html lang="en">

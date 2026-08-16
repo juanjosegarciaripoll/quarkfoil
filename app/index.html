@@ -28,7 +28,8 @@
     <div class="toolbar__group toolbar__modes" role="group" aria-label="Mode">
       <button data-mode="source" type="button">Source</button>
       <button data-mode="design" type="button" class="active">Design</button>
-      <button data-mode="present" type="button">Present</button>
+      <button data-mode="present" class="toolbar-icon-button" type="button" title="Present" aria-label="Present"><svg class="action-svg" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="1.5"></rect><path d="M9 22h6M12 18v4"></path></svg></button>
+      <button id="presenter-button" class="toolbar-icon-button" type="button" title="Presenter view" aria-label="Presenter view"><svg class="action-svg" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="3.5" width="13" height="10" rx="1.5"></rect><path d="M6.5 17h5M9 13.5V17"></path><circle cx="19" cy="8" r="2"></circle><path d="M15.5 20v-2.5a3.5 3.5 0 0 1 7 0V20M19 13.8V20"></path></svg></button>
     </div>
     <div class="toolbar__group design-only">
       <label>Layout
@@ -367,6 +368,7 @@
   <input id="video-input" type="file" accept="video/mp4,video/webm,.avi,.mkv,video/x-msvideo,video/x-matroska" hidden>
 
   <script src="vendor/reveal/reveal.js"></script>
+  <script src="vendor/reveal/notes.js"></script>
   <script src="vendor/marked/marked.min.js"></script>
   <script src="vendor/yaml/js-yaml.min.js"></script>
   <script src="vendor/bibtex/bibtexParse.js"></script>
