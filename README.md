@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="app/assets/quarkfoil-mark.svg" alt="Quarkfoil logo" width="112">
+</p>
+
 # Quarkfoil
 
 [![CI](https://github.com/juanjosegarciaripoll/quarkfoil/actions/workflows/ci.yml/badge.svg)](https://github.com/juanjosegarciaripoll/quarkfoil/actions/workflows/ci.yml)
