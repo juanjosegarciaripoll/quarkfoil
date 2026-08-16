@@ -3,7 +3,9 @@
 All notable changes to Quarkfoil are documented here. The project follows
 [Semantic Versioning](https://semver.org/).
 
-## [0.4.0] - Unreleased
+## [Unreleased]
+
+## [0.4.0] - 2026-08-16
 
 This release strengthens day-to-day editing and recovery, expands diagram and
 plot creation, and adds an offline-safe workflow for reusable open-source icons.
@@ -192,7 +194,8 @@ substantially expanding visual editing and scientific-presentation support.
   static exporter, scientific layouts, image objects, equations, documentation,
   packaging, and CI workflow.
 
-[0.4.0]: https://github.com/juanjosegarciaripoll/quarkfoil/compare/v0.3.0...HEAD
-[0.3.0]: https://github.com/juanjosegarciaripoll/quarkfoil/compare/v0.2.0...v0.3.0
-[0.2.0]: https://github.com/juanjosegarciaripoll/quarkfoil/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/juanjosegarciaripoll/quarkfoil/releases/tag/v0.1.0
+[Unreleased]: https://github.com/juanjosegarciaripoll/quarkfoil/compare/0.4.0...HEAD
+[0.4.0]: https://github.com/juanjosegarciaripoll/quarkfoil/compare/0.3.0...0.4.0
+[0.3.0]: https://github.com/juanjosegarciaripoll/quarkfoil/compare/0.2.0...0.3.0
+[0.2.0]: https://github.com/juanjosegarciaripoll/quarkfoil/compare/0.1.0...0.2.0
+[0.1.0]: https://github.com/juanjosegarciaripoll/quarkfoil/releases/tag/0.1.0
