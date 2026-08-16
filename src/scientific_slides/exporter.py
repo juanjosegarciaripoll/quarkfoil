@@ -15,6 +15,7 @@ from .paths import APP_ROOT, inside as _inside
 
 
 EXPORT_FILES = {
+    "assets/quarkfoil-mark.svg": "quarkfoil/quarkfoil-mark.svg",
     "modules/parser.js": "quarkfoil/parser.js",
     "modules/render.js": "quarkfoil/render.js",
     "modules/shapes.js": "quarkfoil/shapes.js",
@@ -273,6 +274,7 @@ def _index_html(assets: str) -> str:
   <meta name="referrer" content="no-referrer">
   <meta http-equiv="Content-Security-Policy" content="{html.escape(policy, quote=True)}">
   <title>Quarkfoil presentation</title>
+  <link rel="icon" href="quarkfoil/quarkfoil-mark.svg" type="image/svg+xml">
 {styles}
   <link rel="stylesheet" href="quarkfoil/layout.css">
   <link rel="stylesheet" href="quarkfoil/themes.css">

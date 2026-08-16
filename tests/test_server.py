@@ -135,6 +135,9 @@ class ServerTests(unittest.TestCase):
         from scientific_slides.server import APP_ROOT
 
         self.assertTrue((APP_ROOT / "index.html").is_file())
+        self.assertTrue((APP_ROOT / "assets/quarkfoil-mark.svg").is_file())
+        self.assertTrue((APP_ROOT / "assets/favicon.ico").is_file())
+        self.assertTrue((APP_ROOT / "manifest.webmanifest").is_file())
 
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()

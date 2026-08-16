@@ -56,6 +56,8 @@ class ExporterTests(unittest.TestCase):
         self.assertTrue((output / "quarkfoil/shapes.js").is_file())
         self.assertTrue((output / "quarkfoil/layout.css").is_file())
         self.assertTrue((output / "quarkfoil/themes.css").is_file())
+        self.assertTrue((output / "quarkfoil/quarkfoil-mark.svg").is_file())
+        self.assertIn('rel="icon" href="quarkfoil/quarkfoil-mark.svg"', index)
         self.assertTrue((output / "quarkfoil/vendor/katex/fonts/KaTeX_Main-Regular.woff2").is_file())
         self.assertIn("Reveal.js", (output / "THIRD_PARTY_LICENSES.txt").read_text(encoding="utf-8"))
         player = (output / "quarkfoil/player.js").read_text(encoding="utf-8")
