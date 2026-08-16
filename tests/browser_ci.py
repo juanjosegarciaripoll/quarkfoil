@@ -74,12 +74,17 @@ def assert_text_undo(driver: webdriver.Remote, editor, original: str, browser: s
 
 def send_markdown_shortcut(driver: webdriver.Remote, editor, browser: str, shortcut: str, key: str) -> None:
     if browser == "safari":
-        driver.execute_script(
-            "arguments[0].dispatchEvent(new KeyboardEvent('keydown', "
-            "{key:arguments[1], code:'Key' + arguments[1].toUpperCase(), metaKey:true, bubbles:true, cancelable:true}));",
+        handled = driver.execute_script(
+            "const event = new Event('keydown', {bubbles:true, cancelable:true});"
+            "Object.defineProperties(event, {"
+            "key:{value:arguments[1]}, code:{value:'Key' + arguments[1].toUpperCase()}, metaKey:{value:true},"
+            "ctrlKey:{value:false}, altKey:{value:false}, shiftKey:{value:false}});"
+            "arguments[0].dispatchEvent(event); return event.defaultPrevented;",
             editor,
             key,
         )
+        if not handled:
+            raise RuntimeError(f"Synthetic Command-{key.upper()} was not handled by Quarkfoil")
         return
     editor.send_keys(shortcut, key)
 

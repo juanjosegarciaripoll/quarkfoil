@@ -30,7 +30,7 @@ import {
   updateSlideNotes,
 } from "./parser.js";
 import { renderDeck, syncVideoPlayback } from "./render.js";
-import { applyMarkdownStyle, arrowGeometry, bindRangeControl, buildShapePalette, canvasLinkTarget, canvasStartsMarquee, clipboardImageFile, deleteKey, DesignEditor, dialogDragPosition, initialImageGeometry, moveGeometryGroup, overlayPasteOffset, pageSlideIndex, projectAssetPage, rectanglesIntersect, renameClipboardImage, repeatedActivation, resolveImportDestination, storeOverlayClipboard, storedOverlayClipboard, videoFile } from "./editor.js";
+import { applyMarkdownStyle, arrowGeometry, bindRangeControl, buildShapePalette, canvasLinkTarget, canvasStartsMarquee, clipboardImageFile, deleteKey, DesignEditor, dialogDragPosition, handleMarkdownShortcut, initialImageGeometry, moveGeometryGroup, overlayPasteOffset, pageSlideIndex, projectAssetPage, rectanglesIntersect, renameClipboardImage, repeatedActivation, resolveImportDestination, storeOverlayClipboard, storedOverlayClipboard, videoFile } from "./editor.js";
 import { briefReference, formatBibliography, parseBibliography, prepareBibliography, renameBibliographyEntry, uniqueCitationKey } from "./bibliography.js";
 import { compileExpression, createPlotSvg } from "./plot.js";
 import { externalDeckAction } from "./external.js";
@@ -552,6 +552,17 @@ try {
     "Markdown bold wraps the selected textarea text and retains its selection");
   applyMarkdownStyle(markdownTextarea, "**");
   assert(markdownTextarea.value === "format me", "repeating Markdown bold removes the surrounding markers");
+  markdownTextarea.setSelectionRange(0, 6);
+  markdownTextarea.addEventListener("keydown", handleMarkdownShortcut);
+  const commandBold = new Event("keydown", { bubbles: true, cancelable: true });
+  Object.defineProperties(commandBold, {
+    key: { value: "b" }, metaKey: { value: true }, ctrlKey: { value: false },
+    altKey: { value: false }, shiftKey: { value: false },
+  });
+  markdownTextarea.dispatchEvent(commandBold);
+  assert(commandBold.defaultPrevented && markdownTextarea.value === "**format** me",
+    "synthetic Command-B reaches the Markdown shortcut handler in Safari-compatible tests");
+  applyMarkdownStyle(markdownTextarea, "**");
   markdownTextarea.setSelectionRange(7, 7);
   applyMarkdownStyle(markdownTextarea, "*");
   assert(markdownTextarea.value === "format **me" && markdownTextarea.selectionStart === 8,
