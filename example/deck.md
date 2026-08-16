@@ -154,12 +154,12 @@ Valid?
 Markdown and $\LaTeX$
 :::
 
-::: overlay {#sine-wave type="shape" shape="sine" x="42" y="57" w="21" h="18"}
-
+::: overlay {#competing-terms type="shape" shape="cross" x="42" y="57" w="21" h="18"}
+Competing terms
 :::
 
-::: overlay {#cosine-wave type="shape" shape="cosine" x="69" y="57" w="21" h="18"}
-
+::: overlay {#result type="shape" shape="star" x="69" y="57" w="21" h="18"}
+Result
 :::
 
 ---

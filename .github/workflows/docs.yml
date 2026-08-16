@@ -4,15 +4,23 @@ on:
   push:
     branches: [main]
     paths:
+      - app/**
       - docs/**
       - example/**
+      - src/**
+      - tests/static_export_ci.py
+      - THIRD_PARTY_LICENSES.md
       - mkdocs.yml
       - pyproject.toml
       - uv.lock
   pull_request:
     paths:
+      - app/**
       - docs/**
       - example/**
+      - src/**
+      - tests/static_export_ci.py
+      - THIRD_PARTY_LICENSES.md
       - mkdocs.yml
       - pyproject.toml
       - uv.lock
@@ -36,11 +44,13 @@ jobs:
         with:
           enable-cache: true
       - name: Install documentation dependencies
-        run: uv sync --frozen --group docs
+        run: uv sync --frozen --group docs --group browser
       - name: Build documentation
         run: uv run --frozen --no-sync mkdocs build --strict
       - name: Export live example
         run: uv run --frozen --no-sync quarkfoil export example/deck.md --output site/example --cdn
+      - name: Test live example export
+        run: uv run --frozen --no-sync python tests/static_export_ci.py site/example --browser firefox
       - name: Configure GitHub Pages
         if: github.event_name != 'pull_request'
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
