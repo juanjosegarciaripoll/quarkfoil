@@ -70,6 +70,7 @@ def main() -> int:
         slides = driver.find_elements(By.CSS_SELECTOR, ".slides > section")
         if not slides:
             raise RuntimeError("Static presentation rendered no slides")
+        printable_slides = len(driver.find_elements(By.CSS_SELECTOR, ".slides section.scientific-slide"))
         for index in range(1, len(slides)):
             selector = f".slides > section:nth-child({index + 1}).present"
             for _ in range(50):
@@ -83,7 +84,25 @@ def main() -> int:
                     continue
             else:
                 raise RuntimeError(f"Static presentation did not navigate to slide {index + 1}")
-        print(f"Static export loaded and navigated through {len(slides)} slides in {args.browser}")
+        driver.get(f"http://127.0.0.1:{server.server_port}/?print-pdf")
+        try:
+            WebDriverWait(driver, 30).until(
+                lambda active_driver: "reveal-print" in (
+                    active_driver.find_element(By.TAG_NAME, "html").get_attribute("class") or ""
+                ).split()
+            )
+        except TimeoutException as error:
+            raise RuntimeError("Static presentation did not enter Reveal's PDF print mode") from error
+        try:
+            WebDriverWait(driver, 30).until(
+                lambda active_driver: active_driver.find_elements(By.CSS_SELECTOR, ".pdf-page")
+            )
+        except TimeoutException as error:
+            raise RuntimeError("Static presentation did not create PDF pages") from error
+        pdf_pages = driver.find_elements(By.CSS_SELECTOR, ".pdf-page")
+        if len(pdf_pages) != printable_slides:
+            raise RuntimeError(f"Static presentation created {len(pdf_pages)} PDF pages for {printable_slides} slides")
+        print(f"Static export loaded, navigated, and created {printable_slides} PDF pages in {args.browser}")
         return 0
     finally:
         if driver is not None:

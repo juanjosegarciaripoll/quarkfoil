@@ -35,6 +35,7 @@ import { briefReference, formatBibliography, parseBibliography, prepareBibliogra
 import { compileExpression, createPlotSvg } from "./plot.js";
 import { externalDeckAction } from "./external.js";
 import { initialShapeGeometry } from "./shapes.js";
+import { pdfPrintUrl, pdfPrintView, printShortcut } from "./print.js";
 
 const source = `---
 title: Test deck
@@ -484,6 +485,17 @@ After an additional blank line. {fragment=4}
 }
 
 try {
+  assert(pdfPrintView("?print-pdf&print-dialog"), "PDF print query is recognized");
+  assert(!pdfPrintView("?print-dialog"), "ordinary pages are not mistaken for the PDF print view");
+  const printUrl = new URL(pdfPrintUrl({ href: "http://127.0.0.1:8000/?deck=example%2Fdeck.md#slide-2" }));
+  assert(printUrl.searchParams.has("print-pdf") && printUrl.searchParams.has("print-dialog")
+    && printUrl.searchParams.get("deck") === "example/deck.md" && !printUrl.hash,
+  "PDF print URL preserves the deck selection and clears the slide hash");
+  assert(printShortcut({ ctrlKey: true, metaKey: false, altKey: false, key: "P" })
+    && printShortcut({ ctrlKey: false, metaKey: true, altKey: false, key: "p" })
+    && !printShortcut({ ctrlKey: true, metaKey: false, altKey: true, key: "p" }),
+  "Ctrl-P and Cmd-P are recognized without intercepting Alt-modified shortcuts");
+
   const rangeFixture = document.createElement("div");
   rangeFixture.innerHTML = '<input id="test-range" type="range" min="0.25" max="3" step="0.05" value="1"><input id="test-range-value" type="number">';
   document.body.append(rangeFixture);

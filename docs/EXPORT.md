@@ -78,6 +78,25 @@ python -m http.server --directory lecture-site
 Then open `http://127.0.0.1:8000/`. Reveal.js keyboard, touch, overview,
 fragments, URL hashes, and speaker notes remain available.
 
+## Print or save as PDF
+
+Use **Print / PDF** in an exported presentation, or press <kbd>Ctrl</kbd>+<kbd>P</kbd>
+(<kbd>Command</kbd>+<kbd>P</kbd> on macOS). Quarkfoil reloads the presentation in
+Reveal.js's PDF layout and opens the browser print dialog after fonts and images
+are ready. Choose **Save as PDF** to create a multi-page file with one slide per
+page.
+
+Reveal.js recommends Chrome or another Chromium-based browser for PDF export;
+other browsers may show the print layout but are not guaranteed to produce the
+same PDF output.
+
+The editor toolbar offers the same action when Quarkfoil is running through its
+local server. It validates and saves the Markdown, then opens the deck in a
+dedicated presentation-only print view equivalent to the static player.
+Browser-only presentations opened through the file picker must instead be
+run locally or exported as a static website, because reloading into print mode
+would lose the browser's file handle.
+
 ## Live example
 
 The [published sample presentation](https://juanjosegarciaripoll.github.io/quarkfoil/example/)

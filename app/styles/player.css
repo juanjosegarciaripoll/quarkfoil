@@ -29,3 +29,20 @@ body {
   color: #ffb4b4;
   white-space: pre-wrap;
 }
+
+#print-button {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 90;
+  padding: 0.5rem 0.75rem;
+  color: #dfe7ee;
+  background: #172438dd;
+  border: 1px solid #62758a;
+  border-radius: 0.35rem;
+  cursor: pointer;
+}
+
+@media print {
+  #print-button { display: none; }
+}

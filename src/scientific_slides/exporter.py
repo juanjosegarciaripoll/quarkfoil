@@ -21,6 +21,7 @@ EXPORT_FILES = {
     "modules/shapes.js": "quarkfoil/shapes.js",
     "modules/bibliography.js": "quarkfoil/bibliography.js",
     "modules/player.js": "quarkfoil/player.js",
+    "modules/print.js": "quarkfoil/print.js",
     "styles/layout.css": "quarkfoil/layout.css",
     "styles/themes.css": "quarkfoil/themes.css",
     "styles/player.css": "quarkfoil/player.css",
@@ -281,6 +282,7 @@ def _index_html(assets: str) -> str:
   <link rel="stylesheet" href="quarkfoil/player.css">
 </head>
 <body>
+  <button id="print-button" type="button" title="Print or save as PDF">Print / PDF</button>
   <main class="reveal" aria-label="Presentation">
     <div id="slides" class="slides"></div>
   </main>

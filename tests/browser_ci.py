@@ -148,6 +148,31 @@ def main() -> int:
         WebDriverWait(driver, 30).until(
             lambda active_driver: active_driver.find_element(By.ID, "save-state").text == "Saved"
         )
+        editor_window = driver.current_window_handle
+        driver.find_element(By.ID, "print-button").click()
+        try:
+            WebDriverWait(driver, 30).until(
+                lambda active_driver: len(active_driver.window_handles) == 2
+            )
+        except TimeoutException as error:
+            raise RuntimeError("Editor Print / PDF did not open a new window") from error
+        print_window = next(handle for handle in driver.window_handles if handle != editor_window)
+        driver.switch_to.window(print_window)
+        try:
+            WebDriverWait(driver, 30).until(
+                lambda active_driver: "/print.html?" in active_driver.current_url
+            )
+            WebDriverWait(driver, 30).until(
+                lambda active_driver: not active_driver.find_elements(By.ID, "loading")
+            )
+        except TimeoutException as error:
+            raise RuntimeError(f"Editor print window did not finish loading; URL={driver.current_url!r}") from error
+        if "/print.html?" not in driver.current_url:
+            raise RuntimeError(f"Editor print window opened an unexpected URL: {driver.current_url!r}")
+        if driver.find_elements(By.ID, "workspace"):
+            raise RuntimeError("Local PDF printing reused the editor workspace instead of the presentation-only player")
+        driver.close()
+        driver.switch_to.window(editor_window)
         if not driver.find_elements(By.ID, "project-file-online-icons") or not driver.find_elements(By.CSS_SELECTOR, "#icon-dialog #icon-gallery"):
             raise RuntimeError("The project image picker does not expose the isolated online icon importer")
         toolbar_layout = driver.execute_script(

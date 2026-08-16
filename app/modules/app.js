@@ -4,6 +4,7 @@ import { DesignEditor, handleMarkdownShortcut, pageSlideIndex, projectAssetPage,
 import { saveSnapshot } from "./storage.js";
 import { briefReference, formatBibliography, parseBibliography, prepareBibliography, renameBibliographyEntry, uniqueCitationKey } from "./bibliography.js";
 import { externalDeckAction, responseRevision } from "./external.js";
+import { pdfPrintUrl, printShortcut } from "./print.js";
 
 const STARTER = `---
 title: Quarkfoil
@@ -91,6 +92,7 @@ const elements = {
   notesResizer: document.querySelector("#notes-resizer"),
   save: document.querySelector("#save-button"),
   download: document.querySelector("#download-button"),
+  print: document.querySelector("#print-button"),
   saveState: document.querySelector("#save-state"),
 };
 
@@ -1122,14 +1124,14 @@ async function saveDeck() {
     if (state.local) {
       while (deckCheckPending) await new Promise(resolve => setTimeout(resolve, 20));
       await pollForExternalDeck({ force: true });
-      if (state.externalChange) { openExternalChangeDialog(); return; }
+      if (state.externalChange) { openExternalChangeDialog(); return false; }
     }
     if (state.mode === "design" && elements.notes.value !== (state.deck.slides[state.currentSlide]?.notes || "")) {
-      if (!commitSource(updateSlideNotes(state.deck, state.currentSlide, elements.notes.value))) return;
+      if (!commitSource(updateSlideNotes(state.deck, state.currentSlide, elements.notes.value))) return false;
     }
-    if (elements.source.value !== state.source && !commitSource(elements.source.value)) return;
+    if (elements.source.value !== state.source && !commitSource(elements.source.value)) return false;
     const normalized = normalizeDeck(state.deck);
-    if (normalized !== state.source && !commitSource(normalized)) return;
+    if (normalized !== state.source && !commitSource(normalized)) return false;
     if (state.local) {
       const response = await fetch(`/api/deck?path=${encodeURIComponent(state.config.deck)}`, {
         method: "PUT",
@@ -1140,7 +1142,7 @@ async function saveDeck() {
       if (!response.ok) {
         if (response.status === 409) {
           await pollForExternalDeck({ force: true });
-          if (state.externalChange) { openExternalChangeDialog(); return; }
+          if (state.externalChange) { openExternalChangeDialog(); return false; }
         }
         throw new Error(result.error || "Save failed");
       }
@@ -1151,12 +1153,33 @@ async function saveDeck() {
       await writable.close();
     } else {
       downloadSource();
-      return;
+      return false;
     }
     state.savedSource = state.source;
     updateDirtyState();
     showStatus("Saved");
-  } catch (error) { showStatus(error.message, true); }
+    return true;
+  } catch (error) { showStatus(error.message, true); return false; }
+}
+
+async function printDeck() {
+  if (!state.local) {
+    showStatus("Print / PDF is available from the local Quarkfoil server or an exported presentation", true);
+    return;
+  }
+  const printWindow = window.open("about:blank", "_blank");
+  if (!printWindow) {
+    showStatus("Allow popups for Quarkfoil to open the Print / PDF view", true);
+    return;
+  }
+  printWindow.opener = null;
+  try {
+    if (!await saveDeck()) { printWindow.close(); return; }
+    printWindow.location.replace(pdfPrintUrl({ href: new URL("/print.html", window.location).href }));
+  } catch (error) {
+    printWindow.close();
+    throw error;
+  }
 }
 
 function downloadSource() {
@@ -1620,6 +1643,7 @@ function bindUi() {
     parseAndRender(source, { preserveSlide: false });
   });
   document.querySelector("#bibliography-button").addEventListener("click", openBibliography);
+  elements.print.addEventListener("click", printDeck);
   document.querySelector("#bibliography-search").addEventListener("input", () => rebuildBibliographyList());
   document.querySelector("#bibliography-search").addEventListener("keydown", event => {
     if (event.key === "Enter" && !event.isComposing) event.preventDefault();
@@ -1648,6 +1672,7 @@ function bindUi() {
   document.querySelector("#move-slide-up").addEventListener("click", () => moveSelectedSlide(-1));
   document.querySelector("#move-slide-down").addEventListener("click", () => moveSelectedSlide(1));
   document.addEventListener("keydown", event => {
+    if (printShortcut(event)) { event.preventDefault(); printDeck(); return; }
     const editing = textEditingTarget(event.target);
     const draftEditorOpen = state.mode === "source" || Boolean(document.querySelector("#content-dialog[open]"));
     const undoShortcut = (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z";
@@ -1700,6 +1725,8 @@ async function initialize() {
     margin: 0,
     minScale: 0.1,
     maxScale: 3,
+    pdfMaxPagesPerSlide: 1,
+    pdfSeparateFragments: false,
     plugins: window.RevealNotes ? [window.RevealNotes] : [],
   });
   await reveal.initialize();

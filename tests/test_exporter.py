@@ -53,15 +53,18 @@ class ExporterTests(unittest.TestCase):
         self.assertEqual((output / "presentation.md").read_text(encoding="utf-8"), self.deck.read_text(encoding="utf-8"))
         self.assertTrue((output / "figures/diagram.svg").is_file())
         self.assertTrue((output / "quarkfoil/player.js").is_file())
+        self.assertTrue((output / "quarkfoil/print.js").is_file())
         self.assertTrue((output / "quarkfoil/shapes.js").is_file())
         self.assertTrue((output / "quarkfoil/layout.css").is_file())
         self.assertTrue((output / "quarkfoil/themes.css").is_file())
         self.assertTrue((output / "quarkfoil/quarkfoil-mark.svg").is_file())
         self.assertIn('rel="icon" href="quarkfoil/quarkfoil-mark.svg"', index)
+        self.assertIn('id="print-button"', index)
         self.assertTrue((output / "quarkfoil/vendor/katex/fonts/KaTeX_Main-Regular.woff2").is_file())
         self.assertIn("Reveal.js", (output / "THIRD_PARTY_LICENSES.txt").read_text(encoding="utf-8"))
         player = (output / "quarkfoil/player.js").read_text(encoding="utf-8")
-        self.assertNotIn("/api/", player)
+        self.assertIn('document.body.dataset.playerSource === "local"', player)
+        self.assertNotIn('data-player-source="local"', index)
 
     def test_imported_icon_license_is_folded_into_export_notice(self) -> None:
         icon = self.project / "figures/icons/tabler--car.svg"
