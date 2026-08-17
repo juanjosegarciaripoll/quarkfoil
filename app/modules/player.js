@@ -90,8 +90,4 @@ document.addEventListener("keydown", event => {
   }
 });
 
-try {
-  await initialize();
-} catch (error) {
-  showError(error);
-}
+initialize().catch(showError);
