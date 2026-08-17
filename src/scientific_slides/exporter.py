@@ -385,6 +385,20 @@ def _executable(candidates: tuple[str, ...], label: str) -> str:
     raise RuntimeError(f"{label} is required to create an export preview")
 
 
+def _preview_command(browser: str, output: Path, url: str) -> list[str]:
+    return [
+        browser,
+        "--headless=new",
+        "--disable-gpu",
+        "--hide-scrollbars",
+        "--force-device-scale-factor=1",
+        "--window-size=1280,720",
+        "--virtual-time-budget=30000",
+        f"--screenshot={output}",
+        url,
+    ]
+
+
 def _create_preview(export_root: Path, preview_path: str) -> None:
     browser = _executable(
         (
@@ -395,8 +409,6 @@ def _create_preview(export_root: Path, preview_path: str) -> None:
         ),
         "Chrome, Chromium, or Edge",
     )
-    ghostscript = _executable(("gs", "gswin64c", "gswin32c"), "Ghostscript")
-    pdf = export_root / ".quarkfoil-preview.pdf"
     output = export_root / preview_path
     output.parent.mkdir(parents=True, exist_ok=True)
     if output.exists():
@@ -407,43 +419,15 @@ def _create_preview(export_root: Path, preview_path: str) -> None:
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
-        url = f"http://127.0.0.1:{server.server_port}/?print-pdf"
+        url = f"http://127.0.0.1:{server.server_port}/?preview"
         subprocess.run(
-            [
-                browser,
-                "--headless=new",
-                "--disable-gpu",
-                "--no-pdf-header-footer",
-                "--virtual-time-budget=30000",
-                f"--print-to-pdf={pdf}",
-                url,
-            ],
-            check=True,
-            capture_output=True,
-            timeout=60,
-        )
-        if not pdf.is_file() or not pdf.stat().st_size:
-            raise RuntimeError("The browser did not create the preview PDF")
-        subprocess.run(
-            [
-                ghostscript,
-                "-q",
-                "-dSAFER",
-                "-dBATCH",
-                "-dNOPAUSE",
-                "-sDEVICE=png16m",
-                "-dFirstPage=1",
-                "-dLastPage=1",
-                "-r150",
-                f"-sOutputFile={output}",
-                str(pdf),
-            ],
+            _preview_command(browser, output, url),
             check=True,
             capture_output=True,
             timeout=60,
         )
         if not output.is_file() or not output.stat().st_size:
-            raise RuntimeError("Ghostscript did not create the preview image")
+            raise RuntimeError("The browser did not create the preview image")
     except subprocess.CalledProcessError as error:
         detail = error.stderr.decode(errors="replace").strip() if isinstance(error.stderr, bytes) else str(error.stderr or "").strip()
         raise RuntimeError(detail or "Could not create the export preview") from error
@@ -453,7 +437,6 @@ def _create_preview(export_root: Path, preview_path: str) -> None:
         server.shutdown()
         server.server_close()
         thread.join(timeout=5)
-        pdf.unlink(missing_ok=True)
 
 
 def export_presentation(

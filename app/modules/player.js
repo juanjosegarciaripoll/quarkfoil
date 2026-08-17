@@ -1,9 +1,11 @@
 import { parseDeck } from "./parser.js";
 import { renderDeck, syncVideoPlayback } from "./render.js";
 import { prepareBibliography } from "./bibliography.js";
-import { openPrintDialogWhenReady, pdfPrintUrl, pdfPrintView, printShortcut } from "./print.js";
+import { openPrintDialogWhenReady, pdfPrintUrl, pdfPrintView, printShortcut, waitForRenderAssets } from "./print.js";
 
 const localPlayer = document.body.dataset.playerSource === "local";
+const search = new URLSearchParams(location.search);
+const previewView = search.has("preview");
 
 function assetPath(source) {
   if (!source || /^(?:javascript|data:text\/html):/i.test(source)) return "";
@@ -18,7 +20,7 @@ function showError(error) {
 }
 
 async function initialize() {
-  const requestedDeck = new URLSearchParams(location.search).get("deck");
+  const requestedDeck = search.get("deck");
   const deckUrl = localPlayer
     ? `/api/deck${requestedDeck ? `?path=${encodeURIComponent(requestedDeck)}` : ""}`
     : "presentation.md";
@@ -46,13 +48,13 @@ async function initialize() {
   }
   renderDeck(deck, document.querySelector("#slides"), assetPath, prepareBibliography(bibliographySource, deck, bibliographyPdfs), { includeTrashed: false });
   const reveal = new window.Reveal(document.querySelector(".reveal"), {
-    controls: true,
-    progress: true,
-    hash: true,
-    history: true,
-    keyboard: true,
-    touch: true,
-    overview: true,
+    controls: !previewView,
+    progress: !previewView,
+    hash: !previewView,
+    history: !previewView,
+    keyboard: !previewView,
+    touch: !previewView,
+    overview: !previewView,
     center: false,
     transition: "none",
     width: 1280,
@@ -67,10 +69,16 @@ async function initialize() {
   await reveal.initialize();
   reveal.on("slidechanged", event => syncVideoPlayback(event.currentSlide));
   syncVideoPlayback(reveal.getCurrentSlide());
-  document.querySelector("#loading").remove();
+  if (previewView) {
+    document.querySelector("#print-button")?.remove();
+    await waitForRenderAssets();
+    document.querySelector("#loading").remove();
+    await waitForRenderAssets();
+    document.documentElement.dataset.previewReady = "true";
+  } else document.querySelector("#loading").remove();
   if (pdfPrintView()) {
     document.querySelector("#print-button")?.remove();
-    if (new URLSearchParams(location.search).has("print-dialog")) openPrintDialogWhenReady();
+    if (search.has("print-dialog")) openPrintDialogWhenReady();
   }
 }
 
@@ -82,4 +90,8 @@ document.addEventListener("keydown", event => {
   }
 });
 
-initialize().catch(showError);
+try {
+  await initialize();
+} catch (error) {
+  showError(error);
+}

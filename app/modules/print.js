@@ -12,7 +12,7 @@ export const printShortcut = event => Boolean(
   (event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === "p"
 );
 
-export async function openPrintDialogWhenReady(root = document) {
+export async function waitForRenderAssets(root = document) {
   if (root.fonts?.ready) await root.fonts.ready;
   const images = [...root.images].filter(image => !image.complete);
   await Promise.all(images.map(image => new Promise(resolve => {
@@ -20,5 +20,9 @@ export async function openPrintDialogWhenReady(root = document) {
     image.addEventListener("error", resolve, { once: true });
   })));
   await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+}
+
+export async function openPrintDialogWhenReady(root = document) {
+  await waitForRenderAssets(root);
   window.print();
 }

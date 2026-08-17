@@ -8,7 +8,7 @@ from pathlib import Path
 from unittest import mock
 
 from scientific_slides import main
-from scientific_slides.exporter import _asset_references, export_presentation
+from scientific_slides.exporter import _asset_references, _preview_command, export_presentation
 
 
 class ExporterTests(unittest.TestCase):
@@ -124,6 +124,14 @@ class ExporterTests(unittest.TestCase):
         self.assertTrue((output / "artwork/lecture-preview.png").is_file())
         self.assertIn('property="og:image" content="artwork/lecture-preview.png"', index)
         self.assertIn('name="twitter:image" content="artwork/lecture-preview.png"', index)
+
+    def test_preview_browser_command_captures_a_1280_by_720_viewport(self) -> None:
+        output = self.root / "preview.png"
+        url = "http://127.0.0.1:8000/?preview"
+        chromium = _preview_command("/usr/bin/chromium", output, url)
+        self.assertIn("--window-size=1280,720", chromium)
+        self.assertIn(f"--screenshot={output}", chromium)
+        self.assertNotIn("--print-to-pdf", " ".join(chromium))
 
     def test_imported_icon_license_is_folded_into_export_notice(self) -> None:
         icon = self.project / "figures/icons/tabler--car.svg"

@@ -93,9 +93,10 @@ or Twitter card metadata:
 quarkfoil export lecture.md --output lecture-site --preview
 ```
 
-Quarkfoil produces a temporary PDF through the same Reveal.js print route used
-by **Print / PDF**, then asks Ghostscript to rasterize its first page. This
-requires Chrome, Chromium, or Edge and the Ghostscript command-line program.
+Quarkfoil asks Chrome, Chromium, or Edge to capture the first slide directly at
+1280 × 720 pixels. The browser runs headlessly, waits for the slide's fonts and
+images, and hides presentation controls from the captured viewport. No PDF
+renderer or image-conversion program is required.
 For `lecture.md`, the resulting image is `figures/lecture-preview.png`, or the
 equivalent location selected by `assets.figures`. Its reference in `index.html`
 remains relative so the exported folder can be deployed at any URL.

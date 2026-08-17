@@ -22,7 +22,7 @@ def _export(arguments: list[str]) -> int:
     parser.add_argument(
         "--preview",
         action="store_true",
-        help="Create a link-sharing preview with a Chromium browser and Ghostscript",
+        help="Create a link-sharing preview with Chrome, Chromium, or Edge",
     )
     parser.add_argument(
         "--no-notes",
