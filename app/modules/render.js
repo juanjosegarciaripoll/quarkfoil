@@ -329,6 +329,7 @@ function renderSlide(slide, metadata, assetResolver, bibliography) {
     cell.dataset.cellId = name;
     const item = findCell(slide, name);
     if (item) {
+      if (item.attrs.values["font-size"]) cell.style.fontSize = `${item.fontSize}em`;
       cell.dataset.contentType = item.type;
       fillContent(cell, item, assetResolver, bibliography, false, true);
     } else {

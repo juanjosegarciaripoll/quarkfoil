@@ -121,6 +121,15 @@
         </label>
         <small id="slide-color-state">Colors inherited from theme</small>
       </form>
+      <form id="cell-properties" hidden>
+        <label>Font size
+          <span class="range-with-value-reset">
+            <input id="prop-cell-font-size" type="range" min="0.25" max="3" step="0.05" value="0.72">
+            <input id="prop-cell-font-size-value" type="number" min="0.25" max="3" step="0.05" value="0.72" aria-label="Panel font size in em">
+            <button id="reset-cell-font-size" type="button" title="Use default panel font size" aria-label="Use default panel font size">↺</button>
+          </span>
+        </label>
+      </form>
       <form id="object-properties" hidden>
         <label>ID <input id="prop-id" readonly></label>
         <label>X <input id="prop-x" type="number" step="0.1"></label>

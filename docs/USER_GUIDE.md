@@ -74,6 +74,10 @@ Changing a slide's layout keeps regions that exist in both layouts and removes
 the Markdown for regions that the new layout does not use. Positioned objects,
 speaker notes, and footers are unaffected.
 
+Click a layout region to adjust its font size in Properties. The reset button
+restores the default size. This setting is stored on the region's Markdown
+directive, so different panels on the same slide can use different sizes.
+
 In Design mode, edit optional speaker notes in the pane below the slide. Drag
 the divider to give the notes more or less room. Notes are stored as Markdown
 in the slide's `::: notes` block and remain available in Reveal's speaker view.

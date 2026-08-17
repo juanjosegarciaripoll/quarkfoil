@@ -306,7 +306,7 @@ function parseSlide(source, range, index, diagnostics) {
     if (CELL_NAMES.has(block.name)) {
       const image = parseImage(block.body);
       const video = parseVideo(block.attrs);
-      cells.push({ id: block.name, type: video ? "video" : image ? "image" : "markdown", source: block.body, image, video, range: block.range, attrs: block.attrs });
+      cells.push({ id: block.name, type: video ? "video" : image ? "image" : "markdown", source: block.body, image, video, range: block.range, attrs: block.attrs, fontSize: parseFontSize(block.attrs.values["font-size"] || "0.72") });
     } else if (block.name === "overlay") {
       const image = parseImage(block.body);
       const type = block.attrs.values.type || (image ? "image" : "markdown");
@@ -375,11 +375,14 @@ function parseSlide(source, range, index, diagnostics) {
       ? { start: contentStart, headerEnd: contentStart, bodyStart: contentStart, bodyEnd: range.end, end: range.end }
       : null;
     const sourceRanges = ordinaryRange ? [ordinaryRange] : ordinarySourceRanges(bodyRaw, parsed.occupied, contentStart);
-    cells.unshift({ id: "core", type: "markdown", source: ordinary, image: null, video: null, range: ordinaryRange, sourceRanges, attrs: parseAttributes("") });
+    cells.unshift({ id: "core", type: "markdown", source: ordinary, image: null, video: null, range: ordinaryRange, sourceRanges, attrs: parseAttributes(""), fontSize: 0.72 });
   }
-  if (!cells.length && !["0", "free"].includes(layout)) cells.push({ id: "core", type: "markdown", source: "", image: null, video: null, range: null, attrs: parseAttributes("") });
+  if (!cells.length && !["0", "free"].includes(layout)) cells.push({ id: "core", type: "markdown", source: "", image: null, video: null, range: null, attrs: parseAttributes(""), fontSize: 0.72 });
   const duplicateCells = cells.map(cell => cell.id).filter((id, position, all) => all.indexOf(id) !== position);
   for (const id of new Set(duplicateCells)) diagnostics.push({ level: "error", slide: index + 1, message: `Duplicate '${id}' cell` });
+  for (const cell of cells) {
+    if (!Number.isFinite(cell.fontSize) || cell.fontSize <= 0) diagnostics.push({ level: "error", slide: index + 1, message: `Cell '${cell.id}' has invalid font size` });
+  }
   const duplicateOverlays = overlays.map(overlay => overlay.id).filter((id, position, all) => all.indexOf(id) !== position);
   for (const id of new Set(duplicateOverlays)) diagnostics.push({ level: "error", slide: index + 1, message: `Duplicate overlay ID '${id}'` });
   for (const overlay of overlays) {
@@ -863,6 +866,30 @@ export function setCellContent(deck, slideIndex, cellId, content) {
     return source;
   }
   return appendBlock(deck, slide, directiveBlock(cellId, content));
+}
+
+export function updateCellProperties(deck, slideIndex, cellId, changes) {
+  const slide = deck.slides[slideIndex];
+  const cell = slide?.cells.find(item => item.id === cellId);
+  if (!slide || !CELL_NAMES.has(cellId)) throw new Error(`Unknown cell '${cellId}'`);
+  const attrs = structuredClone(cell?.attrs || parseAttributes(""));
+  for (const [key, value] of Object.entries(changes)) {
+    if (value === null || value === "") delete attrs.values[key];
+    else attrs.values[key] = String(value);
+  }
+  const serialized = serializeAttributes(attrs);
+  if (!cell && !serialized) return deck.source;
+  if (cell?.range && cell.range.headerEnd > cell.range.start) {
+    const replacement = `::: ${cellId}${serialized ? ` {${serialized}}` : ""}\n`;
+    return patchRange(deck.source, cell.range.start, cell.range.headerEnd, replacement);
+  }
+  let source = deck.source;
+  for (const range of [...(cell?.sourceRanges || [])].sort((left, right) => right.start - left.start)) {
+    source = patchRange(source, range.start, range.end, "");
+  }
+  const reparsed = parseDeck(source);
+  const target = reparsed.slides[slideIndex];
+  return appendBlock(reparsed, target, directiveBlock(cellId, cell?.source || "", serialized ? ` {${serialized}}` : ""));
 }
 
 export function updateSlideNotes(deck, slideIndex, content) {

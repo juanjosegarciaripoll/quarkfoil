@@ -8,6 +8,7 @@ import {
   parseDeck,
   serializeOverlays,
   setCellContent,
+  updateCellProperties,
   updateBlockContent,
   updateHeadingLayout,
   updateOverlay,
@@ -316,6 +317,7 @@ export class DesignEditor {
     this.stage = document.querySelector("#stage");
     this.properties = document.querySelector("#object-properties");
     this.slideProperties = document.querySelector("#slide-properties");
+    this.cellProperties = document.querySelector("#cell-properties");
     this.imageProperties = document.querySelector("#image-properties");
     this.videoProperties = document.querySelector("#video-properties");
     this.plotProperties = document.querySelector("#plot-properties");
@@ -359,7 +361,7 @@ export class DesignEditor {
     document.addEventListener("copy", event => this.onCopy(event));
     document.addEventListener("cut", event => this.onCopy(event, { cut: true }));
     document.addEventListener("paste", event => this.onPaste(event));
-    for (const id of ["prop-focus-x", "prop-focus-y", "prop-image-opacity", "prop-font-size"]) bindRangeControl(id);
+    for (const id of ["prop-focus-x", "prop-focus-y", "prop-image-opacity", "prop-font-size", "prop-cell-font-size"]) bindRangeControl(id);
     document.querySelector("#layout-select").addEventListener("change", event => this.changeLayout(event.target.value));
     document.querySelector("#prop-slide-theme").addEventListener("change", event => this.applySlideProperties({ theme: event.target.value || null }));
     document.querySelector("#prop-slide-footer").addEventListener("change", event => this.applySlideProperties({ footer: event.target.checked ? null : "none" }));
@@ -493,6 +495,9 @@ export class DesignEditor {
     document.querySelector("#prop-attribution-keys").addEventListener("change", () => this.applyAttributionKeys());
     document.querySelector("#prop-font-size").addEventListener("input", event => this.previewFontSize(event.target.value));
     document.querySelector("#prop-font-size").addEventListener("change", () => this.applyFontSize());
+    document.querySelector("#prop-cell-font-size").addEventListener("input", event => this.previewCellFontSize(event.target.value));
+    document.querySelector("#prop-cell-font-size").addEventListener("change", () => this.applyCellFontSize());
+    document.querySelector("#reset-cell-font-size").addEventListener("click", () => this.applyCellFontSize(null));
     bindColorControl("prop-text-color", () => this.applyTextColor(colorControlValue("prop-text-color")));
     document.querySelectorAll("#properties input[type=color]").forEach(input => {
       input.addEventListener("click", event => {
@@ -692,6 +697,8 @@ export class DesignEditor {
     element.classList.add("selected-cell");
     const cell = this.slide().cells.find(item => item.id === element.dataset.cellId);
     this.noSelection.textContent = `Cell: ${element.dataset.cellId}. Double-click to edit.`;
+    this.cellProperties.hidden = false;
+    setRangeControl("prop-cell-font-size", cell?.fontSize || 0.72);
     if (cell?.type === "image" && cell.image) {
       this.imageProperties.hidden = false;
       document.querySelector("#prop-fit").value = cell.image.attrs.values.fit || "contain";
@@ -722,6 +729,7 @@ export class DesignEditor {
     this.fontProperties.hidden = true;
     this.noSelection.hidden = true;
     this.slideProperties.hidden = false;
+    this.cellProperties.hidden = true;
     document.querySelector("#edit-content").hidden = false;
     document.querySelector("#duplicate-object").disabled = true;
     document.querySelector("#delete-object").disabled = true;
@@ -818,6 +826,19 @@ export class DesignEditor {
     const value = Number(document.querySelector("#prop-font-size").value);
     this.commit(updateOverlay(this.options.getDeck(), this.slideIndex(), this.selected.dataset.objectId, {
       "font-size": `${Math.round(value * 100) / 100}em`,
+    }));
+  }
+
+  previewCellFontSize(value) {
+    if (!this.selectedCell) return;
+    this.selectedCell.style.fontSize = `${value}em`;
+  }
+
+  applyCellFontSize(value = undefined) {
+    if (!this.selectedCell) return;
+    const size = value === null ? null : Number(document.querySelector("#prop-cell-font-size").value);
+    this.commit(updateCellProperties(this.options.getDeck(), this.slideIndex(), this.selectedCell.dataset.cellId, {
+      "font-size": size === null ? null : `${Math.round(size * 100) / 100}em`,
     }));
   }
 

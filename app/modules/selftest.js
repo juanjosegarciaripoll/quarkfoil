@@ -20,6 +20,7 @@ import {
   pasteOverlays,
   serializeOverlays,
   setCellContent,
+  updateCellProperties,
   trashSlide,
   updateBlockContent,
   updateHeadingLayout,
@@ -626,6 +627,17 @@ try {
   assert(deck.slides[0].layout === "1-2", "layout parses");
   assert(Math.round(deck.slides[0].columns[0]) === 40, "column ratios parse");
   assert(deck.slides[0].cells.find(cell => cell.id === "top-right").image.attrs.values.fit === "cover", "image attributes parse");
+  const resizedPanel = parseDeck(updateCellProperties(deck, 0, "left", { "font-size": "1.1em" }));
+  assert(resizedPanel.slides[0].cells.find(cell => cell.id === "left").fontSize === 1.1, "layout panel font size serializes and parses");
+  const panelFixture = document.createElement("div");
+  renderDeck(resizedPanel, panelFixture, source => source);
+  assert(panelFixture.querySelector(".cell-left").style.fontSize === "1.1em", "layout panel font size renders");
+  const resetPanel = parseDeck(updateCellProperties(resizedPanel, 0, "left", { "font-size": null }));
+  assert(!resetPanel.slides[0].cells.find(cell => cell.id === "left").attrs.values["font-size"], "layout panel font size resets to the default");
+  const ordinaryPanel = parseDeck(updateCellProperties(parseDeck("## Core {.layout-1}\n\nLarger body.\n"), 0, "core", { "font-size": "1.2em" }));
+  assert(ordinaryPanel.slides[0].cells[0].source === "Larger body." && ordinaryPanel.slides[0].cells[0].fontSize === 1.2, "ordinary core content converts to a styled panel without content loss");
+  const emptyPanel = parseDeck(updateCellProperties(parseDeck("## Empty {.layout-1-1}\n"), 0, "right", { "font-size": "1.3em" }));
+  assert(emptyPanel.slides[0].cells.find(cell => cell.id === "right")?.fontSize === 1.3, "empty layout panels accept font-size properties");
   const clearedImageCell = parseDeck(setCellContent(deck, 0, "top-right", ""));
   assert(!clearedImageCell.slides[0].cells.find(cell => cell.id === "top-right")?.image, "deleting a selected layout image clears its cell content");
   const clearedMarkdownCell = parseDeck(setCellContent(deck, 0, "left", ""));

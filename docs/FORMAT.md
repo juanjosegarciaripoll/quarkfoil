@@ -121,7 +121,7 @@ its structural attributes.
 Grid regions use fenced directives:
 
 ```markdown
-::: left
+::: left {font-size="1.1em"}
 Markdown for the left region.
 :::
 
@@ -131,6 +131,9 @@ Markdown for the left region.
 ```
 
 Valid region names are `core`, `left`, `right`, `top-left`, `bottom-left`, `top-right`, and `bottom-right`, according to the selected layout.
+The optional `font-size` attribute sets a region's text size in `em`; the
+Design properties expose values from `0.25em` through `3em`. Removing the
+attribute restores the default `0.72em` region size.
 Within a grid region, one empty line has its usual Markdown meaning and
 separates blocks such as paragraphs or lists. Each additional consecutive
 empty line adds one line of visible vertical space. Empty lines inside fenced
