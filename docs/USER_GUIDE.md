@@ -102,6 +102,8 @@ elements sharing an index appear together. For example:
 
 Click an empty part of the slide to show slide-wide Properties. Theme chooses
 the deck default, Scientific light, or Scientific dark for that slide.
+Show footer controls whether that slide displays its inherited or
+slide-specific footer; enabling it again removes the slide override.
 Background and Foreground create explicit color overrides; the reset buttons
 beside them remove those attributes and return to the theme colors. Omitted
 theme and color values do not occupy Markdown state. Color pickers include an

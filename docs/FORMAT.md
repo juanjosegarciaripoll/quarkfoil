@@ -157,7 +157,7 @@ Image `fit` values are `contain`, `cover`, `stretch`, `width`, `height`, and
 `native`. `stretch` reshapes the external image resource to the exact region or
 overlay dimensions without changing the source file.
 
-### Per-slide themes and colors
+### Per-slide appearance
 
 A slide inherits the deck's front-matter theme unless its heading selects one:
 
@@ -177,6 +177,15 @@ Resolution is explicit slide color, then slide theme, then deck theme, then
 also supply accent, muted, font, citation, and implicit shape colors. Colors
 use six-digit `#RRGGBB` or eight-digit `#RRGGBBAA` hexadecimal notation; the
 last byte controls alpha.
+
+A slide can suppress its inherited or slide-specific footer with a heading
+attribute:
+
+```markdown
+## Full-bleed result {.layout-1 footer="none"}
+```
+
+Removing `footer="none"` restores the footer.
 
 ## Markdown and equations
 

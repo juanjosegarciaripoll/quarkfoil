@@ -362,6 +362,7 @@ export class DesignEditor {
     for (const id of ["prop-focus-x", "prop-focus-y", "prop-image-opacity", "prop-font-size"]) bindRangeControl(id);
     document.querySelector("#layout-select").addEventListener("change", event => this.changeLayout(event.target.value));
     document.querySelector("#prop-slide-theme").addEventListener("change", event => this.applySlideProperties({ theme: event.target.value || null }));
+    document.querySelector("#prop-slide-footer").addEventListener("change", event => this.applySlideProperties({ footer: event.target.checked ? null : "none" }));
     for (const name of ["background", "foreground"]) {
       bindColorControl(`prop-slide-${name}`, () => this.applySlideProperties({ [name]: colorControlValue(`prop-slide-${name}`) }));
     }
@@ -733,6 +734,7 @@ export class DesignEditor {
     if (!slide || !section) return;
     const style = getComputedStyle(section);
     document.querySelector("#prop-slide-theme").value = slide.headingAttrs.values.theme || "";
+    document.querySelector("#prop-slide-footer").checked = slide.headingAttrs.values.footer !== "none";
     setColorControl("prop-slide-background", style.getPropertyValue("--slide-background"), "#fbfcfd");
     setColorControl("prop-slide-foreground", style.getPropertyValue("--slide-foreground"), "#17202a");
     const overrides = ["background", "foreground"].filter(name => slide.headingAttrs.values[name]);

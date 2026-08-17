@@ -360,13 +360,14 @@ function assertCitations() {
 }
 
 function assertThemes() {
-  let deck = parseDeck("---\ntheme: scientific-light\n---\n\n## Light {.layout-1}\n\n---\n\n## Dark {.layout-1 theme=\"scientific-dark\" background=\"#101820\" foreground=\"#f0f4f8\"}\n");
+  let deck = parseDeck("---\ntheme: scientific-light\ndefaults:\n  footer: Footer\n---\n\n## Light {.layout-1}\n\n---\n\n## Dark {.layout-1 theme=\"scientific-dark\" background=\"#101820\" foreground=\"#f0f4f8\" footer=\"none\"}\n");
   const fixture = document.createElement("div");
   renderDeck(deck, fixture, source => source);
   const [light, dark] = fixture.querySelectorAll(".scientific-slide");
   assert(light.classList.contains("theme-scientific-light"), "slide inherits the deck theme");
   assert(dark.classList.contains("theme-scientific-dark"), "slide selects its own theme");
   assert(dark.style.getPropertyValue("--slide-background") === "#101820" && dark.style.getPropertyValue("--slide-foreground") === "#f0f4f8", "slide colors override theme variables");
+  assert(light.querySelector(".slide-footer") && !dark.querySelector(".slide-footer"), "slide footer annotation suppresses the inherited footer");
   const overview = document.createElement("div");
   overview.className = "reveal overview";
   const overviewSlides = document.createElement("div");
@@ -380,8 +381,8 @@ function assertThemes() {
   assert(getComputedStyle(overviewLight).display === "block" && getComputedStyle(overviewDark).display === "block", "overview reveals non-current slide surfaces");
   assert(getComputedStyle(overviewLight).backgroundColor !== getComputedStyle(overviewDark).backgroundColor, "overview keeps slide themes independent");
   overview.remove();
-  deck = parseDeck(updateSlideProperties(deck, 1, { theme: null, background: null, foreground: null }));
-  assert(!deck.slides[1].headingAttrs.values.theme && !deck.slides[1].headingAttrs.values.background, "inherited slide theme values do not occupy source state");
+  deck = parseDeck(updateSlideProperties(deck, 1, { theme: null, background: null, foreground: null, footer: null }));
+  assert(!deck.slides[1].headingAttrs.values.theme && !deck.slides[1].headingAttrs.values.background && !deck.slides[1].headingAttrs.values.footer, "inherited slide appearance values do not occupy source state");
 }
 
 function assertTables() {
