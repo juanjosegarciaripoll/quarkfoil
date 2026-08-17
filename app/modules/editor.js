@@ -87,6 +87,16 @@ export function buildShapePalette(target, choose) {
   target.replaceChildren(...buttons);
   return buttons;
 }
+export function buildShapeSelect(target) {
+  const options = Object.entries(SHAPES).map(([shape, label]) => {
+    const option = document.createElement("option");
+    option.value = shape;
+    option.textContent = label;
+    return option;
+  });
+  target.replaceChildren(...options);
+  return options;
+}
 export async function resolveImportDestination(exists, proposed, choose) {
   return await exists ? await choose() : proposed;
 }
@@ -335,6 +345,7 @@ export class DesignEditor {
     this.shapePicker = document.querySelector("#shape-picker");
     this.shapePaletteButton = document.querySelector("#shape-palette-button");
     this.shapePalette = document.querySelector("#shape-palette");
+    buildShapeSelect(document.querySelector("#prop-shape"));
     this.imageInputPurpose = "add";
     this.videoInputPurpose = "add";
     this.lastCanvasActivation = null;
@@ -1173,7 +1184,9 @@ export class DesignEditor {
 
   applyShapeProperties() {
     if (!this.selected || this.selected.dataset.objectType !== "shape") return;
-    const shape = document.querySelector("#prop-shape").value;
+    const object = this.slide().overlays.find(item => item.id === this.selected.dataset.objectId);
+    const requestedShape = document.querySelector("#prop-shape").value;
+    const shape = Object.hasOwn(SHAPES, requestedShape) ? requestedShape : object?.shape || "rectangle";
     const fill = colorControlValue("prop-shape-fill");
     const stroke = colorControlValue("prop-shape-stroke");
     const strokeWidth = Number(document.querySelector("#prop-shape-stroke-width").value);

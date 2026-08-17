@@ -3,7 +3,7 @@ import { renderDeck, syncVideoPlayback } from "./render.js";
 import { boundarySlideShortcut, DesignEditor, handleMarkdownShortcut, pageSlideIndex, projectAssetPage, resolveImportDestination } from "./editor.js";
 import { saveSnapshot } from "./storage.js";
 import { briefReference, formatBibliography, parseBibliography, prepareBibliography, renameBibliographyEntry, uniqueCitationKey } from "./bibliography.js";
-import { externalDeckAction, responseRevision } from "./external.js";
+import { externalDeckAction, externalMergePlan, renderExternalMerge, responseRevision } from "./external.js";
 import { pdfPrintUrl, printShortcut } from "./print.js";
 
 const STARTER = `---
@@ -199,13 +199,7 @@ function showExternalChange(source, hash, error = "") {
   document.querySelector("#external-change-banner").hidden = false;
   updateDirtyState();
   const dialog = document.querySelector("#external-change-dialog");
-  if (dialog.open) {
-    document.querySelector("#external-disk-source").value = source;
-    document.querySelector("#external-change-detail").textContent = error
-      ? `The disk version cannot be loaded until its Markdown is repaired: ${error}`
-      : "A newer disk version arrived while this comparison was open. Review it before applying a merge.";
-    document.querySelector("#external-use-disk").disabled = Boolean(error);
-  }
+  if (dialog.open) openExternalChangeDialog();
 }
 
 function resetHistory() {
@@ -232,10 +226,49 @@ function openExternalChangeDialog() {
   const browserSource = currentBrowserSource();
   document.querySelector("#external-browser-source").value = browserSource;
   document.querySelector("#external-disk-source").value = change.source;
-  document.querySelector("#external-merged-source").value = browserSource;
+  const choices = document.querySelector("#external-merge-choices");
+  choices.replaceChildren();
+  let mergeMessage = "Compare both revisions, use the disk version, or edit a reconciled result below.";
+  if (!change.error) {
+    change.mergePlan = externalMergePlan(state.savedSource, browserSource, change.source);
+    change.mergeSelections = {};
+    if (change.mergePlan.automatic) {
+      document.querySelector("#external-merged-source").value = renderExternalMerge(change.mergePlan);
+      for (const item of change.mergePlan.changes) {
+        const row = document.createElement("div");
+        row.className = "external-merge-choice";
+        row.dataset.conflict = String(item.conflict);
+        const title = document.createElement("strong");
+        title.textContent = item.title;
+        row.append(title);
+        for (const side of ["browser", "disk"]) {
+          const label = document.createElement("label");
+          const input = document.createElement("input");
+          input.type = "radio";
+          input.name = `external-merge-${item.key}`;
+          input.value = side;
+          input.checked = item.side === side;
+          input.addEventListener("change", () => {
+            change.mergeSelections[item.key] = side;
+            document.querySelector("#external-merged-source").value = renderExternalMerge(change.mergePlan, change.mergeSelections);
+          });
+          label.append(input, side === "browser" ? "Browser" : "Disk");
+          row.append(label);
+        }
+        choices.append(row);
+      }
+      const conflicts = change.mergePlan.changes.filter(item => item.conflict).length;
+      mergeMessage = conflicts
+        ? `${change.mergePlan.changes.length} changed item(s); choose Browser or Disk for ${conflicts} overlapping change(s).`
+        : `${change.mergePlan.changes.length} changed item(s) merged automatically. Review the result before applying.`;
+    } else {
+      document.querySelector("#external-merged-source").value = browserSource;
+      mergeMessage = change.mergePlan.reason;
+    }
+  } else document.querySelector("#external-merged-source").value = browserSource;
   document.querySelector("#external-change-detail").textContent = change.error
     ? `The disk version is invalid and cannot be loaded directly: ${change.error}`
-    : "Compare both revisions, use the disk version, or edit a reconciled result below.";
+    : mergeMessage;
   document.querySelector("#external-use-disk").disabled = Boolean(change.error);
   const status = document.querySelector("#external-merge-status");
   status.textContent = "Saving remains blocked until the external change is reconciled.";

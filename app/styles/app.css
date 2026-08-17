@@ -271,6 +271,11 @@ dialog::backdrop { background: #000a; }
   font: 12px/1.4 "Cascadia Mono", Consolas, monospace;
 }
 .external-change-versions { min-height: 180px; }
+.external-merge-choices { display: grid; gap: 0.35rem; max-height: 150px; overflow: auto; }
+.external-merge-choice { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 0.7rem; align-items: center; padding: 0.4rem 0.55rem; background: #171b20; border: 1px solid #3d454e; border-radius: 4px; }
+.external-merge-choice strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.external-merge-choice label { display: flex; gap: 0.25rem; align-items: center; font-size: 0.78rem; }
+.external-merge-choice[data-conflict="true"] { border-color: #e6a23c; }
 .external-merge-label { min-height: 220px; }
 #external-merge-status { min-height: 1.2em; color: #b9c2ca; }
 #external-merge-status.error { color: #ff8787; }

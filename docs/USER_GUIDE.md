@@ -208,6 +208,8 @@ presentation, image, video, or generated plot.
 
 Shapes resize and move like other overlays. Their Properties include the
 template, background color, line color, line width, line style, and an optional shadow.
+Left brace and Right brace provide scalable curly braces for grouping related
+content; their label-safe area is on the open side of the brace.
 Selecting the arc reveals start and end angles, measured clockwise from the
 right, and optional arrowheads at either or both ends. Equal angles make a
 complete circle.
@@ -250,12 +252,19 @@ discard it in favor of a valid disk version, or apply valid merged Markdown and
 then save it against the external revision. Closing the comparison does not
 dismiss the conflict or enable saving.
 
+When both revisions retain the same slides in the same order, Quarkfoil uses
+the last saved source as a common base and merges changes slide by slide.
+One-sided edits are combined automatically. Every changed slide is listed by
+title, and overlapping edits let you choose the Browser or Disk version before
+applying the still-editable merged Markdown. Inserted, deleted, reordered, or
+renamed slides and changed section structure fall back to manual Markdown
+reconciliation rather than being guessed.
+
 Invalid external Markdown never replaces the last valid presentation. It is
 shown in the comparison for repair, while direct loading of that disk version
 remains disabled. External tools should finish writes with an atomic replacement
 and should not modify the file during the brief moment Quarkfoil itself is
-saving. This workflow supports safe external editing and explicit reconciliation;
-it does not silently merge simultaneous changes.
+saving. This workflow supports safe external editing and explicit reconciliation.
 
 The browser also keeps recovery snapshots in IndexedDB. These snapshots supplement the Markdown file; they are not a substitute for version control or backups.
 

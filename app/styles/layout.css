@@ -328,6 +328,7 @@ html.reveal-print .reveal .slides section.scientific-slide {
 .citation { color: inherit; text-decoration: none; }
 .citation:hover { text-decoration: underline; }
 .citation-pdf { color: inherit; font-size: 0.8em; text-decoration: none; vertical-align: 0.08em; }
+.overlay-citation a { color: inherit; }
 .citation-pdf:hover { filter: brightness(1.2); }
 .citation-missing { color: #c92a2a; font-weight: 700; }
 
@@ -355,7 +356,7 @@ html.reveal-print .reveal .slides section.scientific-slide {
   stroke-linecap: var(--shape-stroke-linecap, butt);
   stroke-linejoin: round;
 }
-.shape-arc { fill: none; }
+.shape-arc, .shape-brace { fill: none; }
 .shape-arrow-head { fill: var(--shape-stroke, var(--shape-default-stroke)); stroke: none; }
 .shape-label {
   position: absolute;

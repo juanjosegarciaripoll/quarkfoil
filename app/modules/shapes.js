@@ -19,6 +19,8 @@ const SHAPE_DEFINITIONS = Object.freeze({
   star: { label: "Five-pointed star", initialGeometry: { x: 41, y: 29, w: 18, h: 32 }, labelInsets: [38, 38, 42, 38], draw: common => svgElement("polygon", { ...common, points: "50,0 61.8,33.8 97.6,34.5 68.6,55.7 79.4,90.5 50,70 20.6,90.5 31.4,55.7 2.4,34.5 38.2,33.8" }) },
   cloud: { label: "Cloud", labelInsets: [15, 12, 10, 12], draw: common => svgElement("path", { ...common, d: "M20 100 C7 100 0 88 5 73 C0 58 7 40 20 39 C22 20 39 10 52 20 C65 5 86 15 87 34 C100 38 100 57 96 70 C100 86 89 100 75 100 Z" }) },
   callout: { label: "Comic callout", labelInsets: [0, 0, 22, 0], draw: common => svgElement("path", { ...common, d: "M10 0 H90 Q100 0 100 10 V68 Q100 78 90 78 H37 L15 100 L20 78 H10 Q0 78 0 68 V10 Q0 0 10 0 Z" }) },
+  "left-brace": { label: "Left brace", initialGeometry: { x: 41, y: 25, w: 18, h: 50 }, labelInsets: [4, 4, 4, 48], draw: common => svgElement("path", { ...common, class: `${common.class} shape-brace`, d: "M82 2 C52 2 48 17 48 34 C48 45 38 50 18 50 C38 50 48 55 48 66 C48 83 52 98 82 98" }) },
+  "right-brace": { label: "Right brace", initialGeometry: { x: 41, y: 25, w: 18, h: 50 }, labelInsets: [4, 48, 4, 4], draw: common => svgElement("path", { ...common, class: `${common.class} shape-brace`, d: "M18 2 C48 2 52 17 52 34 C52 45 62 50 82 50 C62 50 52 55 52 66 C52 83 48 98 18 98" }) },
   arc: { label: "Arc", initialGeometry: { x: 41, y: 29, w: 18, h: 32 }, labelInsets: [0, 0, 0, 0], draw: (common, parameters) => makeArc(common, parameters) },
 });
 

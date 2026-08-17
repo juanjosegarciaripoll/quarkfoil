@@ -31,11 +31,11 @@ import {
   updateSlideNotes,
 } from "./parser.js";
 import { renderDeck, syncVideoPlayback } from "./render.js";
-import { applyMarkdownStyle, arrowGeometry, bindRangeControl, boundarySlideShortcut, buildShapePalette, canvasLinkTarget, canvasStartsMarquee, clipboardImageFile, deleteKey, DesignEditor, dialogDragPosition, handleMarkdownShortcut, initialImageGeometry, moveGeometryGroup, overlayPasteOffset, pageSlideIndex, projectAssetPage, rectanglesIntersect, renameClipboardImage, repeatedActivation, resolveImportDestination, storeOverlayClipboard, storedOverlayClipboard, videoFile } from "./editor.js";
+import { applyMarkdownStyle, arrowGeometry, bindRangeControl, boundarySlideShortcut, buildShapePalette, buildShapeSelect, canvasLinkTarget, canvasStartsMarquee, clipboardImageFile, deleteKey, DesignEditor, dialogDragPosition, handleMarkdownShortcut, initialImageGeometry, moveGeometryGroup, overlayPasteOffset, pageSlideIndex, projectAssetPage, rectanglesIntersect, renameClipboardImage, repeatedActivation, resolveImportDestination, storeOverlayClipboard, storedOverlayClipboard, videoFile } from "./editor.js";
 import { briefReference, formatBibliography, parseBibliography, prepareBibliography, renameBibliographyEntry, uniqueCitationKey } from "./bibliography.js";
 import { compileExpression, createPlotSvg } from "./plot.js";
-import { externalDeckAction } from "./external.js";
-import { initialShapeGeometry } from "./shapes.js";
+import { externalDeckAction, externalMergePlan, renderExternalMerge } from "./external.js";
+import { initialShapeGeometry, shapeLabelInsets, SHAPES } from "./shapes.js";
 import { pdfPrintUrl, pdfPrintView, printShortcut } from "./print.js";
 
 const source = `---
@@ -196,14 +196,24 @@ function assertShapes() {
   const palette = document.createElement("div");
   let chosenShape = null;
   const shapeButtons = buildShapePalette(palette, shape => { chosenShape = shape; });
-  assert(shapeButtons.length === 12 && shapeButtons.every(button => button.querySelector(".shape-background .shape-surface")),
+  assert(shapeButtons.length === 14 && shapeButtons.every(button => button.querySelector(".shape-background .shape-surface")),
     "shape palette uses every insertable shape SVG as an icon");
+  const shapeSelect = document.createElement("select");
+  buildShapeSelect(shapeSelect);
+  assert([...shapeSelect.options].map(option => option.value).join(" ") === Object.keys(SHAPES).join(" "),
+    "shape properties list every insertable template");
   assert(shapeButtons.every(button => button.getAttribute("aria-label")?.startsWith("Add ")), "shape palette icons have accessible names");
   shapeButtons.find(button => button.dataset.shape === "diamond").click();
   assert(chosenShape === "diamond", "shape palette icons choose their matching insertion template");
   for (const name of ["cross", "x", "star"]) {
     assert(shapeButtons.find(button => button.dataset.shape === name)?.querySelector("polygon"), `${name} palette entry uses trusted polygon geometry`);
   }
+  const leftBrace = shapeButtons.find(button => button.dataset.shape === "left-brace")?.querySelector("path");
+  const rightBrace = shapeButtons.find(button => button.dataset.shape === "right-brace")?.querySelector("path");
+  assert(leftBrace?.classList.contains("shape-brace") && rightBrace?.classList.contains("shape-brace"), "brace palette entries use trusted open-path geometry");
+  assert(leftBrace.getAttribute("d") !== rightBrace.getAttribute("d"), "left and right braces use mirrored orientations");
+  assert(shapeLabelInsets("left-brace")[3] > shapeLabelInsets("left-brace")[1]
+    && shapeLabelInsets("right-brace")[1] > shapeLabelInsets("right-brace")[3], "brace labels stay on each brace's open side");
   for (const name of ["rectangle", "cross", "star", "arc"]) {
     const geometry = initialShapeGeometry(name);
     assert(Math.abs(geometry.w * 1280 / 100 - geometry.h * 720 / 100) < 0.01, `${name} is inserted at a visual 1:1 aspect ratio`);
@@ -321,7 +331,7 @@ function assertCitations() {
   fixture.id = "layout-fixture";
   fixture.className = "reveal";
   const slides = document.createElement("div"); slides.className = "slides"; fixture.append(slides); document.body.append(fixture);
-  const parsed = parseDeck(`## References {.layout-1}\n\nInline [@einstein1905], repeated [@einstein1905], and code \`[@ignored]\`.\n\n::: overlay {#source type="citation" keys="smith2024 einstein1905" display="brief" x="50" y="80" w="45" h="8"}\n\n:::`);
+  const parsed = parseDeck(`## References {.layout-1}\n\nInline [@einstein1905], repeated [@einstein1905], and code \`[@ignored]\`.\n\n::: overlay {#source type="citation" keys="smith2024 einstein1905" display="brief" x="50" y="80" w="45" h="8" color="#c92a2a"}\n\n:::`);
   const bib = `@article{einstein1905, author={Einstein, Albert}, journal={Annalen der Physik}, volume={17}, pages={891--921}, year={1905}, doi={10.1002/test}}\n@article{smith2024, author={Smith, Alice and Jones, Bob}, journal={Physical Review Letters}, volume={132}, number={123456}, year={2024}}`;
   const bibliography = prepareBibliography(bib, parsed, { smith2024: "/api/bibliography-pdf/test-token" });
   const doiEntry = parseBibliography("@article{wallraff2004, month={Sept}, doi={10.1038/nature02851}}")[0];
@@ -357,6 +367,8 @@ function assertCitations() {
   assert(!fixture.querySelector("p .citation-pdf"), "inline numbered citations do not add PDF links");
   const attributionStyle = getComputedStyle(fixture.querySelector(".overlay-citation"));
   assert(attributionStyle.backgroundColor === "rgba(0, 0, 0, 0)" && attributionStyle.boxShadow === "none", "attributions render without a background panel");
+  assert(getComputedStyle(fixture.querySelector(".overlay-citation .citation")).color === attributionStyle.color
+    && getComputedStyle(attributionPdf).color === attributionStyle.color, "attribution links inherit the assigned overlay text color");
   fixture.remove();
 }
 
@@ -593,6 +605,22 @@ try {
   assert(externalDeckAction({ knownHash: "a", diskHash: "b", dirty: true, valid: true }) === "conflict"
     && externalDeckAction({ knownHash: "a", diskHash: "b", dirty: false, valid: false }) === "conflict",
   "dirty browser drafts and invalid external decks require explicit reconciliation");
+  const mergeBase = "## Alpha {#alpha .layout-1}\n\nBase alpha.\n\n---\n\n## Beta {#beta .layout-1}\n\nBase beta.\n";
+  const mergeBrowser = mergeBase.replace("Base alpha.", "Browser alpha.");
+  const mergeDisk = mergeBase.replace("Base beta.", "Disk beta.");
+  const automaticMerge = externalMergePlan(mergeBase, mergeBrowser, mergeDisk);
+  const automaticSource = renderExternalMerge(automaticMerge);
+  assert(automaticMerge.automatic && automaticMerge.changes.length === 2
+    && automaticSource.includes("Browser alpha.") && automaticSource.includes("Disk beta."),
+  "external reconciliation automatically combines non-overlapping slide edits");
+  const overlappingDisk = mergeBase.replace("Base alpha.", "Disk alpha.");
+  const conflictPlan = externalMergePlan(mergeBase, mergeBrowser, overlappingDisk);
+  assert(conflictPlan.changes[0].conflict && renderExternalMerge(conflictPlan).includes("Browser alpha.")
+    && renderExternalMerge(conflictPlan, { "id:alpha": "disk" }).includes("Disk alpha."),
+  "external reconciliation lists overlapping slides and honors browser or disk choices");
+  const structuralPlan = externalMergePlan(mergeBase, `${mergeBrowser}\n---\n\n## Added {.layout-1}\n`, mergeDisk);
+  assert(!structuralPlan.automatic && structuralPlan.reason.includes("inserted"),
+    "external reconciliation falls back to manual Markdown for structural slide changes");
   const expression = compileExpression("Math.sin(x) + x ** 2");
   assert(Math.abs(expression(2) - (Math.sin(2) + 4)) < 1e-10, "plot expressions support JavaScript-style Math functions and operators");
   assert(Math.abs(compileExpression("cos(t)")(Math.PI) + 1) < 1e-10, "plot expressions accept t as a parametric variable");
