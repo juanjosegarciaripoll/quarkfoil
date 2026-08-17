@@ -117,23 +117,16 @@ def _asset_references(source: str) -> set[str]:
     values = [match.group(1) for match in ASSET_PATTERN.finditer(source)]
     values.extend(next(group for group in match.groups() if group is not None) for match in ATTRIBUTE_ASSET_PATTERN.finditer(source))
     for raw_value in values:
-        value = unquote(raw_value).replace("\\", "/")
+        value = raw_value.replace("\\", "/")
         parsed = urlsplit(value)
         if parsed.scheme or parsed.netloc or value.startswith(("/", "#")):
             continue
-        references.add(parsed.path)
+        references.add(unquote(parsed.path))
     return references
 
 
 def _without_speaker_notes(source: str) -> str:
     return NOTES_BLOCK_PATTERN.sub("", source)
-
-
-def _yaml_scalar(value: str) -> str:
-    value = value.strip()
-    if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
-        value = value[1:-1]
-    return value.strip()
 
 
 def _front_matter(source: str) -> dict[str, object]:
@@ -168,55 +161,37 @@ def _page_metadata(source: str, fallback_title: str) -> dict[str, str]:
     return {"title": title, "author": author, "description": description}
 
 
-def _configured_asset_folders(source: str) -> set[str]:
-    if not source.startswith("---"):
-        return {"figures"}
-    lines = source.splitlines()
-    try:
-        end = lines.index("---", 1)
-    except ValueError:
-        return {"figures"}
-
-    folders = {"figures"}
-    in_assets = False
-    in_include = False
-    for line in lines[1:end]:
-        if not line.strip() or line.lstrip().startswith("#"):
-            continue
-        indent = len(line) - len(line.lstrip(" "))
-        stripped = line.strip()
-        if indent == 0:
-            in_assets = stripped == "assets:"
-            in_include = False
-            continue
-        if not in_assets:
-            continue
-        if indent == 2 and stripped.startswith("figures:"):
-            value = _yaml_scalar(stripped.split(":", 1)[1])
-            if value:
-                folders.discard("figures")
-                folders.add(value)
-            in_include = False
-        elif indent == 2 and stripped == "include:":
-            in_include = True
-        elif in_include and indent >= 4 and stripped.startswith("-"):
-            value = _yaml_scalar(stripped[1:])
-            if value:
-                folders.add(value)
-        elif indent <= 2:
-            in_include = False
-    return folders
+def _configured_assets(source: str) -> tuple[str, set[str]]:
+    assets = _front_matter(source).get("assets", {})
+    if assets is None:
+        assets = {}
+    if not isinstance(assets, dict):
+        raise ValueError("Presentation assets must be a mapping")
+    figures = assets.get("figures") or "figures"
+    include = assets.get("include") or []
+    if not isinstance(figures, str):
+        raise ValueError("assets.figures must be a project-relative directory")
+    if not isinstance(include, list) or any(not isinstance(folder, str) for folder in include):
+        raise ValueError("assets.include must be a list of project-relative directories")
+    return figures, set(include)
 
 
-def _folder_files(project: Path, relative: str) -> set[str]:
+def _asset_folder(project: Path, relative: str) -> Path | None:
     normalized = unquote(relative).replace("\\", "/")
     folder = (project / normalized).resolve()
     if not normalized or folder == project or not _inside(project, folder):
         raise ValueError(f"Asset folder leaves the presentation directory: {relative}")
     if not folder.exists():
-        return set()
+        return None
     if not folder.is_dir():
         raise ValueError(f"Configured asset folder is not a directory: {relative}")
+    return folder
+
+
+def _folder_files(project: Path, relative: str) -> set[str]:
+    folder = _asset_folder(project, relative)
+    if folder is None:
+        return set()
     return {
         path.relative_to(project).as_posix()
         for path in folder.rglob("*")
@@ -227,10 +202,13 @@ def _folder_files(project: Path, relative: str) -> set[str]:
 def _copy_project_assets(deck: Path, source: str, destination: Path) -> None:
     project = deck.parent.resolve()
     references = _asset_references(source)
-    match = re.search(r"(?m)^bibliography:\s*[\"']?([^\s\"']+)", source.split("---", 2)[1] if source.startswith("---") else "")
-    if match:
-        references.add(match.group(1))
-    for folder in _configured_asset_folders(source):
+    front = _front_matter(source)
+    bibliography = front.get("bibliography")
+    if isinstance(bibliography, str) and bibliography:
+        references.add(bibliography)
+    figures, included = _configured_assets(source)
+    _asset_folder(project, figures)
+    for folder in included:
         references.update(_folder_files(project, folder))
     for relative in sorted(references):
         asset = (project / relative).resolve()

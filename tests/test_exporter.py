@@ -46,6 +46,13 @@ class ExporterTests(unittest.TestCase):
         self.assertEqual((output / "media/demo.webm").read_bytes(), b"webm-video")
         self.assertEqual((output / "posters/demo.jpg").read_bytes(), b"jpeg-poster")
 
+    def test_asset_references_decode_paths_and_ignore_nonlocal_urls(self) -> None:
+        source = (
+            "![encoded](figures/a%20b.svg?raw=1#view)\n"
+            "[remote](https://example.test/file.pdf) [root](/private.pdf) [fragment](#slide)\n"
+        )
+        self.assertEqual(_asset_references(source), {"figures/a b.svg"})
+
     def test_local_export_is_complete(self) -> None:
         output = export_presentation(self.deck, self.root / "local-site")
         index = (output / "index.html").read_text(encoding="utf-8")
@@ -160,6 +167,8 @@ class ExporterTests(unittest.TestCase):
         self.assertIn("figures/icons/tabler--car.svg", notice)
         self.assertIn("Copyright (c) 2020-2026 Paweł Kuna", notice)
         self.assertNotIn("unused", notice)
+        self.assertFalse((output / "figures/icons/tabler--unused.svg").exists())
+        self.assertFalse((output / "figures/icons/.quarkfoil-icons.json").exists())
 
     def test_cdn_export_uses_pinned_integrity_checked_urls(self) -> None:
         output = export_presentation(self.deck, self.root / "cdn-site", assets="cdn")
@@ -180,20 +189,51 @@ class ExporterTests(unittest.TestCase):
             export_presentation(self.deck, output)
         self.assertEqual(marker.read_text(encoding="utf-8"), "keep")
 
+    def test_missing_referenced_figure_leaves_no_export(self) -> None:
+        self.deck.write_text("## Missing\n\n![](figures/missing.svg)\n", encoding="utf-8")
+        output = self.root / "missing-figure-site"
+        with self.assertRaises(FileNotFoundError):
+            export_presentation(self.deck, output)
+        self.assertFalse(output.exists())
+
     def test_configured_asset_folders_are_exported(self) -> None:
         artwork = self.project / "artwork"
         resources = self.project / "resources"
         artwork.mkdir()
         resources.mkdir()
-        (artwork / "unused.svg").write_text("<svg/>", encoding="utf-8")
+        nested = artwork / "nested"
+        nested.mkdir()
+        (nested / "used.svg").write_text("<svg id='used'/>", encoding="utf-8")
+        (artwork / "unused.svg").write_text("<svg id='unused'/>", encoding="utf-8")
         (resources / "notes.pdf").write_bytes(b"%PDF-test")
+        (resources / "unreferenced.csv").write_text("data", encoding="utf-8")
         self.deck.write_text(
             "---\ntitle: Assets\nassets:\n  figures: artwork\n  include:\n    - resources\n---\n\n"
-            "## Files {.layout-1}\n\n[Notes](resources/notes.pdf)\n",
+            "## Files {.layout-1}\n\n![](artwork/nested/used.svg)\n\n[Notes](resources/notes.pdf)\n",
             encoding="utf-8",
         )
         output = export_presentation(self.deck, self.root / "asset-site")
-        self.assertTrue((output / "artwork/unused.svg").is_file())
+        self.assertTrue((output / "artwork/nested/used.svg").is_file())
+        self.assertFalse((output / "artwork/unused.svg").exists())
+        self.assertTrue((output / "resources/notes.pdf").is_file())
+        self.assertTrue((output / "resources/unreferenced.csv").is_file())
+
+    def test_no_notes_omits_assets_referenced_only_by_speaker_notes(self) -> None:
+        private = self.project / "private.pdf"
+        private.write_bytes(b"private")
+        self.deck.write_text(
+            "## Slide {.layout-1}\n\nVisible.\n\n::: notes\n[Private](private.pdf)\n:::\n",
+            encoding="utf-8",
+        )
+        output = export_presentation(self.deck, self.root / "note-assets-site", include_notes=False)
+        self.assertFalse((output / "private.pdf").exists())
+
+    def test_configured_figures_must_be_a_directory(self) -> None:
+        (self.project / "artwork").write_text("not a directory", encoding="utf-8")
+        self.deck.write_text("---\nassets:\n  figures: artwork\n---\n\n## Slide\n", encoding="utf-8")
+        with self.assertRaises(ValueError):
+            export_presentation(self.deck, self.root / "invalid-figures-site")
+        self.assertFalse((self.root / "invalid-figures-site").exists())
 
     def test_bibliography_is_exported(self) -> None:
         bibliography = self.project / "references.bib"

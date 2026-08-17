@@ -6,7 +6,9 @@ All notable changes to Quarkfoil are documented here. The project follows
 ## [Unreleased]
 
 - Export deck metadata directly in static HTML and optionally create a
-  Ghostscript link-sharing preview from the first PDF page.
+  link-sharing preview by capturing the first slide in a headless browser.
+- Copy only referenced files from `assets.figures` during static export while
+  retaining complete directories explicitly listed under `assets.include`.
 
 ## [0.4.0] - 2026-08-16
 

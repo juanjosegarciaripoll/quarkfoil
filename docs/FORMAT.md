@@ -64,11 +64,11 @@ Markdown:
 [Experimental data](references/data.csv)
 ```
 
-Static export copies the configured figure folder, every folder in
-`assets.include`, and individually referenced local Markdown assets. A
-configured folder that does not yet exist is ignored; a configured path that
-exists but is not a directory is an export error. The default remains fully
-backward compatible:
+Static export copies only referenced files from the configured figure folder.
+Every folder in `assets.include` is copied recursively, including unreferenced
+files, and local Markdown assets referenced outside the figure folder are
+copied individually. A configured folder that does not yet exist is ignored; a
+configured path that exists but is not a directory is an export error:
 
 ```yaml
 assets:

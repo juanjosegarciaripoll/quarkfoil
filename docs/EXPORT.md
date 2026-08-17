@@ -21,8 +21,10 @@ When a referenced SVG was downloaded by the online icon picker, its collection
 notice and full license text are appended to `THIRD_PARTY_LICENSES.txt`. Unused
 icon records are omitted. No attribution is rendered on the slides.
 
-The configured `assets.figures` directory and all directories listed under
-`assets.include` in the YAML preface are copied recursively. See the
+Only referenced files from `assets.figures` are copied. Directories listed
+under `assets.include` in the YAML preface are copied recursively, making that
+the explicit mechanism for preserving a folder wholesale. Referenced local
+files outside the figure directory are also copied individually. See the
 [format reference](FORMAT.md#asset-folders) for configuration and path rules.
 
 ```text
