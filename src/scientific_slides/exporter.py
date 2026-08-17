@@ -86,6 +86,12 @@ CDN_FILES = {
 
 ASSET_PATTERN = re.compile(r"!?\[[^\]]*\]\(([^)\s]+)")
 ATTRIBUTE_ASSET_PATTERN = re.compile(r"\b(?:src|poster)=(?:\"([^\"]+)\"|'([^']+)'|([^\s}]+))")
+NOTES_BLOCK_PATTERN = re.compile(
+    r"(?m)^:::[ \t]*notes(?:[ \t]+\{[^}\r\n]*\})?[ \t]*\r?\n"
+    r".*?"
+    r"^:::[ \t]*(?:\r?\n|$)",
+    re.DOTALL,
+)
 
 
 class _QuietHandler(http.server.SimpleHTTPRequestHandler):
@@ -117,6 +123,10 @@ def _asset_references(source: str) -> set[str]:
             continue
         references.add(parsed.path)
     return references
+
+
+def _without_speaker_notes(source: str) -> str:
+    return NOTES_BLOCK_PATTERN.sub("", source)
 
 
 def _yaml_scalar(value: str) -> str:
@@ -446,7 +456,14 @@ def _create_preview(export_root: Path, preview_path: str) -> None:
         pdf.unlink(missing_ok=True)
 
 
-def export_presentation(deck: Path, output: Path, *, assets: str = "local", preview: bool = False) -> Path:
+def export_presentation(
+    deck: Path,
+    output: Path,
+    *,
+    assets: str = "local",
+    preview: bool = False,
+    include_notes: bool = True,
+) -> Path:
     resolved = deck.resolve()
     if not resolved.is_file():
         raise FileNotFoundError(f"Presentation not found: {resolved}")
@@ -460,6 +477,8 @@ def export_presentation(deck: Path, output: Path, *, assets: str = "local", prev
         raise FileExistsError(f"Export destination already exists: {destination}")
     destination.parent.mkdir(parents=True, exist_ok=True)
     source = resolved.read_text(encoding="utf-8")
+    if not include_notes:
+        source = _without_speaker_notes(source)
     metadata = _page_metadata(source, resolved.stem)
     preview_path = None
     if preview:

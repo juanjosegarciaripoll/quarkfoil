@@ -67,6 +67,32 @@ class ExporterTests(unittest.TestCase):
         self.assertIn('document.body.dataset.playerSource === "local"', player)
         self.assertNotIn('data-player-source="local"', index)
 
+    def test_export_can_remove_speaker_notes(self) -> None:
+        self.deck.write_text(
+            "## First {.layout-1}\n\nVisible content.\n\n"
+            "::: notes\nPrivate speaker note.\n\nSecond paragraph.\n:::\n\n"
+            "---\n\n## Second {.layout-1}\n\nStill visible.\n\n"
+            "::: notes {audience=private}\nAnother private note.\n:::\n",
+            encoding="utf-8",
+        )
+        output = export_presentation(self.deck, self.root / "no-notes-site", include_notes=False)
+        exported = (output / "presentation.md").read_text(encoding="utf-8")
+        self.assertIn("Visible content.", exported)
+        self.assertIn("Still visible.", exported)
+        self.assertNotIn("::: notes", exported)
+        self.assertNotIn("Private speaker note", exported)
+        self.assertNotIn("Another private note", exported)
+
+    def test_cli_no_notes_removes_speaker_notes(self) -> None:
+        self.deck.write_text(
+            "## Slide {.layout-1}\n\nContent.\n\n::: notes\nDo not publish.\n:::\n",
+            encoding="utf-8",
+        )
+        output = self.root / "cli-no-notes-site"
+        result = main(["export", str(self.deck), "--output", str(output), "--no-notes"])
+        self.assertEqual(result, 0)
+        self.assertNotIn("Do not publish", (output / "presentation.md").read_text(encoding="utf-8"))
+
     def test_deck_metadata_is_written_into_exported_html(self) -> None:
         self.deck.write_text(
             "---\ntitle: Quantum & light\nauthor:\n  - Ada Lovelace\n  - Emmy Noether\n"

@@ -76,7 +76,13 @@ python -m http.server --directory lecture-site
 ```
 
 Then open `http://127.0.0.1:8000/`. Reveal.js keyboard, touch, overview,
-fragments, URL hashes, and speaker notes remain available.
+fragments, URL hashes, and speaker notes remain available. To publish without
+speaker notes, add `--no-notes`; this removes the notes from the exported
+`presentation.md` rather than merely hiding them in the player:
+
+```console
+quarkfoil export lecture.md --output lecture-site --no-notes
+```
 
 ## Link-sharing preview
 

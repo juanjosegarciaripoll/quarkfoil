@@ -24,8 +24,19 @@ def _export(arguments: list[str]) -> int:
         action="store_true",
         help="Create a link-sharing preview with a Chromium browser and Ghostscript",
     )
+    parser.add_argument(
+        "--no-notes",
+        action="store_true",
+        help="Remove speaker notes from the exported presentation",
+    )
     args = parser.parse_args(arguments)
-    destination = export_presentation(args.deck, args.output, assets=args.assets, preview=args.preview)
+    destination = export_presentation(
+        args.deck,
+        args.output,
+        assets=args.assets,
+        preview=args.preview,
+        include_notes=not args.no_notes,
+    )
     print(f"Exported Quarkfoil presentation to {destination}")
     print(f"Serve {destination / 'index.html'} from any static web server")
     return 0
