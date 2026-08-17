@@ -5,6 +5,7 @@ import unittest
 import subprocess
 import sys
 from pathlib import Path
+from unittest import mock
 
 from scientific_slides import main
 from scientific_slides.exporter import _asset_references, export_presentation
@@ -65,6 +66,38 @@ class ExporterTests(unittest.TestCase):
         player = (output / "quarkfoil/player.js").read_text(encoding="utf-8")
         self.assertIn('document.body.dataset.playerSource === "local"', player)
         self.assertNotIn('data-player-source="local"', index)
+
+    def test_deck_metadata_is_written_into_exported_html(self) -> None:
+        self.deck.write_text(
+            "---\ntitle: Quantum & light\nauthor:\n  - Ada Lovelace\n  - Emmy Noether\n"
+            "subtitle: A <shared> deck\n---\n\n## Slide\n",
+            encoding="utf-8",
+        )
+        output = export_presentation(self.deck, self.root / "metadata-site")
+        index = (output / "index.html").read_text(encoding="utf-8")
+        self.assertIn("<title>Quantum &amp; light</title>", index)
+        self.assertIn('name="author" content="Ada Lovelace, Emmy Noether"', index)
+        self.assertIn('property="og:description" content="A &lt;shared&gt; deck"', index)
+        self.assertNotIn('property="og:image"', index)
+
+    def test_preview_uses_deck_name_and_configured_figures_folder(self) -> None:
+        self.deck.write_text(
+            "---\ntitle: Preview\nassets:\n  figures: artwork\n---\n\n## Slide\n",
+            encoding="utf-8",
+        )
+
+        def create_preview(root: Path, relative: str) -> None:
+            self.assertEqual(relative, "artwork/lecture-preview.png")
+            target = root / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(b"png")
+
+        with mock.patch("scientific_slides.exporter._create_preview", side_effect=create_preview):
+            output = export_presentation(self.deck, self.root / "preview-site", preview=True)
+        index = (output / "index.html").read_text(encoding="utf-8")
+        self.assertTrue((output / "artwork/lecture-preview.png").is_file())
+        self.assertIn('property="og:image" content="artwork/lecture-preview.png"', index)
+        self.assertIn('name="twitter:image" content="artwork/lecture-preview.png"', index)
 
     def test_imported_icon_license_is_folded_into_export_notice(self) -> None:
         icon = self.project / "figures/icons/tabler--car.svg"

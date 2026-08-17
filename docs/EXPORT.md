@@ -78,6 +78,26 @@ python -m http.server --directory lecture-site
 Then open `http://127.0.0.1:8000/`. Reveal.js keyboard, touch, overview,
 fragments, URL hashes, and speaker notes remain available.
 
+## Link-sharing preview
+
+Add `--preview` to create a PNG suitable for services that inspect Open Graph
+or Twitter card metadata:
+
+```console
+quarkfoil export lecture.md --output lecture-site --preview
+```
+
+Quarkfoil produces a temporary PDF through the same Reveal.js print route used
+by **Print / PDF**, then asks Ghostscript to rasterize its first page. This
+requires Chrome, Chromium, or Edge and the Ghostscript command-line program.
+For `lecture.md`, the resulting image is `figures/lecture-preview.png`, or the
+equivalent location selected by `assets.figures`. Its reference in `index.html`
+remains relative so the exported folder can be deployed at any URL.
+
+The exported HTML also contains the presentation title, author, description
+(or subtitle), and corresponding link-sharing metadata directly in its
+`<head>`; crawlers do not need to run the presentation JavaScript to read it.
+
 ## Print or save as PDF
 
 Use **Print / PDF** in an exported presentation, or press <kbd>Ctrl</kbd>+<kbd>P</kbd>

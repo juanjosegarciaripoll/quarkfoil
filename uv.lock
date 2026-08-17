@@ -549,6 +549,9 @@ wheels = [
 name = "quarkfoil"
 version = "0.4.0"
 source = { editable = "." }
+dependencies = [
+    { name = "pyyaml" },
+]
 
 [package.dev-dependencies]
 browser = [
@@ -559,6 +562,7 @@ docs = [
 ]
 
 [package.metadata]
+requires-dist = [{ name = "pyyaml", specifier = ">=6,<7" }]
 
 [package.metadata.requires-dev]
 browser = [{ name = "selenium", specifier = ">=4.35,<5" }]

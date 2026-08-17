@@ -26,6 +26,8 @@ The supported preface fields are:
 |---|---|---|
 | `title` | Presentation title and exported browser-page title | `New presentation` for a generated starter |
 | `author` | Presentation author metadata | Empty, except in a generated starter |
+| `subtitle` | Presentation description used by exported link-sharing metadata | Empty |
+| `description` | Explicit exported description; takes precedence over `subtitle` | Empty |
 | `aspect-ratio` | Intended slide aspect ratio | `16:9` |
 | `theme` | Default presentation theme (`scientific-light` or `scientific-dark`) | `scientific-light` |
 | `defaults.footer` | Markdown footer inherited by slides | Empty |

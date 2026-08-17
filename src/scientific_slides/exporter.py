@@ -3,12 +3,17 @@ from __future__ import annotations
 import base64
 import hashlib
 import html
+import http.server
 import os
 import re
 import shutil
+import subprocess
 import tempfile
+import threading
 from pathlib import Path
-from urllib.parse import unquote, urlsplit
+from urllib.parse import quote, unquote, urlsplit
+
+import yaml
 
 from .icons import icon_notices
 from .paths import APP_ROOT, inside as _inside
@@ -83,6 +88,11 @@ ASSET_PATTERN = re.compile(r"!?\[[^\]]*\]\(([^)\s]+)")
 ATTRIBUTE_ASSET_PATTERN = re.compile(r"\b(?:src|poster)=(?:\"([^\"]+)\"|'([^']+)'|([^\s}]+))")
 
 
+class _QuietHandler(http.server.SimpleHTTPRequestHandler):
+    def log_message(self, format: str, *args: object) -> None:
+        pass
+
+
 def _integrity(path: Path) -> str:
     digest = hashlib.sha384(path.read_bytes()).digest()
     return "sha384-" + base64.b64encode(digest).decode("ascii")
@@ -114,6 +124,38 @@ def _yaml_scalar(value: str) -> str:
     if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
         value = value[1:-1]
     return value.strip()
+
+
+def _front_matter(source: str) -> dict[str, object]:
+    if not source.startswith("---"):
+        return {}
+    match = re.match(r"^---[ \t]*\r?\n(.*?)\r?\n---[ \t]*(?:\r?\n|$)", source, re.DOTALL)
+    if not match:
+        return {}
+    loaded = yaml.safe_load(match.group(1)) or {}
+    if not isinstance(loaded, dict):
+        raise ValueError("Presentation front matter must be a mapping")
+    return loaded
+
+
+def _metadata_text(value: object) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, list):
+        return ", ".join(filter(None, (_metadata_text(item) for item in value)))
+    if isinstance(value, dict):
+        if "name" in value:
+            return _metadata_text(value["name"])
+        return " ".join(filter(None, (_metadata_text(item) for item in value.values())))
+    return str(value)
+
+
+def _page_metadata(source: str, fallback_title: str) -> dict[str, str]:
+    front = _front_matter(source)
+    title = _metadata_text(front.get("title")) or fallback_title
+    author = _metadata_text(front.get("author"))
+    description = _metadata_text(front.get("description")) or _metadata_text(front.get("subtitle"))
+    return {"title": title, "author": author, "description": description}
 
 
 def _configured_asset_folders(source: str) -> set[str]:
@@ -259,7 +301,7 @@ def _resource_tags(assets: str) -> tuple[str, str, str]:
     return styles, scripts, "'self' https://cdn.jsdelivr.net"
 
 
-def _index_html(assets: str) -> str:
+def _index_html(assets: str, metadata: dict[str, str], preview_path: str | None = None) -> str:
     styles, scripts, external = _resource_tags(assets)
     # Reveal's notes plugin writes this pinned inline speaker-controller script
     # into its popup; the hash avoids enabling arbitrary inline JS.
@@ -270,6 +312,30 @@ def _index_html(assets: str) -> str:
         f"font-src {external}; img-src 'self' data:; connect-src 'self'; "
         "object-src 'none'; frame-src 'self'; base-uri 'none'; form-action 'none'"
     )
+    title = html.escape(metadata["title"], quote=True)
+    author = html.escape(metadata["author"], quote=True)
+    description = html.escape(metadata["description"], quote=True)
+    meta = [f'  <meta name="author" content="{author}">'] if author else []
+    if description:
+        meta.append(f'  <meta name="description" content="{description}">')
+    meta.extend((
+        '  <meta property="og:type" content="website">',
+        f'  <meta property="og:title" content="{title}">',
+        '  <meta name="twitter:card" content="summary_large_image">',
+        f'  <meta name="twitter:title" content="{title}">',
+    ))
+    if description:
+        meta.extend((
+            f'  <meta property="og:description" content="{description}">',
+            f'  <meta name="twitter:description" content="{description}">',
+        ))
+    if preview_path:
+        preview_url = html.escape(quote(preview_path, safe="/"), quote=True)
+        meta.extend((
+            f'  <meta property="og:image" content="{preview_url}">',
+            f'  <meta name="twitter:image" content="{preview_url}">',
+        ))
+    metadata_tags = "\n".join(meta)
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -277,7 +343,8 @@ def _index_html(assets: str) -> str:
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="referrer" content="no-referrer">
   <meta http-equiv="Content-Security-Policy" content="{html.escape(policy, quote=True)}">
-  <title>Quarkfoil presentation</title>
+  <title>{title}</title>
+{metadata_tags}
   <link rel="icon" href="quarkfoil/quarkfoil-mark.svg" type="image/svg+xml">
 {styles}
   <link rel="stylesheet" href="quarkfoil/layout.css">
@@ -297,7 +364,89 @@ def _index_html(assets: str) -> str:
 """
 
 
-def export_presentation(deck: Path, output: Path, *, assets: str = "local") -> Path:
+def _executable(candidates: tuple[str, ...], label: str) -> str:
+    for candidate in candidates:
+        found = shutil.which(candidate)
+        if found:
+            return found
+        path = Path(candidate)
+        if path.is_file():
+            return str(path)
+    raise RuntimeError(f"{label} is required to create an export preview")
+
+
+def _create_preview(export_root: Path, preview_path: str) -> None:
+    browser = _executable(
+        (
+            "chromium", "chromium-browser", "google-chrome", "google-chrome-stable", "microsoft-edge", "msedge",
+            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+            "/Applications/Chromium.app/Contents/MacOS/Chromium",
+            "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+        ),
+        "Chrome, Chromium, or Edge",
+    )
+    ghostscript = _executable(("gs", "gswin64c", "gswin32c"), "Ghostscript")
+    pdf = export_root / ".quarkfoil-preview.pdf"
+    output = export_root / preview_path
+    output.parent.mkdir(parents=True, exist_ok=True)
+    if output.exists():
+        raise FileExistsError(f"Preview image already exists in the presentation assets: {preview_path}")
+
+    handler = lambda *args, **kwargs: _QuietHandler(*args, directory=str(export_root), **kwargs)
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        url = f"http://127.0.0.1:{server.server_port}/?print-pdf"
+        subprocess.run(
+            [
+                browser,
+                "--headless=new",
+                "--disable-gpu",
+                "--no-pdf-header-footer",
+                "--virtual-time-budget=30000",
+                f"--print-to-pdf={pdf}",
+                url,
+            ],
+            check=True,
+            capture_output=True,
+            timeout=60,
+        )
+        if not pdf.is_file() or not pdf.stat().st_size:
+            raise RuntimeError("The browser did not create the preview PDF")
+        subprocess.run(
+            [
+                ghostscript,
+                "-q",
+                "-dSAFER",
+                "-dBATCH",
+                "-dNOPAUSE",
+                "-sDEVICE=png16m",
+                "-dFirstPage=1",
+                "-dLastPage=1",
+                "-r150",
+                f"-sOutputFile={output}",
+                str(pdf),
+            ],
+            check=True,
+            capture_output=True,
+            timeout=60,
+        )
+        if not output.is_file() or not output.stat().st_size:
+            raise RuntimeError("Ghostscript did not create the preview image")
+    except subprocess.CalledProcessError as error:
+        detail = error.stderr.decode(errors="replace").strip() if isinstance(error.stderr, bytes) else str(error.stderr or "").strip()
+        raise RuntimeError(detail or "Could not create the export preview") from error
+    except subprocess.TimeoutExpired as error:
+        raise RuntimeError("Timed out while creating the export preview") from error
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+        pdf.unlink(missing_ok=True)
+
+
+def export_presentation(deck: Path, output: Path, *, assets: str = "local", preview: bool = False) -> Path:
     resolved = deck.resolve()
     if not resolved.is_file():
         raise FileNotFoundError(f"Presentation not found: {resolved}")
@@ -311,6 +460,14 @@ def export_presentation(deck: Path, output: Path, *, assets: str = "local") -> P
         raise FileExistsError(f"Export destination already exists: {destination}")
     destination.parent.mkdir(parents=True, exist_ok=True)
     source = resolved.read_text(encoding="utf-8")
+    metadata = _page_metadata(source, resolved.stem)
+    preview_path = None
+    if preview:
+        figures = "figures"
+        front_assets = _front_matter(source).get("assets", {})
+        if isinstance(front_assets, dict) and front_assets.get("figures"):
+            figures = str(front_assets["figures"])
+        preview_path = (Path(figures) / f"{resolved.stem}-preview.png").as_posix()
 
     temporary = Path(tempfile.mkdtemp(prefix=f".{destination.name}-", dir=destination.parent))
     try:
@@ -324,7 +481,9 @@ def export_presentation(deck: Path, output: Path, *, assets: str = "local") -> P
         (temporary / "THIRD_PARTY_LICENSES.txt").write_text(
             _third_party_notice(resolved.parent, _asset_references(source)), encoding="utf-8"
         )
-        (temporary / "index.html").write_text(_index_html(assets), encoding="utf-8")
+        (temporary / "index.html").write_text(_index_html(assets, metadata, preview_path), encoding="utf-8")
+        if preview_path:
+            _create_preview(temporary, preview_path)
         os.replace(temporary, destination)
     except Exception:
         shutil.rmtree(temporary, ignore_errors=True)

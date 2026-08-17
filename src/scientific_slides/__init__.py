@@ -19,8 +19,13 @@ def _export(arguments: list[str]) -> int:
     assets = parser.add_mutually_exclusive_group()
     assets.add_argument("--assets", choices=("local", "cdn"), default="local", help="Dependency source (default: local)")
     assets.add_argument("--cdn", dest="assets", action="store_const", const="cdn", help="Use pinned jsDelivr dependencies")
+    parser.add_argument(
+        "--preview",
+        action="store_true",
+        help="Create a link-sharing preview with a Chromium browser and Ghostscript",
+    )
     args = parser.parse_args(arguments)
-    destination = export_presentation(args.deck, args.output, assets=args.assets)
+    destination = export_presentation(args.deck, args.output, assets=args.assets, preview=args.preview)
     print(f"Exported Quarkfoil presentation to {destination}")
     print(f"Serve {destination / 'index.html'} from any static web server")
     return 0

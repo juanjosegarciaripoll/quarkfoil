@@ -5,6 +5,9 @@ All notable changes to Quarkfoil are documented here. The project follows
 
 ## [Unreleased]
 
+- Export deck metadata directly in static HTML and optionally create a
+  Ghostscript link-sharing preview from the first PDF page.
+
 ## [0.4.0] - 2026-08-16
 
 This release strengthens day-to-day editing and recovery, expands diagram and
