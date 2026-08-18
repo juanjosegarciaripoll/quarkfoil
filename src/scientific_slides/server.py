@@ -24,7 +24,7 @@ from pathlib import Path
 
 from .icons import ICON_COLLECTIONS, fetch_icon_svg, import_icon, search_icons
 from .paths import APP_ROOT, inside as _inside
-from .storage import deck_file_lock
+from .storage import atomic_write, deck_file_lock
 
 
 MAX_WRITE_BYTES = 20 * 1024 * 1024
@@ -798,16 +798,7 @@ class SlideHandler(SimpleHTTPRequestHandler):
                     )
                     return
 
-                fd, temporary = tempfile.mkstemp(prefix=".slides-", suffix=".tmp", dir=deck_path.parent)
-                try:
-                    with os.fdopen(fd, "wb") as stream:
-                        stream.write(body)
-                        stream.flush()
-                        os.fsync(stream.fileno())
-                    os.replace(temporary, deck_path)
-                finally:
-                    if os.path.exists(temporary):
-                        os.unlink(temporary)
+                atomic_write(deck_path, body)
         self._send_json({"ok": True, "hash": hashlib.sha256(body).hexdigest()})
 
     def do_POST(self) -> None:
@@ -1036,8 +1027,11 @@ def fetch_doi_bibtex(value: str) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     arguments = list(sys.argv[1:] if argv is None else argv)
-    parser = argparse.ArgumentParser(description="Open a scientific Markdown presentation in Quarkfoil")
-    parser.add_argument("deck", type=Path, help="Markdown presentation to open")
+    parser = argparse.ArgumentParser(
+        description="Open a scientific Markdown presentation in Quarkfoil",
+        epilog="Agent deck operations: quarkfoil deck --help",
+    )
+    parser.add_argument("deck", metavar="DECK_FILE", type=Path, help="Markdown presentation to open")
     parser.add_argument("--host", default="127.0.0.1", help="Address to bind (default: 127.0.0.1)")
     parser.add_argument("--port", type=int, default=8765, help="Port to use; 0 chooses an available port (default: 8765)")
     parser.add_argument("--verbose", action="store_true", help="Log HTTP requests")

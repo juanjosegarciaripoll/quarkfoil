@@ -53,9 +53,9 @@ prompt:
 
 > Always use `--no-notes` when inspecting or applying this presentation.
 
-This hides notes from the assistant's command output. When the assistant
-replaces a slide with `--no-notes`, Quarkfoil keeps that slide's existing notes.
-Deleting a whole slide still deletes its notes with it.
+This hides notes from the assistant's command output. It never changes the
+stored notes. Replacing a slide keeps its existing notes by default; deleting a
+whole slide still deletes its notes with it.
 
 ## If something goes wrong
 
@@ -93,6 +93,10 @@ quarkfoil deck inspect lecture.md --no-notes
 `--no-notes` removes notes from the returned JSON, and the returned revision
 still identifies the complete file including notes.
 
+For a smaller response, `--no-source` omits the complete deck source,
+`--slides 2,5` returns only those slides, and `--compact` removes indentation.
+The revision always identifies the exact complete file bytes.
+
 ### Apply a transaction
 
 Create a transaction containing the inspected revision and one or more
@@ -105,7 +109,8 @@ operations:
     {
       "operation": "replace",
       "slide": 2,
-      "source": "## Revised method {.layout-1}\n\nNew content.\n"
+      "source": "## Revised method {.layout-1}\n\nNew content.\n",
+      "notes": "preserve"
     },
     {
       "operation": "insert",
@@ -132,6 +137,8 @@ quarkfoil deck apply lecture.md operations.json --if-revision sha256:0123456789a
 Supported operations are:
 
 - `replace`: replace `slide` with exactly one slide supplied as `source`.
+  Its optional `notes` policy is `preserve` (the default), `replace` (use notes
+  in `source`), or `remove`.
 - `insert`: insert one slide from `source` after `after`; zero inserts at the
   beginning.
 - `delete`: delete `slide`. The final slide cannot be deleted.
@@ -139,10 +146,22 @@ Supported operations are:
 
 Operations run sequentially. A slide number in each operation refers to the
 presentation produced by the preceding operation in the same transaction.
+For example, inserting after slide 2 makes the inserted slide number 3, so a
+following replacement of slide 3 replaces the new slide. Trashed slides remain
+part of the numbering. Moving a slide after itself is invalid; moving it to its
+current position changes nothing.
 
-On success, the command returns a new snapshot as JSON. Add `--no-notes` to
-omit notes from that returned snapshot and preserve existing notes on replaced
-slides. Explicitly deleting a slide still removes the complete slide.
+On success, the command returns a new snapshot and revision as JSON. Add
+`--no-notes` to omit notes from that returned snapshot; it does not control the
+replacement policy. Use `--quiet` for only the revision and diagnostics, and
+`--compact` for unindented JSON. Use `--dry-run` (or `--check`) to resolve and
+validate every sequential operation without writing the presentation.
+
+Run `quarkfoil deck protocol` for the versioned, machine-readable contract.
+Successful data is written to standard output. Errors are JSON on standard
+error: status 2 means an invalid request, and status 3 is a revision conflict.
+Validation errors identify the failing operation. Parser warnings are returned
+as diagnostics; parser errors reject the transaction.
 
 ### Conflict and safety behavior
 
@@ -153,5 +172,10 @@ Invalid transactions exit with status 2 and also change nothing.
 
 After all operations succeed, Quarkfoil validates the complete result, writes a
 temporary sibling file, flushes it, and atomically replaces the presentation.
+Failures leave the original file byte-for-byte unchanged. Untouched Markdown
+and the deck's newline style are retained. On POSIX systems its permission bits
+are retained; on Windows Quarkfoil uses the native replacement operation to
+retain file attributes and access-control lists. Revisions are SHA-256 hashes
+of the exact UTF-8 file bytes, without newline normalization.
 A clean browser editor reloads the external revision; an editor with unsaved
 work uses its normal external-change reconciliation flow.

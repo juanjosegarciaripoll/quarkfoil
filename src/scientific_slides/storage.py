@@ -56,8 +56,32 @@ def deck_file_lock(path: Path) -> Iterator[None]:
             _unlock(stream)
 
 
+def _replace_existing_windows(temporary: Path, path: Path) -> None:
+    """Replace an existing Windows file while retaining its ACLs and attributes."""
+    import ctypes
+    from ctypes import wintypes
+
+    replace_file = ctypes.WinDLL("kernel32", use_last_error=True).ReplaceFileW
+    replace_file.argtypes = (
+        wintypes.LPCWSTR,
+        wintypes.LPCWSTR,
+        wintypes.LPCWSTR,
+        wintypes.DWORD,
+        wintypes.LPVOID,
+        wintypes.LPVOID,
+    )
+    replace_file.restype = wintypes.BOOL
+    if not replace_file(str(path.resolve()), str(temporary.resolve()), None, 0, None, None):
+        raise ctypes.WinError(ctypes.get_last_error())
+
+
 def atomic_write(path: Path, data: bytes) -> None:
     """Durably replace *path* with *data* without exposing a partial file."""
+    original_mode = None
+    if os.name != "nt" and path.exists():
+        import stat
+
+        original_mode = stat.S_IMODE(path.stat().st_mode)
     descriptor, temporary_name = tempfile.mkstemp(prefix=".quarkfoil-deck-", suffix=".tmp", dir=path.parent)
     temporary = Path(temporary_name)
     try:
@@ -65,7 +89,12 @@ def atomic_write(path: Path, data: bytes) -> None:
             stream.write(data)
             stream.flush()
             os.fsync(stream.fileno())
-        os.replace(temporary, path)
+        if original_mode is not None:
+            os.chmod(temporary, original_mode)
+        if os.name == "nt" and path.exists():
+            _replace_existing_windows(temporary, path)
+        else:
+            os.replace(temporary, path)
         if os.name != "nt":
             directory = os.open(path.parent, os.O_RDONLY)
             try:
