@@ -250,8 +250,15 @@ function makeArrow(overlay) {
 }
 
 function fillContent(container, item, assetResolver, bibliography, preserveLines = false, preserveBlankLines = false) {
-  if (item.type === "image" && item.image) container.append(makeImage(item.image, assetResolver));
-  else if (item.type === "video" && item.video) container.append(makeVideo(item.video, assetResolver));
+  if (["image", "video"].includes(item.type) && (item.image || item.video)) {
+    const media = item.type === "image" ? makeImage(item.image, assetResolver) : makeVideo(item.video, assetResolver);
+    if (container.classList.contains("slide-overlay")) {
+      const clip = document.createElement("div");
+      clip.className = "overlay-media-clip";
+      clip.append(media);
+      container.append(clip);
+    } else container.append(media);
+  }
   else if (item.type === "arrow" && item.arrow) container.append(makeArrow(item));
   else if (item.type === "shape") {
     container.dataset.shape = item.shape;

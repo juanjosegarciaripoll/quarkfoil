@@ -238,6 +238,7 @@ body.presenting .toolbar { display: none; }
   border-radius: 50%;
   background: #0b7285;
 }
+.resize-handle::before { content: ""; position: absolute; inset: -5px; }
 .resize-handle.nw { left: -7px; top: -7px; cursor: nwse-resize; }
 .resize-handle.ne { right: -7px; top: -7px; cursor: nesw-resize; }
 .resize-handle.se { right: -7px; bottom: -7px; cursor: nwse-resize; }

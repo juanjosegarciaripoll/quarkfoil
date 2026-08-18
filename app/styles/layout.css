@@ -308,7 +308,8 @@ html.reveal-print .reveal .slides section.scientific-slide {
 .slide-overlay[data-align="center"] .katex-display > .katex { text-align: center; }
 .slide-overlay[data-align="right"] .katex-display,
 .slide-overlay[data-align="right"] .katex-display > .katex { text-align: right; }
-.overlay-image, .overlay-video { overflow: hidden; }
+.overlay-image, .overlay-video { overflow: visible; }
+.overlay-media-clip { position: absolute; inset: 0; overflow: hidden; }
 .overlay-citation {
   padding: 0.35em 0.5em;
   color: var(--muted);

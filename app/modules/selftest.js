@@ -716,10 +716,13 @@ try {
   assert(video.video.controls && video.video.autoplay && video.video.muted && !video.video.loop, "video playback defaults and options parse");
   const videoFixture = document.createElement("div");
   renderDeck(deck, videoFixture, asset => `/test/${asset}`);
+  document.body.append(videoFixture);
   const videoElement = videoFixture.querySelector(".overlay-video video");
+  const videoClip = videoElement.closest(".overlay-media-clip");
+  assert(videoClip?.parentElement.matches(".overlay-video") && getComputedStyle(videoClip).overflow === "hidden"
+    && getComputedStyle(videoClip.parentElement).overflow === "visible", "overlay media clips inside its box without clipping editor controls");
   assert(videoElement.src.endsWith("/test/artwork/demo.mp4") && videoElement.poster.endsWith("/test/artwork/poster.jpg"), "video and poster assets resolve");
   assert(videoElement.controls && videoElement.muted && videoElement.dataset.autoplay === "true", "native video options render");
-  document.body.append(videoFixture);
   let videoPlays = 0; let videoPauses = 0;
   videoElement.play = () => { videoPlays += 1; return Promise.resolve(); };
   videoElement.pause = () => { videoPauses += 1; };
