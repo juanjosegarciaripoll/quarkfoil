@@ -372,7 +372,7 @@ export class DesignEditor {
     document.addEventListener("copy", event => this.onCopy(event));
     document.addEventListener("cut", event => this.onCopy(event, { cut: true }));
     document.addEventListener("paste", event => this.onPaste(event));
-    for (const id of ["prop-focus-x", "prop-focus-y", "prop-image-opacity", "prop-font-size", "prop-cell-font-size"]) bindRangeControl(id);
+    for (const id of ["prop-focus-x", "prop-focus-y", "prop-image-opacity", "prop-font-size", "prop-cell-font-size", "prop-rotation"]) bindRangeControl(id);
     document.querySelector("#layout-select").addEventListener("change", event => this.changeLayout(event.target.value));
     document.querySelector("#prop-slide-theme").addEventListener("change", event => this.applySlideProperties({ theme: event.target.value || null }));
     document.querySelector("#prop-slide-footer").addEventListener("change", event => this.applySlideProperties({ footer: event.target.checked ? null : "none" }));
@@ -489,6 +489,8 @@ export class DesignEditor {
       document.querySelector(`#prop-${id}`).addEventListener("change", () => this.applyProperties());
     }
     document.querySelector("#prop-locked").addEventListener("change", () => this.applyProperties());
+    document.querySelector("#prop-rotation").addEventListener("input", event => this.previewRotation(event.target.value));
+    document.querySelector("#prop-rotation").addEventListener("change", () => this.applyRotation());
     document.querySelector("#prop-fit").addEventListener("change", () => this.applyImageProperties());
     document.querySelector("#prop-focus-x").addEventListener("change", () => this.applyImageProperties());
     document.querySelector("#prop-focus-y").addEventListener("change", () => this.applyImageProperties());
@@ -775,6 +777,7 @@ export class DesignEditor {
       input.disabled = object.type === "arrow" && key !== "z";
     }
     document.querySelector("#prop-fragment").value = object.fragment ?? "";
+    setRangeControl("prop-rotation", object.rotation);
     document.querySelector("#prop-locked").checked = object.locked;
     document.querySelector("#edit-content").hidden = ["image", "video", "citation", "arrow"].includes(object.type);
     if (object.type === "image" && object.image) {
@@ -837,6 +840,19 @@ export class DesignEditor {
     const value = Number(document.querySelector("#prop-font-size").value);
     this.commit(updateOverlay(this.options.getDeck(), this.slideIndex(), this.selected.dataset.objectId, {
       "font-size": `${Math.round(value * 100) / 100}em`,
+    }));
+  }
+
+  previewRotation(value) {
+    if (!this.selected) return;
+    this.selected.style.rotate = `${value}deg`;
+  }
+
+  applyRotation() {
+    if (!this.selected) return;
+    const rotation = Number(document.querySelector("#prop-rotation").value);
+    this.commit(updateOverlay(this.options.getDeck(), this.slideIndex(), this.selected.dataset.objectId, {
+      rotation: rotation === 0 ? null : rotation,
     }));
   }
 

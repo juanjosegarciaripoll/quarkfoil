@@ -35,7 +35,7 @@ import { applyMarkdownStyle, arrowGeometry, bindRangeControl, boundarySlideShort
 import { briefReference, formatBibliography, parseBibliography, prepareBibliography, renameBibliographyEntry, uniqueCitationKey } from "./bibliography.js";
 import { compileExpression, createPlotSvg } from "./plot.js";
 import { externalDeckAction, externalMergePlan, renderExternalMerge } from "./external.js";
-import { initialShapeGeometry, shapeLabelInsets, SHAPES } from "./shapes.js";
+import { initialShapeGeometry, makeShapeSvg, shapeLabelInsets, SHAPES } from "./shapes.js";
 import { pdfPrintUrl, pdfPrintView, printShortcut } from "./print.js";
 
 const source = `---
@@ -196,7 +196,7 @@ function assertShapes() {
   const palette = document.createElement("div");
   let chosenShape = null;
   const shapeButtons = buildShapePalette(palette, shape => { chosenShape = shape; });
-  assert(shapeButtons.length === 14 && shapeButtons.every(button => button.querySelector(".shape-background .shape-surface")),
+  assert(shapeButtons.length === Object.keys(SHAPES).length && shapeButtons.every(button => button.querySelector(".shape-background .shape-surface")),
     "shape palette uses every insertable shape SVG as an icon");
   const shapeSelect = document.createElement("select");
   buildShapeSelect(shapeSelect);
@@ -239,7 +239,7 @@ Second thought
 \\(E=mc^2\\)
 :::
 
-::: overlay {#arc type="shape" shape="arc" x="62" y="5" w="25" h="20" start-angle="45" end-angle="300" heads="both" stroke="#c92a2a"}
+::: overlay {#arc type="shape" shape="arc" x="62" y="5" w="25" h="20" rotation="15" start-angle="45" end-angle="300" heads="both" stroke="#c92a2a"}
 :::`);
   renderDeck(parsed, slides, source => source);
   slides.querySelector(".scientific-slide").classList.add("present");
@@ -273,6 +273,7 @@ Second thought
   const arc = parsed.slides[0].overlays.find(item => item.id === "arc");
   const arcElement = fixture.querySelector('[data-object-id="arc"]');
   const arcPath = arcElement.querySelector(".shape-arc");
+  assert(arc.rotation === 15 && arcElement.style.rotate === "15deg", "overlay rotation parses and renders");
   assert(arc.shapeParameters.startAngle === 45 && arc.shapeParameters.endAngle === 300 && arc.shapeParameters.heads === "both",
     "arc angles and arrowheads parse");
   assert(arcPath.getAttribute("d").includes("A 42 42 0 1 1") && arcPath.hasAttribute("marker-start") && arcPath.hasAttribute("marker-end"),
@@ -282,6 +283,11 @@ Second thought
   const changedArc = parseDeck(updateOverlay(parsed, 0, "arc", { "start-angle": 90, "end-angle": 225, heads: "end" }));
   assert(changedArc.slides[0].overlays.find(item => item.id === "arc").shapeParameters.endAngle === 225
     && changedArc.slides[0].overlays.find(item => item.id === "arc").shapeParameters.heads === "end", "arc parameters serialize");
+  const triangle = makeShapeSvg("triangle");
+  assert(Object.hasOwn(SHAPES, "triangle") && triangle.querySelector('polygon[points="50,0 100,100 0,100"]')
+    && shapeLabelInsets("triangle").join(" ") === "40 20 8 20", "triangle geometry and label-safe region are defined");
+  const rotated = updateOverlay(parsed, 0, "arc", { rotation: -30 });
+  assert(rotated.includes('rotation="-30"') && parseDeck(rotated).slides[0].overlays.find(item => item.id === "arc").rotation === -30, "overlay rotation serializes");
   fixture.remove();
 }
 

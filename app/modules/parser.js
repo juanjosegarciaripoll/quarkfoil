@@ -345,6 +345,7 @@ function parseSlide(source, range, index, diagnostics) {
           z: Number(block.attrs.values.z ?? overlays.length + 10),
         },
         fontSize: parseFontSize(block.attrs.values["font-size"]),
+        rotation: Number(block.attrs.values.rotation ?? 0),
         color: block.attrs.values.color || null,
         alignment,
         fragment: block.attrs.values.fragment ? Number(block.attrs.values.fragment) : null,
@@ -389,6 +390,7 @@ function parseSlide(source, range, index, diagnostics) {
     const values = Object.values(overlay.geometry);
     if (values.some(value => !Number.isFinite(value))) diagnostics.push({ level: "error", slide: index + 1, message: `Overlay '${overlay.id}' has invalid geometry` });
     if (!Number.isFinite(overlay.fontSize) || overlay.fontSize <= 0) diagnostics.push({ level: "error", slide: index + 1, message: `Overlay '${overlay.id}' has invalid font size` });
+    if (!Number.isFinite(overlay.rotation)) diagnostics.push({ level: "error", slide: index + 1, message: `Overlay '${overlay.id}' has invalid rotation` });
     if (!["left", "center", "right"].includes(overlay.alignment)) diagnostics.push({ level: "error", slide: index + 1, message: `Overlay '${overlay.id}' has invalid alignment` });
     if (overlay.type === "shape" && !Object.hasOwn(SHAPES, overlay.shape)) diagnostics.push({ level: "error", slide: index + 1, message: `Overlay '${overlay.id}' has unknown shape '${overlay.shape}'` });
     if (overlay.shape === "arc" && (!overlay.shapeParameters || !Number.isFinite(overlay.shapeParameters.startAngle) || !Number.isFinite(overlay.shapeParameters.endAngle))) diagnostics.push({ level: "error", slide: index + 1, message: `Arc '${overlay.id}' has invalid angles` });

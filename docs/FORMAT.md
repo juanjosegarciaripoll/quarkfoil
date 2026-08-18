@@ -294,6 +294,7 @@ Attributes:
 - `type`: `markdown`, `equation`, `image`, `video`, `shape`, or `arrow`.
 - `x`, `y`, `w`, `h`: percentages of the full slide.
 - `z`: layer order.
+- `rotation`: clockwise rotation in degrees; omitted or `0` leaves the overlay unrotated.
 - `locked="true"`: prevent graphical movement.
 - `fragment`: zero-based Reveal fragment index.
 - `font-size`: relative `em` scale for Markdown and equations; the editor exposes `0.25em` through `3em`.
@@ -346,7 +347,7 @@ E = mc^2
 ```
 
 The available shapes are `rectangle`, `rounded-rectangle`, `ellipse`, `circle`,
-`diamond`, `hexagon`, `cross`, `x`, `star`, `cloud`, `callout`, `left-brace`,
+`diamond`, `triangle`, `hexagon`, `cross`, `x`, `star`, `cloud`, `callout`, `left-brace`,
 `right-brace`, and `arc`.
 `fill` controls the background, `stroke` controls the outline, and `stroke-width` controls
 its width. `stroke-style` may be `solid` (the default), `dash`, `dash-dot`, or

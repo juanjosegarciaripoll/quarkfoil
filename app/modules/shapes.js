@@ -13,6 +13,7 @@ const SHAPE_DEFINITIONS = Object.freeze({
   ellipse: { label: "Ellipse", labelInsets: [15, 15, 15, 15], draw: common => svgElement("ellipse", { ...common, cx: "50", cy: "50", rx: "50", ry: "50" }) },
   circle: { label: "Circle", labelInsets: [15, 15, 15, 15], draw: common => svgElement("circle", { ...common, cx: "50", cy: "50", r: "50" }) },
   diamond: { label: "Diamond", labelInsets: [25, 25, 25, 25], draw: common => svgElement("polygon", { ...common, points: "50,0 100,50 50,100 0,50" }) },
+  triangle: { label: "Triangle", labelInsets: [40, 20, 8, 20], draw: common => svgElement("polygon", { ...common, points: "50,0 100,100 0,100" }) },
   hexagon: { label: "Hexagon", labelInsets: [8, 20, 8, 20], draw: common => svgElement("polygon", { ...common, points: "25,0 75,0 100,50 75,100 25,100 0,50" }) },
   cross: { label: "Cross", initialGeometry: { x: 41, y: 29, w: 18, h: 32 }, labelInsets: [36, 36, 36, 36], draw: common => svgElement("polygon", { ...common, points: "35,0 65,0 65,35 100,35 100,65 65,65 65,100 35,100 35,65 0,65 0,35 35,35" }) },
   x: { label: "X", labelInsets: [36, 36, 36, 36], draw: common => svgElement("polygon", { ...common, points: "0,20 20,0 50,30 80,0 100,20 70,50 100,80 80,100 50,70 20,100 0,80 30,50" }) },

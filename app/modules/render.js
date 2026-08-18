@@ -358,6 +358,7 @@ function renderSlide(slide, metadata, assetResolver, bibliography) {
     element.style.width = `${overlay.geometry.w}%`;
     element.style.height = `${overlay.geometry.h}%`;
     element.style.zIndex = String(overlay.geometry.z);
+    element.style.rotate = `${overlay.rotation}deg`;
     if (/^#[0-9a-f]{6}(?:[0-9a-f]{2})?$/i.test(overlay.color || "")) element.style.color = overlay.color;
     if (!["image", "video", "arrow"].includes(overlay.type)) {
       element.style.fontSize = `${overlay.fontSize}em`;
