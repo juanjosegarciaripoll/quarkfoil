@@ -77,7 +77,7 @@ class DeckCliTests(unittest.TestCase):
         self.assertIn("Quarkfoil agent protocol v1", output)
         self.assertIn('"operation":"replace"', output)
         self.assertIn("Exit 3 means the deck changed", output)
-        self.assertIn("--no-notes filters returned JSON only", output)
+        self.assertIn("--no-notes hides returned notes", output)
 
     def test_no_notes_only_filters_returned_output(self) -> None:
         result, output, _ = self.invoke(["deck", "inspect", str(self.deck), "--no-notes"])
@@ -116,6 +116,21 @@ class DeckCliTests(unittest.TestCase):
         self.assertIn("New private note", stored)
         self.assertNotIn("New private note", payload["source"])
         self.assertEqual(payload["revision"], revision(stored.encode("utf-8")))
+
+    def test_no_notes_preserves_hidden_notes_when_replacing_slide(self) -> None:
+        transaction = Path(self.temporary.name) / "transaction.json"
+        transaction.write_text(json.dumps({
+            "revision": revision(SOURCE.encode("utf-8")),
+            "operations": [{
+                "operation": "replace",
+                "slide": 1,
+                "source": "## Revised {.layout-1}\n\nVisible replacement.\n",
+            }],
+        }), encoding="utf-8")
+        result, output, errors = self.invoke(["deck", "apply", str(self.deck), str(transaction), "--no-notes"])
+        self.assertEqual((result, errors), (0, ""))
+        self.assertIn("Private first note", self.deck.read_text(encoding="utf-8"))
+        self.assertNotIn("Private first note", json.loads(output)["source"])
 
     def test_stale_revision_rejects_without_writing(self) -> None:
         transaction = Path(self.temporary.name) / "transaction.json"

@@ -43,7 +43,7 @@ nav:
   - Quick start: QUICK_START.md
   - User guide:
       - Installation and command line: INSTALLATION.md
-      - Agent command line: AGENT_CLI.md
+      - Use with AI assistants: AGENT_CLI.md
       - Editor: USER_GUIDE.md
       - Export a static website: EXPORT.md
       - Presentation format: FORMAT.md

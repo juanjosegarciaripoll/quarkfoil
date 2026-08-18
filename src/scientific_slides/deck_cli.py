@@ -33,7 +33,7 @@ Operations:
 
 Operations are sequential. Always use the revision returned by inspect.
 Exit 3 means the deck changed: inspect again and rebuild the transaction.
---no-notes filters returned JSON only; it never deletes stored notes.
+--no-notes hides returned notes and preserves notes when replacing a slide.
 """
 
 
@@ -143,7 +143,7 @@ def _slide_position(deck: Deck, number: int) -> int:
     return next(index for index, item in enumerate(deck.items) if item is target)
 
 
-def _apply_operation(source: str, operation: Any) -> str:
+def _apply_operation(source: str, operation: Any, *, preserve_notes: bool = False) -> str:
     if not isinstance(operation, dict):
         raise DeckCommandError("each operation must be a JSON object")
     name = operation.get("operation", operation.get("op"))
@@ -152,8 +152,14 @@ def _apply_operation(source: str, operation: Any) -> str:
     deck = parse_deck(source)
     items = [item.raw for item in deck.items]
     if name == "replace":
-        position = _slide_position(deck, _integer(operation, "slide"))
-        items[position] = _slide_source(operation.get("source"))
+        number = _integer(operation, "slide")
+        position = _slide_position(deck, number)
+        replacement = _slide_source(operation.get("source"))
+        existing = deck.slides[number - 1]
+        if preserve_notes and existing.notes_range:
+            note = deck.source[existing.notes_range.start:existing.notes_range.end].strip()
+            replacement = f"{without_notes(replacement).rstrip()}\n\n{note}"
+        items[position] = replacement
     elif name == "insert":
         after = _integer(operation, "after", minimum=0)
         if after > len(deck.slides):
@@ -184,11 +190,11 @@ def _apply_operation(source: str, operation: Any) -> str:
     return _compose(deck, items)
 
 
-def apply_transaction(source: str, operations: Any) -> str:
+def apply_transaction(source: str, operations: Any, *, preserve_notes: bool = False) -> str:
     if not isinstance(operations, list) or not operations:
         raise DeckCommandError("transaction requires a nonempty 'operations' array")
     for operation in operations:
-        source = _apply_operation(source, operation)
+        source = _apply_operation(source, operation, preserve_notes=preserve_notes)
     deck = parse_deck(source)
     errors = [item.message for item in deck.diagnostics if item.level == "error"]
     if errors:
@@ -240,7 +246,7 @@ def _apply(arguments: list[str]) -> int:
         data, current = _read_deck(path)
         if current != expected:
             raise RevisionConflict(expected, current)
-        updated = apply_transaction(data.decode("utf-8"), operations)
+        updated = apply_transaction(data.decode("utf-8"), operations, preserve_notes=args.no_notes)
         encoded = updated.encode("utf-8")
         if len(encoded) > MAX_DECK_BYTES:
             raise DeckCommandError(f"updated presentation exceeds the {MAX_DECK_BYTES}-byte limit")

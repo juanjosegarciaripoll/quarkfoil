@@ -76,7 +76,7 @@ instead of copying the browser libraries. See the
 ## Documentation
 
 - [Installation and command-line use](docs/INSTALLATION.md)
-- [Agent command-line interface](docs/AGENT_CLI.md)
+- [Use Quarkfoil with AI assistants](docs/AGENT_CLI.md)
 - [Editor guide](docs/USER_GUIDE.md)
 - [Markdown format reference](docs/FORMAT.md)
 - [Security and trust model](docs/SECURITY.md)

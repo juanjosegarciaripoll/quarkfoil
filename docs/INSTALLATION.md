@@ -98,6 +98,10 @@ Add `--cdn` for a smaller, network-dependent export. See the
 [static export guide](EXPORT.md) for the generated structure, deployment, and
 security trade-offs.
 
+To let a coding assistant make safe, structured slide changes, follow
+[Use Quarkfoil with an AI assistant](AGENT_CLI.md). No additional plugin or
+service is required beyond an assistant that can run local terminal commands.
+
 ## Project structure
 
 A presentation project is deliberately small:
