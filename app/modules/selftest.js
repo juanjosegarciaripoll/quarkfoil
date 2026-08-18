@@ -723,6 +723,7 @@ try {
     && getComputedStyle(videoClip.parentElement).overflow === "visible", "overlay media clips inside its box without clipping editor controls");
   assert(videoElement.src.endsWith("/test/artwork/demo.mp4") && videoElement.poster.endsWith("/test/artwork/poster.jpg"), "video and poster assets resolve");
   assert(videoElement.controls && videoElement.muted && videoElement.dataset.autoplay === "true", "native video options render");
+  assert(getComputedStyle(videoElement).backgroundColor === "rgba(0, 0, 0, 0)", "video boxes keep a transparent background");
   let videoPlays = 0; let videoPauses = 0;
   videoElement.play = () => { videoPlays += 1; return Promise.resolve(); };
   videoElement.pause = () => { videoPauses += 1; };

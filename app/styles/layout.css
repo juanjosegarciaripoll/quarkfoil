@@ -243,7 +243,7 @@ html.reveal-print .reveal .slides section.scientific-slide {
   max-height: none;
   margin: 0;
 }
-.slide-video { background: #111; }
+.slide-video { background: transparent; }
 .slide-image[data-fit="contain"], .slide-video[data-fit="contain"] { object-fit: contain; }
 .slide-image[data-fit="cover"], .slide-video[data-fit="cover"] { object-fit: cover; }
 .slide-image[data-fit="stretch"] { overflow: hidden; }
