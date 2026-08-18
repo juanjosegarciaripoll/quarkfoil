@@ -16,14 +16,15 @@ from .storage import atomic_write, deck_file_lock
 
 MAX_DECK_BYTES = 20 * 1024 * 1024
 PROTOCOL_VERSION = 1
-CAPABILITIES = ("replace", "insert", "delete", "move", "notes_policy", "dry_run", "quiet", "compact", "inspect_projection")
+CAPABILITIES = ("replace", "insert", "delete", "move", "notes_policy", "dry_run", "quiet", "compact",
+                "inspect_projection", "slide_fingerprints", "apply_results", "source_file")
 GUIDE = """Quarkfoil agent protocol v1
 
 1. Read:
-   quarkfoil deck inspect DECK [--no-notes]
+   quarkfoil deck inspect DECK --no-source --slides N --compact [--no-notes]
 
 2. Apply:
-   quarkfoil deck apply DECK [TRANSACTION.json|-] [--dry-run] [--quiet]
+   quarkfoil deck apply DECK [TRANSACTION.json|-] --quiet --compact
 
 Transaction:
 {"revision":"sha256:...","operations":[...]}
@@ -35,9 +36,13 @@ Operations:
 {"operation":"move","slide":N,"after":N}           # 0 = beginning
 
 Operations are sequential. Always use the revision returned by inspect.
+Apply directly in normal use: it validates everything before one atomic write.
+Use --dry-run only when a separate preview is specifically needed.
 Exit 3 means the deck changed: inspect again and rebuild the transaction.
 Errors are JSON on stderr. Run `quarkfoil deck protocol` for the full contract.
---no-notes hides returned notes; replacement notes default to preserve.
+--no-notes hides returned notes. Default notes policy preserves existing notes
+and ignores notes in replacement source; use "notes":"replace" to store them.
+For complex Markdown, use "source_file":"slide.md" instead of "source".
 """
 
 PROTOCOL = {
@@ -50,18 +55,78 @@ PROTOCOL = {
         "operations_are_sequential": True,
         "unknown_fields": "rejected",
         "operations": {
-            "replace": {"required": ["slide", "source"], "optional": {"notes": ["preserve", "replace", "remove"]}},
-            "insert": {"required": ["after", "source"], "after_zero": "beginning"},
+            "replace": {"required": ["slide", "exactly one of source or source_file"],
+                        "optional": {"notes": ["preserve", "replace", "remove"], "source_revision": "sha256:..."}},
+            "insert": {"required": ["after", "exactly one of source or source_file"],
+                       "optional": {"source_revision": "sha256:..."}, "after_zero": "beginning"},
             "delete": {"required": ["slide"]},
             "move": {"required": ["slide", "after"], "after_zero": "beginning"},
         },
     },
-    "responses": {
-        "success": "JSON on stdout",
-        "error": "JSON on stderr",
-        "inspect": ["protocol_version", "revision", "metadata", "source", "slides", "diagnostics"],
-        "apply": ["protocol_version", "revision", "metadata", "source", "slides", "diagnostics"],
-        "quiet_apply": ["protocol_version", "capabilities", "revision", "diagnostics", "dry_run"],
+    "io": {"success": "JSON on stdout", "error": "JSON on stderr"},
+    "response_shapes": {
+        "slide": {
+            "type": "object",
+            "required": ["number", "slide_revision", "title", "layout", "trashed", "source"],
+            "properties": {
+                "number": {"type": "integer", "minimum": 1},
+                "slide_revision": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+                "title": {"type": "string"}, "layout": {"type": "string"},
+                "trashed": {"type": "boolean"}, "source": {"type": "string"},
+            },
+            "additionalProperties": False,
+        },
+        "inspect": {
+            "type": "object",
+            "required": ["protocol_version", "capabilities", "revision", "metadata", "slides", "diagnostics"],
+            "properties": {
+                "protocol_version": {"const": PROTOCOL_VERSION}, "capabilities": {"type": "array"},
+                "revision": {"type": "string"}, "metadata": {"type": "object"},
+                "slides": {"type": "array", "items": "slide"},
+                "diagnostics": {"type": "array"}, "source": {"type": "string"},
+            },
+            "additionalProperties": False,
+            "notes": "source is omitted with --no-source; projected slides are returned in deck order",
+        },
+        "apply": {
+            "type": "object",
+            "required": ["protocol_version", "capabilities", "revision", "diagnostics", "dry_run",
+                         "changed_slides", "operation_results"],
+            "properties": {
+                "protocol_version": {"const": PROTOCOL_VERSION}, "capabilities": {"type": "array"},
+                "revision": {"type": "string"}, "diagnostics": {"type": "array"},
+                "dry_run": {"type": "boolean"},
+                "changed_slides": {"type": "array", "items": "slide"},
+                "operation_results": {"type": "array", "items": "operation_result"},
+                "metadata": {"type": "object"},
+                "slides": {"type": "array", "items": "slide"},
+                "source": {"type": "string"},
+            },
+            "additionalProperties": False,
+            "notes": "--quiet omits metadata, slides, and source; changed_slides remains",
+        },
+        "operation_result": {
+            "type": "object", "required": ["operation", "type", "result_slide"],
+            "properties": {
+                "operation": {"type": "integer", "minimum": 0},
+                "type": {"enum": ["replace", "insert", "delete", "move"]},
+                "result_slide": {"type": ["integer", "null"], "minimum": 1},
+                "deleted_slide": {"type": "integer", "minimum": 1},
+                "from_slide": {"type": "integer", "minimum": 1},
+                "after": {"type": "integer", "minimum": 0}, "no_op": {"type": "boolean"},
+            },
+            "additionalProperties": False,
+        },
+        "error": {
+            "type": "object",
+            "required": ["error", "message"],
+            "properties": {
+                "error": {"type": "string"}, "message": {"type": "string"},
+                "operation": {"type": "integer", "minimum": 0}, "path": {"type": "string"},
+                "expected_revision": {"type": "string"}, "actual_revision": {"type": "string"},
+            },
+            "notes": "revision_mismatch includes expected_revision and actual_revision",
+        },
     },
     "exit_codes": {"0": "success", "2": "invalid request", "3": "revision conflict"},
     "revision": "SHA-256 of the exact UTF-8 file bytes",
@@ -155,6 +220,13 @@ def _summary(
     selected_slides: set[int] | None = None,
 ) -> dict[str, Any]:
     deck = parse_deck(source)
+    if selected_slides is not None:
+        missing = sorted(selected_slides - set(range(1, len(deck.slides) + 1)))
+        if missing:
+            raise DeckCommandError(
+                f"unknown slide {missing[0]}; presentation has {len(deck.slides)} slides",
+                code="unknown_slide", slide=missing[0], slide_count=len(deck.slides),
+            )
     slides = []
     for slide in deck.slides:
         if selected_slides is not None and slide.index + 1 not in selected_slides:
@@ -162,6 +234,7 @@ def _summary(
         raw = slide.raw if include_notes else without_notes(slide.raw)
         slides.append({
             "number": slide.index + 1,
+            "slide_revision": revision(slide.raw.encode("utf-8")),
             "title": slide.title,
             "layout": slide.layout,
             "trashed": slide.trashed,
@@ -316,27 +389,154 @@ def _apply_operation(source: str, operation: Any) -> str:
         raise DeckCommandError(f"unknown operation '{name}'")
 
 
-def apply_transaction(source: str, operations: Any) -> str:
+def _apply_transaction_details(source: str, operations: Any) -> tuple[str, list[dict[str, Any]], set[str], list[str]]:
     if not isinstance(operations, list) or not operations:
         raise DeckCommandError("transaction requires a nonempty 'operations' array")
+    tokens = [f"original:{index}" for index in range(len(parse_deck(source).slides))]
+    touched: set[str] = set()
+    results: list[dict[str, Any]] = []
     for index, operation in enumerate(operations):
         try:
-            source = _apply_operation(source, operation)
+            updated = _apply_operation(source, operation)
         except DeckCommandError as error:
             raise error.at_operation(index) from error
+        name = operation.get("operation", operation.get("op"))
+        result: dict[str, Any] = {"operation": index, "type": name}
+        if name == "replace":
+            token = tokens[operation["slide"] - 1]
+            touched.add(token)
+            result["_token"] = token
+        elif name == "insert":
+            token = f"inserted:{index}"
+            tokens.insert(operation["after"], token)
+            touched.add(token)
+            result["_token"] = token
+        elif name == "delete":
+            token = tokens.pop(operation["slide"] - 1)
+            touched.discard(token)
+            result.update({"deleted_slide": operation["slide"], "result_slide": None})
+        elif name == "move":
+            number, after = operation["slide"], operation["after"]
+            token = tokens[number - 1]
+            no_op = after == number - 1
+            if not no_op:
+                tokens.pop(number - 1)
+                tokens.insert(after - 1 if number < after else after, token)
+                touched.add(token)
+            result.update({"from_slide": number, "after": after, "no_op": no_op, "_token": token})
+        results.append(result)
+        source = updated
     deck = parse_deck(source)
     errors = [item.message for item in deck.diagnostics if item.level == "error"]
     if errors:
         raise DeckCommandError(f"transaction produced an invalid presentation: {errors[0]}")
-    return source
+    positions = {token: index + 1 for index, token in enumerate(tokens)}
+    for result in results:
+        token = result.pop("_token", None)
+        if token is not None:
+            result["result_slide"] = positions.get(token)
+    return source, results, touched, tokens
 
 
-def _load_transaction(path: str) -> Any:
+def apply_transaction(source: str, operations: Any) -> str:
+    return _apply_transaction_details(source, operations)[0]
+
+
+def _changed_slides(source: str, touched: set[str], tokens: list[str], *, include_notes: bool) -> list[dict[str, Any]]:
+    deck = parse_deck(source)
+    payload = []
+    for index, (slide, token) in enumerate(zip(deck.slides, tokens), start=1):
+        if token not in touched:
+            continue
+        payload.append({
+            "number": index,
+            "slide_revision": revision(slide.raw.encode("utf-8")),
+            "title": slide.title,
+            "layout": slide.layout,
+            "trashed": slide.trashed,
+            "source": slide.raw if include_notes else without_notes(slide.raw),
+        })
+    return payload
+
+
+def _load_transaction(path: str) -> tuple[Any, Path]:
     try:
-        text = sys.stdin.read() if path == "-" else Path(path).read_text(encoding="utf-8")
-        return json.loads(text)
+        if path == "-":
+            text, base = sys.stdin.read(), Path.cwd()
+        else:
+            transaction_path = Path(path).resolve()
+            text, base = transaction_path.read_text(encoding="utf-8"), transaction_path.parent
+        return json.loads(text), base
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
         raise DeckCommandError(f"cannot read transaction: {error}") from error
+
+
+def _materialize_sources(operations: Any, base: Path) -> Any:
+    """Read each external slide fragment once and replace it with inline source."""
+    if not isinstance(operations, list):
+        return operations
+    materialized = []
+    for index, value in enumerate(operations):
+        if not isinstance(value, dict) or value.get("operation", value.get("op")) not in ("replace", "insert"):
+            materialized.append(value)
+            continue
+        operation = dict(value)
+        has_source = "source" in operation
+        has_file = "source_file" in operation
+        if has_source == has_file:
+            raise DeckCommandError(
+                "operation requires exactly one of 'source' or 'source_file'",
+                operation=index, path=f"operations[{index}]",
+            )
+        if not has_file:
+            if "source_revision" in operation:
+                raise DeckCommandError(
+                    "'source_revision' requires 'source_file'",
+                    operation=index, path=f"operations[{index}].source_revision",
+                )
+            materialized.append(operation)
+            continue
+        source_value = operation["source_file"]
+        if not isinstance(source_value, str) or not source_value:
+            raise DeckCommandError(
+                "operation field 'source_file' must be a nonempty path",
+                operation=index, path=f"operations[{index}].source_file",
+            )
+        source_path = Path(source_value)
+        resolved = (base / source_path).resolve() if not source_path.is_absolute() else source_path.resolve()
+        details = {"operation": index, "path": f"operations[{index}].source_file", "resolved_source_path": str(resolved)}
+        try:
+            data = resolved.read_bytes()
+        except OSError as error:
+            raise DeckCommandError(f"cannot read slide source: {error}", **details) from error
+        if len(data) > MAX_DECK_BYTES:
+            raise DeckCommandError(f"slide source exceeds the {MAX_DECK_BYTES}-byte limit", **details)
+        expected = operation.get("source_revision")
+        actual = revision(data)
+        if expected is not None:
+            if not isinstance(expected, str) or not expected.startswith("sha256:") or len(expected) != 71 \
+                    or any(character not in "0123456789abcdef" for character in expected[7:]):
+                raise DeckCommandError("source_revision must be sha256 followed by 64 lowercase hexadecimal digits", **details)
+            if expected != actual:
+                raise DeckCommandError(
+                    "slide source revision does not match",
+                    code="source_revision_mismatch", expected_source_revision=expected,
+                    actual_source_revision=actual, **details,
+                )
+        try:
+            text = data.decode("utf-8")
+        except UnicodeDecodeError as error:
+            raise DeckCommandError("slide source is not valid UTF-8", **details) from error
+        try:
+            _slide_source(text)
+        except DeckCommandError as error:
+            error.details.update(details)
+            raise
+        operation["source"] = text
+        del operation["source_file"]
+        operation.pop("source_revision", None)
+        materialized.append(operation)
+    return materialized
 
 
 def _expected_revision(value: Any) -> str:
@@ -395,11 +595,15 @@ def _apply(arguments: list[str]) -> int:
     parser.add_argument("transaction", nargs="?", default="-", help="JSON transaction file, or - for stdin (default)")
     parser.add_argument("--if-revision", help="Expected SHA-256 revision; may instead be present in transaction JSON")
     parser.add_argument("--no-notes", action="store_true", help="Omit notes from returned JSON; does not change stored notes")
-    parser.add_argument("--dry-run", "--check", action="store_true", help="Validate and return the result without writing")
-    parser.add_argument("--quiet", action="store_true", help="Return only revision and diagnostics")
+    parser.add_argument("--dry-run", "--check", action="store_true",
+                        help="Preview without writing; normal apply already validates atomically")
+    parser.add_argument(
+        "--quiet", action="store_true",
+        help="Omit the complete deck snapshot; return revision, changed slides, operation results, and diagnostics",
+    )
     parser.add_argument("--compact", action="store_true", help="Emit compact JSON")
     args = parser.parse_args(arguments)
-    transaction = _load_transaction(args.transaction)
+    transaction, transaction_base = _load_transaction(args.transaction)
     if isinstance(transaction, list):
         operations, embedded_revision = transaction, None
     elif isinstance(transaction, dict):
@@ -409,6 +613,7 @@ def _apply(arguments: list[str]) -> int:
         operations, embedded_revision = transaction.get("operations"), transaction.get("revision")
     else:
         raise DeckCommandError("transaction must be an object or an operations array")
+    operations = _materialize_sources(operations, transaction_base)
     if args.if_revision and embedded_revision and _expected_revision(args.if_revision) != _expected_revision(embedded_revision):
         raise DeckCommandError("--if-revision and transaction revision disagree", code="revision_disagreement")
     expected = _expected_revision(args.if_revision or embedded_revision)
@@ -417,19 +622,27 @@ def _apply(arguments: list[str]) -> int:
         data, current = _read_deck(path)
         if current != expected:
             raise RevisionConflict(expected, current)
-        updated = apply_transaction(data.decode("utf-8"), operations)
+        updated, operation_results, touched, tokens = _apply_transaction_details(data.decode("utf-8"), operations)
         encoded = updated.encode("utf-8")
         if len(encoded) > MAX_DECK_BYTES:
             raise DeckCommandError(f"updated presentation exceeds the {MAX_DECK_BYTES}-byte limit")
         if not args.dry_run:
             atomic_write(path, encoded)
     updated_revision = revision(encoded)
+    common = {
+        "protocol_version": PROTOCOL_VERSION,
+        "capabilities": list(CAPABILITIES),
+        "revision": updated_revision,
+        "diagnostics": _diagnostics(parse_deck(updated)),
+        "dry_run": args.dry_run,
+        "changed_slides": _changed_slides(updated, touched, tokens, include_notes=not args.no_notes),
+        "operation_results": operation_results,
+    }
     if args.quiet:
-        payload = {"protocol_version": PROTOCOL_VERSION, "capabilities": list(CAPABILITIES), "revision": updated_revision,
-                   "diagnostics": _diagnostics(parse_deck(updated)), "dry_run": args.dry_run}
+        payload = common
     else:
         payload = _summary(updated, updated_revision, include_notes=not args.no_notes)
-        payload["dry_run"] = args.dry_run
+        payload.update(common)
     _print_json(payload, compact=args.compact)
     return 0
 

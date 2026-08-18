@@ -95,7 +95,13 @@ still identifies the complete file including notes.
 
 For a smaller response, `--no-source` omits the complete deck source,
 `--slides 2,5` returns only those slides, and `--compact` removes indentation.
-The revision always identifies the exact complete file bytes.
+Requested slides are returned in deck order, and requesting a missing slide is
+an error. Each slide includes a `slide_revision` fingerprint of its exact
+stored source to help identify unchanged slides after a conflict. The
+fingerprint is calculated before output redaction and therefore includes stored
+notes. With `--no-notes`, it is not the hash of the returned `source` field.
+The deck revision always identifies the exact complete file bytes and remains
+the write guard.
 
 ### Apply a transaction
 
@@ -138,11 +144,32 @@ Supported operations are:
 
 - `replace`: replace `slide` with exactly one slide supplied as `source`.
   Its optional `notes` policy is `preserve` (the default), `replace` (use notes
-  in `source`), or `remove`.
+  in `source`), or `remove`. Under `preserve`, any notes supplied in `source`
+  are ignored.
 - `insert`: insert one slide from `source` after `after`; zero inserts at the
   beginning.
 - `delete`: delete `slide`. The final slide cannot be deleted.
 - `move`: move `slide` after `after`; zero moves it to the beginning.
+
+For equation-heavy or otherwise complex Markdown, `replace` and `insert` may
+use `source_file` instead of `source`:
+
+```json
+{
+  "operation": "replace",
+  "slide": 12,
+  "source_file": "fragments/slide-12.md",
+  "source_revision": "sha256:0123456789abcdef..."
+}
+```
+
+The file contains ordinary, unescaped Markdown. Exactly one of `source` and
+`source_file` is required. Relative paths use the transaction file's directory,
+or the current directory when the transaction comes from standard input.
+Quarkfoil reads each fragment once and validates all fragments before locking
+and changing the deck. `source_revision` is optional; when present, it must
+match the SHA-256 revision of the exact fragment bytes. Fragment files must be
+UTF-8, contain exactly one slide, and are never copied or deleted by Quarkfoil.
 
 Operations run sequentially. A slide number in each operation refers to the
 presentation produced by the preceding operation in the same transaction.
@@ -153,9 +180,13 @@ current position changes nothing.
 
 On success, the command returns a new snapshot and revision as JSON. Add
 `--no-notes` to omit notes from that returned snapshot; it does not control the
-replacement policy. Use `--quiet` for only the revision and diagnostics, and
+replacement policy. Use `--quiet` for the revision, changed slides,
+per-operation results, and diagnostics without a full-deck snapshot. Use
 `--compact` for unindented JSON. Use `--dry-run` (or `--check`) to resolve and
-validate every sequential operation without writing the presentation.
+validate every sequential operation without writing the presentation. Dry-run
+is not recommended for ordinary edits: normal apply performs the same
+validation, checks the exact deck revision, and commits only after the complete
+transaction succeeds. Use dry-run only when a separate preview is wanted.
 
 Run `quarkfoil deck protocol` for the versioned, machine-readable contract.
 Successful data is written to standard output. Errors are JSON on standard

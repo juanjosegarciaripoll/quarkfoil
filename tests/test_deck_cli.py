@@ -5,9 +5,12 @@ import hashlib
 from io import StringIO
 import json
 import multiprocessing
+import os
 from pathlib import Path
+import sys
 import tempfile
 import unittest
+from unittest import mock
 
 from scientific_slides import main
 from scientific_slides.deck_cli import apply_transaction, revision, without_notes
@@ -67,6 +70,7 @@ class DeckCliTests(unittest.TestCase):
         payload = json.loads(output)
         self.assertEqual(payload["revision"], revision(SOURCE.encode("utf-8")))
         self.assertEqual([slide["number"] for slide in payload["slides"]], [1, 2, 3])
+        self.assertEqual(payload["slides"][0]["slide_revision"], revision(parse_deck(SOURCE).slides[0].raw.encode("utf-8")))
         self.assertIn("Private first note", payload["source"])
         self.assertIn("Private first note", payload["slides"][0]["source"])
 
@@ -86,6 +90,16 @@ class DeckCliTests(unittest.TestCase):
         self.assertEqual(payload["protocol_version"], 1)
         self.assertIn("dry_run", payload["capabilities"])
         self.assertEqual(payload["exit_codes"]["3"], "revision conflict")
+        self.assertNotIn("schema_dialect", payload)
+        self.assertIn("changed_slides", payload["response_shapes"]["apply"]["required"])
+
+    def test_apply_help_describes_quiet_result(self) -> None:
+        output = StringIO()
+        with redirect_stdout(output), self.assertRaises(SystemExit) as stopped:
+            main(["deck", "apply", "--help"])
+        self.assertEqual(stopped.exception.code, 0)
+        self.assertIn("Omit the complete deck snapshot; return revision", output.getvalue())
+        self.assertIn("changed slides, operation results, and diagnostics", output.getvalue())
 
     def test_inspect_projection_and_compact_output(self) -> None:
         result, output, errors = self.invoke([
@@ -96,6 +110,14 @@ class DeckCliTests(unittest.TestCase):
         payload = json.loads(output)
         self.assertNotIn("source", payload)
         self.assertEqual([slide["number"] for slide in payload["slides"]], [2])
+
+    def test_projection_rejects_missing_slides_and_uses_deck_order(self) -> None:
+        result, output, errors = self.invoke(["deck", "inspect", str(self.deck), "--slides", "999"])
+        self.assertEqual((result, output), (2, ""))
+        self.assertEqual(json.loads(errors)["error"], "unknown_slide")
+        result, output, errors = self.invoke(["deck", "inspect", str(self.deck), "--slides", "3,1"])
+        self.assertEqual((result, errors), (0, ""))
+        self.assertEqual([slide["number"] for slide in json.loads(output)["slides"]], [1, 3])
 
     def test_no_notes_only_filters_returned_output(self) -> None:
         result, output, _ = self.invoke(["deck", "inspect", str(self.deck), "--no-notes"])
@@ -213,6 +235,104 @@ class DeckCliTests(unittest.TestCase):
         self.assertEqual((result, errors), (0, ""))
         self.assertTrue(json.loads(output)["dry_run"])
         self.assertEqual(self.deck.read_text(encoding="utf-8"), SOURCE)
+
+    def test_quiet_apply_returns_changed_slides_and_operation_mapping(self) -> None:
+        transaction = Path(self.temporary.name) / "transaction.json"
+        transaction.write_text(json.dumps({
+            "revision": revision(SOURCE.encode("utf-8")),
+            "operations": [
+                {"operation": "replace", "slide": 2, "source": "## Replaced\n"},
+                {"operation": "insert", "after": 2, "source": "## Inserted\n"},
+                {"operation": "move", "slide": 4, "after": 1},
+                {"operation": "delete", "slide": 3},
+            ],
+        }), encoding="utf-8")
+        result, output, errors = self.invoke([
+            "deck", "apply", str(self.deck), str(transaction), "--quiet", "--compact",
+        ])
+        self.assertEqual((result, errors), (0, ""))
+        payload = json.loads(output)
+        self.assertEqual([slide["title"] for slide in payload["changed_slides"]], ["Third", "Inserted"])
+        self.assertEqual(
+            [item["result_slide"] for item in payload["operation_results"]],
+            [None, 3, 2, None],
+        )
+        self.assertEqual([slide.title for slide in parse_deck(self.deck.read_text(encoding="utf-8")).slides],
+                         ["First", "Third", "Inserted"])
+
+    def test_source_file_is_relative_to_transaction_and_revision_guarded(self) -> None:
+        fragments = Path(self.temporary.name) / "fragments"
+        fragments.mkdir()
+        fragment = fragments / "equation.md"
+        fragment.write_text("## Equation\n\n\\[H=\\sum_i n_i\\]\n", encoding="utf-8")
+        transaction = fragments / "transaction.json"
+        transaction.write_text(json.dumps({
+            "revision": revision(SOURCE.encode("utf-8")),
+            "operations": [{
+                "operation": "replace", "slide": 2, "source_file": "equation.md",
+                "source_revision": revision(fragment.read_bytes()),
+            }],
+        }), encoding="utf-8")
+
+        result, output, errors = self.invoke([
+            "deck", "apply", str(self.deck), str(transaction), "--quiet", "--compact",
+        ])
+
+        self.assertEqual((result, errors), (0, ""))
+        self.assertIn("\\sum_i", json.loads(output)["changed_slides"][0]["source"])
+        self.assertIn("\\sum_i", self.deck.read_text(encoding="utf-8"))
+        self.assertTrue(fragment.is_file())
+
+    def test_source_file_errors_are_structured_and_leave_deck_unchanged(self) -> None:
+        fragment = Path(self.temporary.name) / "slide.md"
+        fragment.write_text("## External\n", encoding="utf-8")
+        transaction = Path(self.temporary.name) / "transaction.json"
+        transaction.write_text(json.dumps({
+            "revision": revision(SOURCE.encode("utf-8")),
+            "operations": [{
+                "operation": "replace", "slide": 2, "source_file": "slide.md",
+                "source_revision": "sha256:" + "0" * 64,
+            }],
+        }), encoding="utf-8")
+
+        result, output, errors = self.invoke(["deck", "apply", str(self.deck), str(transaction)])
+
+        self.assertEqual((result, output), (2, ""))
+        payload = json.loads(errors)
+        self.assertEqual(payload["error"], "source_revision_mismatch")
+        self.assertEqual(payload["path"], "operations[0].source_file")
+        self.assertEqual(payload["resolved_source_path"], str(fragment.resolve()))
+        self.assertEqual(self.deck.read_text(encoding="utf-8"), SOURCE)
+
+    def test_source_and_source_file_are_mutually_exclusive(self) -> None:
+        transaction = Path(self.temporary.name) / "transaction.json"
+        transaction.write_text(json.dumps({
+            "revision": revision(SOURCE.encode("utf-8")),
+            "operations": [{"operation": "insert", "after": 1, "source": "## Inline\n", "source_file": "x.md"}],
+        }), encoding="utf-8")
+        result, _, errors = self.invoke(["deck", "apply", str(self.deck), str(transaction)])
+        self.assertEqual(result, 2)
+        self.assertIn("exactly one", json.loads(errors)["message"])
+        self.assertEqual(self.deck.read_text(encoding="utf-8"), SOURCE)
+
+    def test_stdin_source_file_is_relative_to_current_directory(self) -> None:
+        fragment = Path(self.temporary.name) / "stdin-slide.md"
+        fragment.write_text("## From stdin\n", encoding="utf-8")
+        transaction = json.dumps({
+            "revision": revision(SOURCE.encode("utf-8")),
+            "operations": [{"operation": "replace", "slide": 2, "source_file": fragment.name}],
+        })
+        previous = Path.cwd()
+        output, errors = StringIO(), StringIO()
+        try:
+            os.chdir(self.temporary.name)
+            with mock.patch.object(sys, "stdin", StringIO(transaction)), \
+                    redirect_stdout(output), redirect_stderr(errors):
+                result = main(["deck", "apply", str(self.deck), "-", "--quiet"])
+        finally:
+            os.chdir(previous)
+        self.assertEqual((result, errors.getvalue()), (0, ""))
+        self.assertEqual(json.loads(output.getvalue())["changed_slides"][0]["title"], "From stdin")
 
     def test_errors_are_structured_and_operation_indexed(self) -> None:
         transaction = Path(self.temporary.name) / "transaction.json"
