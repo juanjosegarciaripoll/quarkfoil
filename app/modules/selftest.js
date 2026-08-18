@@ -31,7 +31,7 @@ import {
   updateSlideNotes,
 } from "./parser.js";
 import { renderDeck, syncVideoPlayback } from "./render.js";
-import { applyMarkdownStyle, arrowGeometry, bindRangeControl, boundarySlideShortcut, buildShapePalette, buildShapeSelect, canvasLinkTarget, canvasStartsMarquee, clipboardImageFile, deleteKey, DesignEditor, dialogDragPosition, handleMarkdownShortcut, initialImageGeometry, moveGeometryGroup, overlayPasteOffset, pageSlideIndex, projectAssetPage, rectanglesIntersect, renameClipboardImage, repeatedActivation, resolveImportDestination, storeOverlayClipboard, storedOverlayClipboard, videoConflictDestination, videoFile } from "./editor.js";
+import { applyMarkdownStyle, arrowGeometry, bindRangeControl, boundarySlideShortcut, buildShapePalette, buildShapeSelect, canvasLinkTarget, canvasStartsMarquee, clipboardImageFile, deleteKey, DesignEditor, dialogDragPosition, handleMarkdownShortcut, initialImageGeometry, moveGeometryGroup, overlayPasteOffset, pageSlideIndex, projectAssetPage, rectanglesIntersect, refreshConvertedVideoAssets, renameClipboardImage, repeatedActivation, resolveImportDestination, storeOverlayClipboard, storedOverlayClipboard, videoConflictDestination, videoFile, videoPathAttributes } from "./editor.js";
 import { briefReference, formatBibliography, parseBibliography, prepareBibliography, renameBibliographyEntry, uniqueCitationKey } from "./bibliography.js";
 import { compileExpression, createPlotSvg } from "./plot.js";
 import { externalDeckAction, externalMergePlan, renderExternalMerge } from "./external.js";
@@ -585,6 +585,14 @@ try {
   const videoDestination = await videoConflictDestination(Object.assign(new Error("generated video exists"), { status: 409 }),
     { name: "clip.avi", overwrite: false }, () => Promise.resolve({ name: "renamed.avi", overwrite: false }));
   assert(videoDestination.name === "renamed.avi", "converted-video collisions await the rename or overwrite destination");
+  const refreshedAssets = [];
+  await refreshConvertedVideoAssets(Promise.resolve({ status: "complete" }), true,
+    { path: "figures/clip.mp4", poster: "figures/clip-poster.jpg" }, path => refreshedAssets.push(path));
+  assert(refreshedAssets.join(" ") === "figures/clip.mp4 figures/clip-poster.jpg", "overwritten conversions refresh video and poster assets after completion");
+  const replacementVideo = videoPathAttributes("figures/new.mp4", "figures/new-poster.jpg");
+  assert(replacementVideo.src === "figures/new.mp4" && replacementVideo.poster === "figures/new-poster.jpg",
+    "project video replacement updates the generated poster pointer");
+  assert(videoPathAttributes("figures/plain.mp4").poster === null, "project videos without generated posters clear stale poster pointers");
   assert(deleteKey("Delete") && deleteKey("Del") && deleteKey("Backspace"), "Delete-key variants remove selected canvas content");
   const markdownTextarea = document.createElement("textarea");
   markdownTextarea.value = "format me";
@@ -726,6 +734,7 @@ try {
     && getComputedStyle(videoClip.parentElement).overflow === "visible", "overlay media clips inside its box without clipping editor controls");
   assert(videoElement.src.endsWith("/test/artwork/demo.mp4") && videoElement.poster.endsWith("/test/artwork/poster.jpg"), "video and poster assets resolve");
   assert(videoElement.controls && videoElement.muted && videoElement.dataset.autoplay === "true", "native video options render");
+  assert(videoElement.dataset.source === "artwork/demo.mp4" && videoElement.dataset.poster === "artwork/poster.jpg", "rendered videos retain refreshable source and poster paths");
   assert(getComputedStyle(videoElement).backgroundColor === "rgba(0, 0, 0, 0)", "video boxes keep a transparent background");
   let videoPlays = 0; let videoPauses = 0;
   videoElement.play = () => { videoPlays += 1; return Promise.resolve(); };

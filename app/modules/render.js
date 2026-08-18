@@ -170,8 +170,12 @@ function makeImage(image, assetResolver) {
 function makeVideo(video, assetResolver) {
   const element = document.createElement("video");
   element.className = "slide-video";
+  element.dataset.source = video.source;
   element.src = assetResolver(video.source) || safeAssetPath(video.source);
-  if (video.poster) element.poster = assetResolver(video.poster) || safeAssetPath(video.poster);
+  if (video.poster) {
+    element.dataset.poster = video.poster;
+    element.poster = assetResolver(video.poster) || safeAssetPath(video.poster);
+  }
   element.controls = video.controls;
   element.dataset.autoplay = String(video.autoplay);
   element.loop = video.loop;

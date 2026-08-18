@@ -613,7 +613,12 @@ class SlideHandler(SimpleHTTPRequestHandler):
                     if len(files) >= MAX_LISTED_ASSETS:
                         break
                     if path.is_file() and path.suffix.lower() in suffixes and _inside(self.project_root, path):
-                        files.append({"path": path.relative_to(self.project_root).as_posix(), "name": path.name})
+                        item = {"path": path.relative_to(self.project_root).as_posix(), "name": path.name}
+                        if kind == "video":
+                            poster = path.with_name(f"{path.stem}-poster.jpg")
+                            if poster.is_file() and _inside(self.project_root, poster):
+                                item["poster"] = poster.relative_to(self.project_root).as_posix()
+                        files.append(item)
                 self._send_json({"files": files, "truncated": len(files) >= MAX_LISTED_ASSETS})
             except (OSError, PermissionError, ValueError) as error:
                 self._send_json({"error": str(error)}, HTTPStatus.BAD_REQUEST)

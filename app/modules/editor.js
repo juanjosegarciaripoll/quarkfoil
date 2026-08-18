@@ -104,6 +104,15 @@ export async function videoConflictDestination(error, destination, choose) {
   if (error?.status !== 409 || destination.overwrite) throw error;
   return await choose();
 }
+export async function refreshConvertedVideoAssets(completion, overwrite, paths, refresh) {
+  const result = await completion;
+  if (overwrite) {
+    refresh(paths.path);
+    refresh(paths.poster);
+  }
+  return result;
+}
+export const videoPathAttributes = (path, poster = null) => ({ src: path, poster: poster || null });
 export const projectAssetPage = (assets, query, page, pageSize = 24) => {
   const needle = query.trim().toLocaleLowerCase();
   const filtered = needle ? assets.filter(asset => asset.path.toLocaleLowerCase().includes(needle)) : assets;
@@ -1462,11 +1471,11 @@ export class DesignEditor {
     }));
   }
 
-  addVideoPath(path) {
+  addVideoPath(path, poster = null) {
     if (!path) return;
     this.commit(insertOverlay(this.options.getDeck(), this.slideIndex(), {
       type: "video", content: "", id: this.uniqueId(`video-${this.slideIndex() + 1}`),
-      x: 30, y: 30, w: 40, h: 22.5, attributes: { src: path },
+      x: 30, y: 30, w: 40, h: 22.5, attributes: videoPathAttributes(path, poster),
     }));
   }
 
@@ -1527,9 +1536,9 @@ export class DesignEditor {
     }
   }
 
-  replaceVideoPath(path) {
+  replaceVideoPath(path, poster = null) {
     if (!path || this.selected?.dataset.objectType !== "video") return;
-    this.commit(updateOverlay(this.options.getDeck(), this.slideIndex(), this.selected.dataset.objectId, { src: path }));
+    this.commit(updateOverlay(this.options.getDeck(), this.slideIndex(), this.selected.dataset.objectId, videoPathAttributes(path, poster)));
   }
 
   async replaceImage(file) {
@@ -1571,7 +1580,7 @@ export class DesignEditor {
   }
 
   openProjectVideoDialog(purpose = "replace") {
-    this.options.browseProjectFiles("video", path => purpose === "add" ? this.addVideoPath(path) : this.replaceVideoPath(path), () => {
+    this.options.browseProjectFiles("video", (path, poster) => purpose === "add" ? this.addVideoPath(path, poster) : this.replaceVideoPath(path, poster), () => {
       this.videoInputPurpose = purpose;
       document.querySelector("#video-input").click();
     });

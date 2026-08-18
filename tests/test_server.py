@@ -317,6 +317,14 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(status, 201)
         result = json.loads(payload)
         self.assertEqual(result["path"], "figures/experiment.mp4")
+        (self.root / "figures/experiment-poster.jpg").write_bytes(b"poster")
+        status, _, payload = self.request("/api/files?kind=video")
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(payload)["files"], [{
+            "path": "figures/experiment.mp4",
+            "name": "experiment.mp4",
+            "poster": "figures/experiment-poster.jpg",
+        }])
         status, _, payload = self.request("/api/assets?folder=figures&kind=video")
         self.assertEqual(status, 200)
         self.assertEqual([asset["path"] for asset in json.loads(payload)["assets"]], ["figures/experiment.mp4"])

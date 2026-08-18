@@ -1,6 +1,6 @@
 import { deleteSection, duplicateSlide, emptyTrash, importSlide, insertOverlay, insertSection, insertSlide, moveSection, moveSlide, normalizeDeck, parseDeck, permanentlyDeleteSlide, restoreSlide, trashSlide, updateSectionTitle, updateSlideNotes } from "./parser.js";
 import { renderDeck, syncVideoPlayback } from "./render.js";
-import { boundarySlideShortcut, DesignEditor, handleMarkdownShortcut, pageSlideIndex, projectAssetPage, resolveImportDestination, videoConflictDestination } from "./editor.js";
+import { boundarySlideShortcut, DesignEditor, handleMarkdownShortcut, pageSlideIndex, projectAssetPage, refreshConvertedVideoAssets, resolveImportDestination, videoConflictDestination } from "./editor.js";
 import { saveSnapshot } from "./storage.js";
 import { briefReference, formatBibliography, parseBibliography, prepareBibliography, renameBibliographyEntry, uniqueCitationKey } from "./bibliography.js";
 import { externalDeckAction, externalMergePlan, renderExternalMerge, responseRevision } from "./external.js";
@@ -119,12 +119,17 @@ function assetResolver(source) {
 }
 
 function refreshAsset(path) {
+  if (!path) return;
   state.assetVersions.set(path, Math.max(Date.now(), (state.assetVersions.get(path) || 0) + 1));
   const resolved = assetResolver(path);
   document.querySelectorAll(".slide-image").forEach(element => {
     if (element.dataset.source !== path) return;
     if (element instanceof HTMLImageElement) element.src = resolved;
     else element.querySelector("image")?.setAttribute("href", resolved);
+  });
+  document.querySelectorAll(".slide-video").forEach(element => {
+    if (element.dataset.source === path) element.src = resolved;
+    if (element.dataset.poster === path) element.poster = resolved;
   });
 }
 
@@ -1066,12 +1071,13 @@ async function browseProjectFiles(kind, select, upload, { newFile: showNew = tru
           preview = document.createElement("img"); preview.alt = ""; preview.src = assetResolver(file.path);
         } else if (kind === "video") {
           preview = document.createElement("video"); preview.muted = true; preview.preload = "metadata"; preview.src = assetResolver(file.path);
+          if (file.poster) preview.poster = assetResolver(file.poster);
         } else {
           preview = document.createElement("span"); preview.className = "project-file-icon"; preview.textContent = "MD";
         }
         const label = document.createElement("span"); label.textContent = file.path;
         button.append(preview, label);
-        button.onclick = () => { dialog.close(); select(file.path); };
+        button.onclick = () => { dialog.close(); select(file.path, file.poster || null); };
         return button;
       }));
       previous.disabled = page === 0;
@@ -1525,7 +1531,11 @@ async function importAsset(file, destination = null) {
       if (!replacement) return null;
       return importAsset(file, replacement);
     }
-    return { path: result.path, poster: result.poster, completion: monitorVideoConversion(result.id) };
+    return {
+      path: result.path,
+      poster: result.poster,
+      completion: refreshConvertedVideoAssets(monitorVideoConversion(result.id), destination.overwrite, result, refreshAsset),
+    };
   }
   if (state.local) {
     const response = await fetch(`/api/asset?name=${encodeURIComponent(destination.name)}&folder=${encodeURIComponent(assetFolder)}&overwrite=${destination.overwrite}`, { method: "POST", headers: { "Content-Type": file.type }, body: file });
