@@ -504,7 +504,51 @@ After an additional blank line. {fragment=4}
   fixture.remove();
 }
 
+function parserFixtureSummary(source) {
+  const deck = parseDeck(source);
+  return {
+    metadata: deck.metadata,
+    slides: deck.slides.map(slide => ({
+      title: slide.title,
+      layout: slide.layout,
+      cells: slide.cells.map(cell => cell.id),
+      overlays: slide.overlays.map(overlay => overlay.id),
+      trashed: slide.trashed,
+      titleSource: slide.titleSource,
+      columns: slide.columns,
+      rows: slide.rows,
+      notes: slide.notes,
+      footer: slide.footer?.source || null,
+    })),
+    sections: deck.sections.map(section => ({
+      title: section.title,
+      id: section.id,
+      slideCount: section.slideCount,
+      isTrash: section.isTrash,
+    })),
+    diagnostics: deck.diagnostics.map(item => item.message),
+  };
+}
+
+function parserFixtureMatches(actual, expected) {
+  if (Array.isArray(expected)) return Array.isArray(actual) && actual.length === expected.length
+    && expected.every((item, index) => parserFixtureMatches(actual[index], item));
+  if (expected && typeof expected === "object") return actual && typeof actual === "object"
+    && Object.entries(expected).every(([key, value]) => parserFixtureMatches(actual[key], value));
+  if (typeof expected === "number") return Math.abs(actual - expected) < 1e-10;
+  return actual === expected;
+}
+
 try {
+  const parserFixturesResponse = await fetch("/parser-fixtures.json");
+  assert(parserFixturesResponse.ok, "shared parser fixture corpus loads");
+  const parserFixtures = await parserFixturesResponse.json();
+  for (const fixture of parserFixtures) {
+    const summary = parserFixtureSummary(fixture.source);
+    assert(parserFixtureMatches(summary, fixture.expected)
+      && (fixture.diagnosticPrefixes || []).every(prefix => summary.diagnostics.some(message => message.startsWith(prefix))),
+      `JavaScript parser matches shared fixture: ${fixture.name}`);
+  }
   assert(pdfPrintView("?print-pdf&print-dialog"), "PDF print query is recognized");
   assert(!pdfPrintView("?print-dialog"), "ordinary pages are not mistaken for the PDF print view");
   const printUrl = new URL(pdfPrintUrl({ href: "http://127.0.0.1:8000/?deck=example%2Fdeck.md#slide-2" }));

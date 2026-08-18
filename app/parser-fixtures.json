@@ -1,0 +1,205 @@
+[
+  {
+    "name": "front matter and layouts",
+    "source": "---\ntitle: Shared corpus\ntheme: scientific-dark\n---\n\n## First {.layout-1-2 columns=\"2 3\" rows=1:1 enabled}\n\n::: left\nLeft.\n:::\n\n::: top-right\nTop.\n:::\n\n::: bottom-right\nBottom.\n:::\n\n---\n\n## Free {.layout-free}\n",
+    "expected": {
+      "metadata": {"title": "Shared corpus", "theme": "scientific-dark"},
+      "slides": [
+        {"title": "First", "layout": "1-2", "cells": ["left", "top-right", "bottom-right"], "overlays": [], "trashed": false},
+        {"title": "Free", "layout": "free", "cells": [], "overlays": [], "trashed": false}
+      ],
+      "sections": [],
+      "diagnostics": []
+    }
+  },
+  {
+    "name": "sections media and objects",
+    "source": "# Results {#results .section}\n\n---\n\n## Media {.layout-1-1}\n\n::: left\n![Plot](figures/plot.svg \"Plot\")\n:::\n\n::: right {type=video src=movie.mp4 autoplay=true}\n:::\n\n::: overlay {#arrow type=arrow x1=5 y1=10 x2=80 y2=90 heads=both}\n:::\n\n::: notes\nSpeaker note.\n:::\n",
+    "expected": {
+      "metadata": {},
+      "slides": [
+        {"title": "Media", "layout": "1-1", "cells": ["left", "right"], "overlays": ["arrow"], "trashed": false}
+      ],
+      "sections": [{"title": "Results", "id": "results", "slideCount": 1, "isTrash": false}],
+      "diagnostics": []
+    }
+  },
+  {
+    "name": "ordinary markdown and CRLF",
+    "source": "## Ordinary {.layout-1}\r\n\r\nBefore.\r\n\r\n::: footer\r\nFooter.\r\n:::\r\n\r\nAfter.\r\n",
+    "expected": {
+      "metadata": {},
+      "slides": [
+        {"title": "Ordinary", "layout": "1", "cells": ["core"], "overlays": [], "trashed": false}
+      ],
+      "sections": [],
+      "diagnostics": []
+    }
+  },
+  {
+    "name": "structural diagnostics",
+    "source": "## Broken {.layout-unknown background=red}\n\n::: overlay {#same font-size=nope}\n:::\n\n::: overlay {#same}\n:::\n\n::: mystery\n",
+    "expected": {
+      "metadata": {},
+      "slides": [
+        {"title": "Broken", "layout": "1", "cells": ["core"], "overlays": ["same", "same"], "trashed": false}
+      ],
+      "sections": [],
+      "diagnostics": [
+        "Unknown layout 'unknown', using 1",
+        "Unclosed ::: mystery block",
+        "Duplicate overlay ID 'same'",
+        "Overlay 'same' has invalid font size",
+        "Invalid background color 'red', using the theme color"
+      ]
+    }
+  },
+  {
+    "name": "trash section",
+    "source": "## Active {.layout-1}\n\n---\n\n# Trash {#quarkfoil-trash .section .trash}\n\n---\n\n## Removed {.layout-1 .trashed}\n",
+    "expected": {
+      "metadata": {},
+      "slides": [
+        {"title": "Active", "layout": "1", "cells": ["core"], "overlays": [], "trashed": false},
+        {"title": "Removed", "layout": "1", "cells": ["core"], "overlays": [], "trashed": true}
+      ],
+      "sections": [{"title": "Trash", "id": "quarkfoil-trash", "slideCount": 1, "isTrash": true}],
+      "diagnostics": []
+    }
+  },
+  {
+    "name": "unclosed front matter",
+    "source": "---\ntitle: Never closed\n",
+    "expected": {
+      "metadata": {},
+      "slides": [{"title": "", "layout": "1", "cells": ["core"], "overlays": [], "trashed": false}],
+      "sections": [],
+      "diagnostics": ["Unclosed YAML front matter"]
+    }
+  },
+  {
+    "name": "invalid YAML",
+    "source": "---\ntitle: [not closed\n---\n\n## Slide\n",
+    "expected": {
+      "metadata": {},
+      "slides": [{"title": "Slide", "layout": "1", "cells": ["core"], "overlays": [], "trashed": false}],
+      "sections": []
+    },
+    "diagnosticPrefixes": ["YAML:"]
+  },
+  {
+    "name": "front matter must be mapping",
+    "source": "---\n- one\n- two\n---\n\n## Slide\n",
+    "expected": {
+      "metadata": {},
+      "slides": [{"title": "Slide", "layout": "1", "cells": ["core"], "overlays": [], "trashed": false}],
+      "sections": [],
+      "diagnostics": ["YAML: Front matter must be a mapping"]
+    }
+  },
+  {
+    "name": "ratios and multiline title",
+    "source": "## Main {.layout-1 columns=bad rows=0:2}\n\n### Subtitle\n\nBody.\n",
+    "expected": {
+      "slides": [{
+        "title": "Main",
+        "layout": "1",
+        "cells": ["core"],
+        "overlays": [],
+        "trashed": false,
+        "titleSource": "## Main\n\n### Subtitle",
+        "columns": [50, 50],
+        "rows": [50, 50]
+      }],
+      "diagnostics": []
+    }
+  },
+  {
+    "name": "implicit identifiers and section content",
+    "source": "# Untitled {.section}\n\nContent is ignored.\n\n---\n\n## Objects {.layout-free}\n\n::: overlay\nAnonymous.\n:::\n\n::: custom\nUnknown.\n:::\n",
+    "expected": {
+      "slides": [{"title": "Objects", "layout": "free", "cells": [], "overlays": ["overlay-1-1"], "trashed": false}],
+      "sections": [{"title": "Untitled", "id": "section-1", "slideCount": 1, "isTrash": false}],
+      "diagnostics": [
+        "Section 'Untitled' has no stable source ID",
+        "Content beneath section 'Untitled' is not presented",
+        "Overlay 'overlay-1-1' has no stable source ID",
+        "Unknown directive 'custom'"
+      ]
+    }
+  },
+  {
+    "name": "duplicate cells and invalid cell font",
+    "source": "## Cells {.layout-1}\n\n::: core {font-size=bad}\nFirst.\n:::\n\n::: core\nSecond.\n:::\n",
+    "expected": {
+      "slides": [{"title": "Cells", "layout": "1", "cells": ["core", "core"], "overlays": [], "trashed": false}],
+      "diagnostics": ["Duplicate 'core' cell", "Cell 'core' has invalid font size"]
+    }
+  },
+  {
+    "name": "overlay validation",
+    "source": "## Validation {.layout-free}\n\n::: overlay {#bad-shape type=shape shape=bogus x=bad z=\"\" font-size=bad rotation=bad align=side stroke-width=-1 stroke-style=wave color=red}\n:::\n\n::: overlay {#arc type=shape shape=arc start-angle=bad end-angle=bad heads=side}\n:::\n\n::: overlay {#arrow type=arrow x1=bad heads=side}\n:::\n\n::: overlay {#video type=video}\n:::\n",
+    "expected": {
+      "slides": [{"title": "Validation", "layout": "free", "cells": [], "overlays": ["bad-shape", "arc", "arrow", "video"], "trashed": false}],
+      "diagnostics": [
+        "Overlay 'bad-shape' has invalid geometry",
+        "Overlay 'bad-shape' has invalid font size",
+        "Overlay 'bad-shape' has invalid rotation",
+        "Overlay 'bad-shape' has invalid alignment",
+        "Overlay 'bad-shape' has unknown shape 'bogus'",
+        "Overlay 'bad-shape' has invalid stroke width",
+        "Overlay 'bad-shape' has invalid stroke style 'wave'",
+        "Overlay 'bad-shape' has invalid text color 'red'",
+        "Arc 'arc' has invalid angles",
+        "Arc 'arc' has invalid arrowheads",
+        "Overlay 'arrow' has invalid geometry",
+        "Arrow 'arrow' has invalid endpoints",
+        "Arrow 'arrow' has invalid arrowheads",
+        "Video overlay 'video' has no src"
+      ]
+    }
+  },
+  {
+    "name": "themes colors and duplicate IDs",
+    "source": "---\ntheme: unavailable\n---\n\n# First {#repeat-section .section}\n\n---\n\n## One {#repeat-slide .layout-1 theme=unavailable foreground=no}\n\n---\n\n# Second {#repeat-section .section}\n\n---\n\n## Two {#repeat-slide .layout-1}\n",
+    "expected": {
+      "metadata": {"theme": "unavailable"},
+      "slides": [
+        {"title": "One", "layout": "1", "cells": ["core"], "overlays": [], "trashed": false},
+        {"title": "Two", "layout": "1", "cells": ["core"], "overlays": [], "trashed": false}
+      ],
+      "sections": [
+        {"title": "First", "id": "repeat-section", "slideCount": 1, "isTrash": false},
+        {"title": "Second", "id": "repeat-section", "slideCount": 1, "isTrash": false}
+      ],
+      "diagnostics": [
+        "Unknown deck theme 'unavailable', using scientific-light",
+        "Unknown theme 'unavailable', using the deck theme",
+        "Invalid foreground color 'no', using the theme color",
+        "Duplicate slide ID 'repeat-slide'",
+        "Duplicate section ID 'repeat-section'"
+      ]
+    }
+  },
+  {
+    "name": "deck with no slides",
+    "source": "# Empty {#empty .section}\n",
+    "expected": {
+      "slides": [],
+      "sections": [{"title": "Empty", "id": "empty", "slideCount": 0, "isTrash": false}],
+      "diagnostics": ["The deck contains no slides"]
+    }
+  },
+  {
+    "name": "separator and heading boundaries",
+    "source": "## First\r\n\r\n---\r\n\r\n---\r\n\r\n## Second\n### Continuation\nBody.\n\n---\n",
+    "expected": {
+      "slides": [
+        {"title": "First", "layout": "1", "cells": ["core"], "overlays": [], "trashed": false},
+        {"title": "Second", "layout": "1", "cells": ["core"], "overlays": [], "trashed": false, "titleSource": "## Second\n### Continuation"}
+      ],
+      "sections": [],
+      "diagnostics": []
+    }
+  }
+]
