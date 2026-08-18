@@ -344,6 +344,20 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(context.exception.code, 503)
         self.assertIn("requires ffmpeg", context.exception.read().decode("utf-8"))
 
+    def test_video_conversion_reports_generated_file_collision(self) -> None:
+        figures = self.root / "figures"
+        figures.mkdir()
+        (figures / "experiment.mp4").write_bytes(b"existing")
+        with (
+            mock.patch("scientific_slides.server.shutil.which", return_value="/usr/bin/tool"),
+            mock.patch("scientific_slides.server._video_conversion_plan", return_value=(".mp4", ["-c:v", "copy"])),
+            self.assertRaises(urllib.error.HTTPError) as context,
+        ):
+            self.request("/api/video-conversion?name=experiment.mkv", method="POST", body=b"video")
+        self.assertEqual(context.exception.code, 409)
+        self.assertIn("experiment.mp4", context.exception.read().decode("utf-8"))
+        self.assertEqual((figures / "experiment.mp4").read_bytes(), b"existing")
+
     def test_asset_import_uses_requested_project_folder(self) -> None:
         status, _, payload = self.request(
             "/api/asset?name=diagram.svg&folder=artwork%2Ffigures",

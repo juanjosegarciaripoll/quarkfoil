@@ -1,6 +1,6 @@
 import { deleteSection, duplicateSlide, emptyTrash, importSlide, insertOverlay, insertSection, insertSlide, moveSection, moveSlide, normalizeDeck, parseDeck, permanentlyDeleteSlide, restoreSlide, trashSlide, updateSectionTitle, updateSlideNotes } from "./parser.js";
 import { renderDeck, syncVideoPlayback } from "./render.js";
-import { boundarySlideShortcut, DesignEditor, handleMarkdownShortcut, pageSlideIndex, projectAssetPage, resolveImportDestination } from "./editor.js";
+import { boundarySlideShortcut, DesignEditor, handleMarkdownShortcut, pageSlideIndex, projectAssetPage, resolveImportDestination, videoConflictDestination } from "./editor.js";
 import { saveSnapshot } from "./storage.js";
 import { briefReference, formatBibliography, parseBibliography, prepareBibliography, renameBibliographyEntry, uniqueCitationKey } from "./bibliography.js";
 import { externalDeckAction, externalMergePlan, renderExternalMerge, responseRevision } from "./external.js";
@@ -1510,7 +1510,21 @@ async function importAsset(file, destination = null) {
   if (!file || (!convertible && !["image/", "video/"].some(prefix => file.type.startsWith(prefix)))) throw new Error("Only image and video files are supported");
   if (convertible) {
     if (!state.local) throw new Error("AVI and MKV conversion requires the local Quarkfoil server");
-    const result = await uploadVideoForConversion(file, assetFolder, destination);
+    let result;
+    try {
+      result = await uploadVideoForConversion(file, assetFolder, destination);
+    } catch (error) {
+      const replacement = await videoConflictDestination(error, destination, () => {
+        const dialog = document.querySelector("#video-conversion-dialog");
+        if (dialog.open) dialog.close();
+        return chooseImportDestination(destination.name, {
+          extensions: [suffix],
+          message: `${error.message}. Choose another filename or enable overwrite.`,
+        });
+      });
+      if (!replacement) return null;
+      return importAsset(file, replacement);
+    }
     return { path: result.path, poster: result.poster, completion: monitorVideoConversion(result.id) };
   }
   if (state.local) {
@@ -1572,7 +1586,7 @@ function uploadVideoForConversion(file, assetFolder, destination) {
       try { result = JSON.parse(request.responseText); }
       catch { reject(new Error("Video upload returned an invalid response")); return; }
       if (request.status < 200 || request.status >= 300) {
-        reject(new Error(result.error || "Video conversion could not start"));
+        reject(Object.assign(new Error(result.error || "Video conversion could not start"), { status: request.status }));
         return;
       }
       status.textContent = "Preview ready. Starting conversion…";

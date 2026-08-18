@@ -100,6 +100,10 @@ export function buildShapeSelect(target) {
 export async function resolveImportDestination(exists, proposed, choose) {
   return await exists ? await choose() : proposed;
 }
+export async function videoConflictDestination(error, destination, choose) {
+  if (error?.status !== 409 || destination.overwrite) throw error;
+  return await choose();
+}
 export const projectAssetPage = (assets, query, page, pageSize = 24) => {
   const needle = query.trim().toLocaleLowerCase();
   const filtered = needle ? assets.filter(asset => asset.path.toLocaleLowerCase().includes(needle)) : assets;

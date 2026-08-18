@@ -31,7 +31,7 @@ import {
   updateSlideNotes,
 } from "./parser.js";
 import { renderDeck, syncVideoPlayback } from "./render.js";
-import { applyMarkdownStyle, arrowGeometry, bindRangeControl, boundarySlideShortcut, buildShapePalette, buildShapeSelect, canvasLinkTarget, canvasStartsMarquee, clipboardImageFile, deleteKey, DesignEditor, dialogDragPosition, handleMarkdownShortcut, initialImageGeometry, moveGeometryGroup, overlayPasteOffset, pageSlideIndex, projectAssetPage, rectanglesIntersect, renameClipboardImage, repeatedActivation, resolveImportDestination, storeOverlayClipboard, storedOverlayClipboard, videoFile } from "./editor.js";
+import { applyMarkdownStyle, arrowGeometry, bindRangeControl, boundarySlideShortcut, buildShapePalette, buildShapeSelect, canvasLinkTarget, canvasStartsMarquee, clipboardImageFile, deleteKey, DesignEditor, dialogDragPosition, handleMarkdownShortcut, initialImageGeometry, moveGeometryGroup, overlayPasteOffset, pageSlideIndex, projectAssetPage, rectanglesIntersect, renameClipboardImage, repeatedActivation, resolveImportDestination, storeOverlayClipboard, storedOverlayClipboard, videoConflictDestination, videoFile } from "./editor.js";
 import { briefReference, formatBibliography, parseBibliography, prepareBibliography, renameBibliographyEntry, uniqueCitationKey } from "./bibliography.js";
 import { compileExpression, createPlotSvg } from "./plot.js";
 import { externalDeckAction, externalMergePlan, renderExternalMerge } from "./external.js";
@@ -582,6 +582,9 @@ try {
   const overwriteDestination = await resolveImportDestination(Promise.resolve(true), { name: "figure.svg", overwrite: false },
     () => Promise.resolve({ name: "figure.svg", overwrite: true }));
   assert(overwriteDestination.name === "figure.svg" && overwriteDestination.overwrite === true, "collision imports await the editable overwrite destination");
+  const videoDestination = await videoConflictDestination(Object.assign(new Error("generated video exists"), { status: 409 }),
+    { name: "clip.avi", overwrite: false }, () => Promise.resolve({ name: "renamed.avi", overwrite: false }));
+  assert(videoDestination.name === "renamed.avi", "converted-video collisions await the rename or overwrite destination");
   assert(deleteKey("Delete") && deleteKey("Del") && deleteKey("Backspace"), "Delete-key variants remove selected canvas content");
   const markdownTextarea = document.createElement("textarea");
   markdownTextarea.value = "format me";
