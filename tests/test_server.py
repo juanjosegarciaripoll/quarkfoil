@@ -12,7 +12,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
-from scientific_slides.server import STARTER_DECK, SlideHandler, _bibliography_pdfs, _normalize_doi_bibtex, _python_snapshot, _restart_executable, _video_conversion_plan, _video_duration, _video_progress, _watch_python_changes, create_server, initialize_deck
+from scientific_slides.server import STARTER_DECK, SlideHandler, _bibliography_pdfs, _installed_runtime, _normalize_doi_bibtex, _python_snapshot, _restart_executable, _video_conversion_plan, _video_duration, _video_progress, _watch_python_changes, create_server, initialize_deck
 
 
 class DeckInitializationTests(unittest.TestCase):
@@ -85,6 +85,15 @@ class DeckInitializationTests(unittest.TestCase):
         ):
             self.assertEqual(_restart_executable(), ("/tools/quarkfoil", ["/tools/quarkfoil"]))
 
+    def test_installed_runtime_is_detected_inside_python_prefix(self) -> None:
+        with (
+            mock.patch("scientific_slides.server.__file__", str(self.root / "environment/package/server.py")),
+            mock.patch("scientific_slides.server.sys.prefix", str(self.root / "environment")),
+        ):
+            self.assertTrue(_installed_runtime())
+        with mock.patch("scientific_slides.server.sys.prefix", str(self.root / "other-environment")):
+            self.assertFalse(_installed_runtime())
+
     def test_reload_waits_for_reinstalled_package_to_stabilize(self) -> None:
         server = mock.Mock()
         stop = mock.Mock()
@@ -95,6 +104,21 @@ class DeckInitializationTests(unittest.TestCase):
         with mock.patch(
             "scientific_slides.server._python_snapshot",
             side_effect=(baseline, (), replacement, replacement),
+        ):
+            _watch_python_changes(server, stop, requested)
+        self.assertTrue(requested.is_set())
+        server.shutdown.assert_called_once_with()
+
+    def test_reload_recovers_when_reinstall_moves_the_package_root(self) -> None:
+        server = mock.Mock()
+        stop = mock.Mock()
+        stop.wait.return_value = False
+        requested = threading.Event()
+        baseline = (("server.py", 1, 10),)
+        with (
+            mock.patch("scientific_slides.server._python_snapshot", side_effect=(baseline, (), ())),
+            mock.patch("scientific_slides.server.shutil.which", return_value="/tools/quarkfoil"),
+            mock.patch("scientific_slides.server.sys.executable", str(self.root / "removed-python")),
         ):
             _watch_python_changes(server, stop, requested)
         self.assertTrue(requested.is_set())

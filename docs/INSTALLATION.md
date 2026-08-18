@@ -57,7 +57,7 @@ Options:
 --no-open       Start the server without opening a browser
 --verbose       Log individual HTTP requests; quiet by default
 --reload        Restart after Quarkfoil Python files change; this is the default
---no-reload     Disable automatic server restarts
+--no-reload     Disable development source restarts; installed-tool replacement still restarts
 ```
 
 With reloading enabled, changes to Quarkfoil's Python files restart the local

@@ -7,6 +7,7 @@ import math
 import mimetypes
 import os
 import re
+import signal
 import shutil
 import subprocess
 import sys
@@ -356,7 +357,16 @@ def _watch_python_changes(server: ThreadingHTTPServer, stop: threading.Event, re
         # ``uv tool install --reinstall`` temporarily removes the environment
         # containing this process. Keep serving until the replacement package
         # and an executable capable of starting it are both available.
-        if not current or not (Path(sys.executable).is_file() or shutil.which("quarkfoil")):
+        if not current:
+            if current != candidate:
+                candidate = current
+                continue
+            if not (Path(sys.executable).is_file() or shutil.which("quarkfoil")):
+                continue
+            reload_requested.set()
+            server.shutdown()
+            return
+        if not (Path(sys.executable).is_file() or shutil.which("quarkfoil")):
             candidate = current
             continue
         if current != candidate:
@@ -374,6 +384,14 @@ def _restart_executable() -> tuple[str, list[str]]:
     if launcher:
         return launcher, [launcher]
     raise FileNotFoundError("Quarkfoil was changed, but no replacement executable is available")
+
+
+def _installed_runtime() -> bool:
+    try:
+        Path(__file__).resolve().relative_to(Path(sys.prefix).resolve())
+        return True
+    except ValueError:
+        return False
 
 
 def initialize_deck(deck: Path) -> Path:
@@ -1018,11 +1036,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--verbose", action="store_true", help="Log HTTP requests")
     reload_group = parser.add_mutually_exclusive_group()
     reload_group.add_argument("--reload", dest="reload", action="store_true", default=True, help="Restart when Quarkfoil Python files change (default)")
-    reload_group.add_argument("--no-reload", dest="reload", action="store_false", help="Disable automatic server restarts")
+    reload_group.add_argument("--no-reload", dest="reload", action="store_false", help="Disable development source restarts; installed-tool replacement still restarts")
     browser = parser.add_mutually_exclusive_group()
     browser.add_argument("--open", dest="open_browser", action="store_true", default=True, help="Open the editor in a browser (default)")
     browser.add_argument("--no-open", dest="open_browser", action="store_false", help="Start the server without opening a browser")
     args = parser.parse_args(arguments)
+    if hasattr(signal, "SIGTTOU"):
+        signal.signal(signal.SIGTTOU, signal.SIG_IGN)
     server = create_server(args.deck, args.host, args.port, verbose=args.verbose, reload=args.reload)
     url = f"http://{args.host}:{server.server_port}/"
     print(f"Quarkfoil: {args.deck.resolve()}")
@@ -1032,7 +1052,7 @@ def main(argv: list[str] | None = None) -> int:
     reload_requested = threading.Event()
     watcher_stop = threading.Event()
     watcher = None
-    if args.reload:
+    if args.reload or _installed_runtime():
         watcher = threading.Thread(target=_watch_python_changes, args=(server, watcher_stop, reload_requested), daemon=True)
         watcher.start()
     try:
