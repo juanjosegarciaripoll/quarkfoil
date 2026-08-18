@@ -227,5 +227,25 @@
       "diagnostics": ["Section 'Empty' contains no slides"],
       "diagnosticCodes": ["empty_section"]
     }
+  },
+  {
+    "name": "unterminated fence inside directive restores boundaries",
+    "source": "## One\r\n\r\n::: overlay {#note type=markdown}\r\n```text\r\nunterminated\r\n:::\r\n\r\n---\r\n\r\n## Two\r\n\r\nplain paragraph body\r\n",
+    "expected": {
+      "slides": [{"title": "One"}, {"title": "Two"}],
+      "sections": [],
+      "diagnostics": ["Unterminated Markdown fence inside directive"],
+      "diagnosticCodes": ["unterminated_fence"]
+    }
+  },
+  {
+    "name": "unterminated ordinary tilde fence at end",
+    "source": "## One\n\n~~~text\nunterminated\n---\n## swallowed\n",
+    "expected": {
+      "slides": [{"title": "One"}],
+      "sections": [],
+      "diagnostics": ["Unterminated Markdown fence at end of presentation"],
+      "diagnosticCodes": ["unterminated_fence"]
+    }
   }
 ]

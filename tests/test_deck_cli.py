@@ -409,6 +409,44 @@ class DeckCliTests(unittest.TestCase):
         self.assertEqual((result, output), (2, ""))
         self.assertEqual(json.loads(errors)["error"], "unreliable_slide_boundaries")
 
+    def test_unterminated_directive_fence_cannot_misaddress_substitute(self) -> None:
+        source = (
+            "## One\r\n\r\n::: overlay {#note type=markdown}\r\n```text\r\nunterminated\r\n:::\r\n\r\n"
+            "---\r\n\r\n## Two\r\n\r\nplain paragraph body\r\n"
+        )
+        self.deck.write_bytes(source.encode("utf-8"))
+        result, output, errors = self.invoke(["deck", "inspect", str(self.deck)])
+        self.assertEqual((result, errors), (0, ""))
+        payload = json.loads(output)
+        self.assertEqual(len(payload["slides"]), 2)
+        self.assertFalse(payload["slides_reliable"])
+        self.assertEqual(payload["diagnostics"][0]["code"], "unterminated_fence")
+        result, output, errors = self.invoke(["deck", "inspect", str(self.deck), "--slides", "1"])
+        self.assertEqual((result, output), (2, ""))
+        self.assertEqual(json.loads(errors)["error"], "unreliable_slide_boundaries")
+        transaction = Path(self.temporary.name) / "transaction.json"
+        transaction.write_text(json.dumps({
+            "revision": revision(source.encode("utf-8")),
+            "operations": [{
+                "operation": "substitute", "slide": 1, "expect": "plain paragraph body",
+                "replacement": "EDITED", "count": 1,
+            }],
+        }), encoding="utf-8")
+        result, output, errors = self.invoke(["deck", "apply", str(self.deck), str(transaction)])
+        self.assertEqual((result, output), (4, ""))
+        self.assertEqual(json.loads(errors)["error"], "expectation_mismatch")
+        self.assertEqual(self.deck.read_bytes(), source.encode("utf-8"))
+
+    def test_unterminated_ordinary_fence_marks_projection_unreliable(self) -> None:
+        source = "## One\n\n~~~text\nunterminated\n---\n## swallowed\n"
+        self.deck.write_text(source, encoding="utf-8")
+        result, output, errors = self.invoke(["deck", "inspect", str(self.deck)])
+        self.assertEqual((result, errors), (0, ""))
+        payload = json.loads(output)
+        self.assertFalse(payload["slides_reliable"])
+        diagnostic = next(item for item in payload["diagnostics"] if item["code"] == "unterminated_fence")
+        self.assertEqual(diagnostic["level"], "error")
+
     def test_operation_validation_paths(self) -> None:
         invalid = [
             ([None], "JSON object"),

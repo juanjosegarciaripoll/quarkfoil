@@ -106,7 +106,9 @@ the write guard.
 Each projected slide also reports the governing section as an `id` and title,
 or `null` before the first section. If a structural parser error makes slide
 boundaries unreliable, numbered projection is rejected; use a full inspection
-to diagnose and repair the source.
+to diagnose and repair the source. This includes an `unterminated_fence` error
+when a Markdown backtick or tilde fence reaches its directive boundary or the
+end of the presentation without closing.
 
 ### Apply a transaction
 

@@ -142,6 +142,9 @@ empty line adds one line of visible vertical space. Empty lines inside fenced
 code blocks remain part of the code and are not converted into spacing. The
 same spacing rule applies to positioned Markdown and shape labels.
 
+A fenced code block must open and close within the same slide. Do not continue
+one across a `---` slide separator.
+
 Markdown headings, paragraphs, and list items can participate in Reveal.js
 fragment sequencing by ending the relevant source line with `{fragment=N}`,
 where `N` is a zero-based index:

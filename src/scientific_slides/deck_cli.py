@@ -15,6 +15,7 @@ from .storage import atomic_write, deck_file_lock
 
 
 MAX_DECK_BYTES = 20 * 1024 * 1024
+UNRELIABLE_BOUNDARY_CODES = frozenset(("unreliable_slide_boundaries", "unterminated_fence"))
 PROTOCOL_VERSION = 1
 CAPABILITIES = ("replace", "insert", "delete", "move", "notes_policy", "dry_run", "quiet", "compact",
                 "inspect_projection", "slide_fingerprints", "apply_results", "source_file", "substitute")
@@ -250,7 +251,7 @@ def _summary(
     selected_slides: set[int] | None = None,
 ) -> dict[str, Any]:
     deck = parse_deck(source)
-    slides_reliable = not any(item.code == "unreliable_slide_boundaries" for item in deck.diagnostics)
+    slides_reliable = not any(item.code in UNRELIABLE_BOUNDARY_CODES for item in deck.diagnostics)
     if selected_slides is not None and not slides_reliable:
         raise DeckCommandError(
             "numbered slide projection is unsafe because slide boundaries are unreliable",

@@ -236,22 +236,37 @@ def _front_matter(source: str, diagnostics: list[Diagnostic]) -> tuple[dict[str,
     return metadata, match.end()
 
 
-def _item_ranges(source: str, start: int) -> list[SourceRange]:
+def _item_ranges(source: str, start: int, diagnostics: list[Diagnostic]) -> list[SourceRange]:
     ranges: list[SourceRange] = []
     cursor = start
-    fence: tuple[str, int] | None = None
+    fence: tuple[str, int, int] | None = None
+    directive_open = False
     for line in re.finditer(r"[^\r\n]*(?:\r\n|\r|\n|$)", source[start:]):
         if not line.group(0):
             break
         text = line.group(0).rstrip("\r\n")
         if fence:
+            if directive_open and re.fullmatch(r"\s*:::\s*", text):
+                diagnostics.append(Diagnostic(
+                    "error", "Unterminated Markdown fence inside directive",
+                    line=fence[2], code="unterminated_fence",
+                ))
+                fence = None
+                directive_open = False
+                continue
             closing = re.fullmatch(r" {0,3}([`~]+)[ \t]*", text)
             if closing and closing.group(1)[0] == fence[0] and len(closing.group(1)) >= fence[1]:
                 fence = None
             continue
         opening = re.match(r" {0,3}([`~]{3,})", text)
         if opening:
-            fence = (opening.group(1)[0], len(opening.group(1)))
+            fence = (opening.group(1)[0], len(opening.group(1)), _line_number(source, start + line.start()))
+            continue
+        if re.fullmatch(r"\s*:::\s*", text):
+            directive_open = False
+            continue
+        if re.match(r"\s*:::\s*[A-Za-z][\w-]*", text):
+            directive_open = True
             continue
         if not re.fullmatch(r"\s*---\s*", text):
             continue
@@ -266,6 +281,11 @@ def _item_ranges(source: str, start: int) -> list[SourceRange]:
             cursor += 1
     if source[cursor:].strip():
         ranges.append(SourceRange(cursor, len(source)))
+    if fence:
+        diagnostics.append(Diagnostic(
+            "error", "Unterminated Markdown fence at end of presentation",
+            line=fence[2], code="unterminated_fence",
+        ))
     return ranges
 
 
@@ -494,7 +514,7 @@ def parse_deck(source: str) -> Deck:
     slides: list[Slide] = []
     sections: list[Section] = []
     items: list[Slide | Section] = []
-    for source_range in _item_ranges(source, body_start):
+    for source_range in _item_ranges(source, body_start, diagnostics):
         section = _section(source, source_range, len(sections), diagnostics)
         if section:
             sections.append(section)

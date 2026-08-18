@@ -722,6 +722,10 @@ try {
   const emptySectionDeck = parseDeck("# Empty {#empty .section}\n\n---\n\n# Filled {#filled .section}\n\n---\n\n## Slide\n");
   assert(emptySectionDeck.diagnostics.some(item => item.code === "empty_section")
     && emptySectionDeck.slides[0].section?.id === "filled", "empty sections report a coded warning");
+  const unterminatedFenceDeck = parseDeck("## One\n\n::: overlay {#note type=markdown}\n```text\nunterminated\n:::\n\n---\n\n## Two\n");
+  assert(unterminatedFenceDeck.slides.length === 2
+    && unterminatedFenceDeck.diagnostics.some(item => item.code === "unterminated_fence"),
+  "unterminated directive fences report an error without swallowing later slide boundaries");
   assert(deck.slides[0].layout === "1-2", "layout parses");
   assert(Math.round(deck.slides[0].columns[0]) === 40, "column ratios parse");
   assert(deck.slides[0].cells.find(cell => cell.id === "top-right").image.attrs.values.fit === "cover", "image attributes parse");
