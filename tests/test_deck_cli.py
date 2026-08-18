@@ -13,6 +13,7 @@ import unittest
 from unittest import mock
 
 from scientific_slides import main
+from scientific_slides import deck_cli
 from scientific_slides.deck_cli import apply_transaction, revision, without_notes
 from scientific_slides.parser import parse_deck
 from scientific_slides.storage import deck_file_lock
@@ -73,6 +74,8 @@ class DeckCliTests(unittest.TestCase):
         self.assertEqual(payload["slides"][0]["slide_revision"], revision(parse_deck(SOURCE).slides[0].raw.encode("utf-8")))
         self.assertIn("Private first note", payload["source"])
         self.assertIn("Private first note", payload["slides"][0]["source"])
+        self.assertIsNone(payload["slides"][0]["section"])
+        self.assertTrue(payload["slides_reliable"])
 
     def test_guide_is_concise_and_complete(self) -> None:
         result, output, errors = self.invoke(["deck", "guide"])
@@ -92,14 +95,17 @@ class DeckCliTests(unittest.TestCase):
         self.assertEqual(payload["exit_codes"]["3"], "revision conflict")
         self.assertNotIn("schema_dialect", payload)
         self.assertIn("changed_slides", payload["response_shapes"]["apply"]["required"])
+        self.assertEqual(payload["response_shapes"]["apply"]["properties"]["changed_slides"]["items"], "changed_slide")
+        self.assertEqual(payload["exit_codes"]["4"], "expectation mismatch")
+        self.assertIn("substitute", payload["capabilities"])
 
     def test_apply_help_describes_quiet_result(self) -> None:
         output = StringIO()
         with redirect_stdout(output), self.assertRaises(SystemExit) as stopped:
             main(["deck", "apply", "--help"])
         self.assertEqual(stopped.exception.code, 0)
-        self.assertIn("Omit the complete deck snapshot; return revision", output.getvalue())
-        self.assertIn("changed slides, operation results, and diagnostics", output.getvalue())
+        self.assertIn("Omit Markdown source; return revision, changed-slide", output.getvalue())
+        self.assertIn("summaries, operation results, and diagnostics", output.getvalue())
 
     def test_inspect_projection_and_compact_output(self) -> None:
         result, output, errors = self.invoke([
@@ -253,6 +259,7 @@ class DeckCliTests(unittest.TestCase):
         self.assertEqual((result, errors), (0, ""))
         payload = json.loads(output)
         self.assertEqual([slide["title"] for slide in payload["changed_slides"]], ["Third", "Inserted"])
+        self.assertTrue(all("source" not in slide for slide in payload["changed_slides"]))
         self.assertEqual(
             [item["result_slide"] for item in payload["operation_results"]],
             [None, 3, 2, None],
@@ -274,9 +281,7 @@ class DeckCliTests(unittest.TestCase):
             }],
         }), encoding="utf-8")
 
-        result, output, errors = self.invoke([
-            "deck", "apply", str(self.deck), str(transaction), "--quiet", "--compact",
-        ])
+        result, output, errors = self.invoke(["deck", "apply", str(self.deck), str(transaction), "--compact"])
 
         self.assertEqual((result, errors), (0, ""))
         self.assertIn("\\sum_i", json.loads(output)["changed_slides"][0]["source"])
@@ -333,6 +338,184 @@ class DeckCliTests(unittest.TestCase):
             os.chdir(previous)
         self.assertEqual((result, errors.getvalue()), (0, ""))
         self.assertEqual(json.loads(output.getvalue())["changed_slides"][0]["title"], "From stdin")
+
+    def test_substitute_is_literal_slide_local_and_sequential(self) -> None:
+        transaction = Path(self.temporary.name) / "transaction.json"
+        transaction.write_text(json.dumps({
+            "revision": revision(SOURCE.encode("utf-8")),
+            "operations": [
+                {"operation": "substitute", "slide": 2, "expect": "Second body.", "replacement": "Equation: \\sum_i n_i."},
+                {"operation": "substitute", "slide": 2, "expect": "Equation", "replacement": "Result"},
+            ],
+        }), encoding="utf-8")
+        result, output, errors = self.invoke([
+            "deck", "apply", str(self.deck), str(transaction), "--quiet", "--compact",
+        ])
+        self.assertEqual((result, errors), (0, ""))
+        payload = json.loads(output)
+        self.assertEqual(payload["operation_results"][0]["result_slide"], 2)
+        self.assertEqual(payload["operation_results"][1]["result_slide"], 2)
+        self.assertNotIn("source", payload["changed_slides"][0])
+        self.assertIn("Result: \\sum_i n_i.", self.deck.read_text(encoding="utf-8"))
+
+    def test_substitute_exact_count_mismatch_exits_four_without_writing(self) -> None:
+        transaction = Path(self.temporary.name) / "transaction.json"
+        transaction.write_text(json.dumps({
+            "revision": revision(SOURCE.encode("utf-8")),
+            "operations": [{
+                "operation": "substitute", "slide": 1, "expect": "First", "replacement": "Changed", "count": 1,
+            }],
+        }), encoding="utf-8")
+        result, output, errors = self.invoke(["deck", "apply", str(self.deck), str(transaction)])
+        self.assertEqual((result, output), (4, ""))
+        payload = json.loads(errors)
+        self.assertEqual(payload["error"], "expectation_mismatch")
+        self.assertEqual((payload["expected_count"], payload["actual_count"]), (1, 2))
+        self.assertEqual(payload["path"], "operations[0]")
+        self.assertEqual(self.deck.read_text(encoding="utf-8"), SOURCE)
+
+    def test_substitute_supports_exact_multiple_count_unicode_crlf_and_deletion(self) -> None:
+        source = "## Ωmega\r\n\r\nΩ + Ω\r\n\r\n---\r\n\r\n## Keep\r\n"
+        updated = apply_transaction(source, [{
+            "operation": "substitute", "slide": 1, "expect": "Ω", "replacement": "", "count": 3,
+        }])
+        self.assertNotIn("Ω", parse_deck(updated).slides[0].raw)
+        self.assertIn("## Keep", updated)
+        self.assertNotIn("\n", updated.replace("\r\n", ""))
+
+    def test_section_membership_and_empty_section_warning_are_returned(self) -> None:
+        source = "# Intro {#intro .section}\n\n---\n\n## One\n\n---\n\n# Results {#results .section}\n\n---\n\n## Two\n"
+        self.deck.write_text(source, encoding="utf-8")
+        result, output, errors = self.invoke(["deck", "inspect", str(self.deck), "--no-source", "--slides", "2"])
+        self.assertEqual((result, errors), (0, ""))
+        self.assertEqual(json.loads(output)["slides"][0]["section"], {"id": "results", "title": "Results"})
+        transaction = Path(self.temporary.name) / "transaction.json"
+        transaction.write_text(json.dumps({
+            "revision": revision(source.encode("utf-8")),
+            "operations": [{"operation": "delete", "slide": 1}],
+        }), encoding="utf-8")
+        result, output, errors = self.invoke(["deck", "apply", str(self.deck), str(transaction), "--quiet"])
+        self.assertEqual((result, errors), (0, ""))
+        diagnostic = next(item for item in json.loads(output)["diagnostics"] if item.get("code") == "empty_section")
+        self.assertEqual(diagnostic["level"], "warning")
+
+    def test_projection_refuses_unreliable_slide_boundaries(self) -> None:
+        source = "---\ntitle: unclosed\n\n## Apparent slide\n"
+        self.deck.write_text(source, encoding="utf-8")
+        result, output, errors = self.invoke(["deck", "inspect", str(self.deck)])
+        self.assertEqual((result, errors), (0, ""))
+        self.assertFalse(json.loads(output)["slides_reliable"])
+        result, output, errors = self.invoke(["deck", "inspect", str(self.deck), "--slides", "1"])
+        self.assertEqual((result, output), (2, ""))
+        self.assertEqual(json.loads(errors)["error"], "unreliable_slide_boundaries")
+
+    def test_operation_validation_paths(self) -> None:
+        invalid = [
+            ([None], "JSON object"),
+            ([{}], "requires an 'operation'"),
+            ([{"operation": "unknown"}], "unknown operation"),
+            ([{"operation": "delete"}], "missing operation field"),
+            ([{"operation": "delete", "slide": 2, "extra": True}], "unknown operation field"),
+            ([{"operation": "delete", "slide": True}], "integer"),
+            ([{"operation": "insert", "after": 9, "source": "## New\n"}], "cannot insert"),
+            ([{"operation": "move", "slide": 1, "after": 9}], "cannot move"),
+            ([{"operation": "move", "slide": 2, "after": 2}], "after itself"),
+            ([{"operation": "replace", "slide": 1, "source": "## New\n", "notes": "bad"}], "notes"),
+            ([{"operation": "substitute", "slide": 1, "expect": "", "replacement": "x"}], "expect"),
+            ([{"operation": "substitute", "slide": 1, "expect": "First", "replacement": 1}], "replacement"),
+            ([{"operation": "substitute", "slide": 1, "expect": "First", "replacement": "x", "count": 0}], "count"),
+        ]
+        for operations, message in invalid:
+            with self.subTest(message=message), self.assertRaisesRegex(Exception, message):
+                apply_transaction(SOURCE, operations)
+        with self.assertRaisesRegex(Exception, "nonempty"):
+            apply_transaction(SOURCE, [])
+        unchanged = apply_transaction(SOURCE, [{"operation": "move", "slide": 2, "after": 1}])
+        self.assertEqual(unchanged, SOURCE)
+        inserted = apply_transaction(SOURCE, [{"operation": "insert", "after": 0, "source": "## Beginning\n"}])
+        self.assertEqual(parse_deck(inserted).slides[0].title, "Beginning")
+
+    def test_slide_source_validation_paths(self) -> None:
+        invalid_sources = [
+            (None, "nonempty"),
+            ("# Empty {#empty .section}\n", "invalid slide source"),
+            ("---\ntitle: x\n---\n\n## Slide\n", "exactly one slide"),
+            ("## One\n\n---\n\n## Two\n", "exactly one slide"),
+        ]
+        for source, message in invalid_sources:
+            with self.subTest(source=source), self.assertRaisesRegex(Exception, message):
+                apply_transaction(SOURCE, [{"operation": "replace", "slide": 1, "source": source}])
+
+    def test_cli_usage_and_transaction_validation_paths(self) -> None:
+        result, _, errors = self.invoke(["deck"])
+        self.assertEqual(result, 2)
+        self.assertEqual(json.loads(errors)["error"], "usage_error")
+        for command in ("guide", "protocol"):
+            result, _, errors = self.invoke(["deck", command, "extra"])
+            self.assertEqual(result, 2)
+            self.assertEqual(json.loads(errors)["error"], "usage_error")
+        transaction = Path(self.temporary.name) / "transaction.json"
+        transaction.write_text("not json", encoding="utf-8")
+        result, _, errors = self.invoke(["deck", "apply", str(self.deck), str(transaction)])
+        self.assertEqual(result, 2)
+        self.assertIn("cannot read transaction", json.loads(errors)["message"])
+        transaction.write_text("42", encoding="utf-8")
+        result, _, errors = self.invoke(["deck", "apply", str(self.deck), str(transaction)])
+        self.assertEqual(result, 2)
+        self.assertIn("object or an operations array", json.loads(errors)["message"])
+        transaction.write_text(json.dumps({"revision": revision(SOURCE.encode()), "operations": [], "extra": 1}), encoding="utf-8")
+        result, _, errors = self.invoke(["deck", "apply", str(self.deck), str(transaction)])
+        self.assertEqual(result, 2)
+        self.assertIn("unknown transaction field", json.loads(errors)["message"])
+        transaction.write_text(json.dumps({"revision": revision(SOURCE.encode()), "operations": []}), encoding="utf-8")
+        result, _, errors = self.invoke([
+            "deck", "apply", str(self.deck), str(transaction), "--if-revision", "sha256:" + "0" * 64,
+        ])
+        self.assertEqual(result, 2)
+        self.assertEqual(json.loads(errors)["error"], "revision_disagreement")
+
+    def test_deck_and_projection_input_validation_paths(self) -> None:
+        result, _, errors = self.invoke(["deck", "inspect", str(Path(self.temporary.name) / "missing.txt")])
+        self.assertEqual(result, 2)
+        self.assertIn("existing", json.loads(errors)["message"])
+        invalid_utf8 = Path(self.temporary.name) / "invalid.md"
+        invalid_utf8.write_bytes(b"\xff")
+        result, _, errors = self.invoke(["deck", "inspect", str(invalid_utf8)])
+        self.assertEqual(result, 2)
+        self.assertIn("UTF-8", json.loads(errors)["message"])
+        for selected in ("x", "0", ""):
+            result, _, errors = self.invoke(["deck", "inspect", str(self.deck), "--slides", selected])
+            self.assertEqual(result, 2)
+            self.assertEqual(json.loads(errors)["error"], "usage_error")
+        with mock.patch.object(deck_cli, "MAX_DECK_BYTES", 1):
+            result, _, errors = self.invoke(["deck", "inspect", str(self.deck)])
+        self.assertEqual(result, 2)
+        self.assertIn("byte limit", json.loads(errors)["message"])
+
+    def test_external_source_validation_paths(self) -> None:
+        base = Path(self.temporary.name)
+        cases = [
+            ({"operation": "replace", "slide": 1, "source": "## X\n", "source_revision": "sha256:" + "0" * 64}, "requires 'source_file'"),
+            ({"operation": "replace", "slide": 1, "source_file": ""}, "nonempty path"),
+            ({"operation": "replace", "slide": 1, "source_file": "missing.md"}, "cannot read"),
+        ]
+        for operation, message in cases:
+            with self.subTest(message=message), self.assertRaisesRegex(Exception, message):
+                deck_cli._materialize_sources([operation], base)
+        fragment = base / "fragment.md"
+        fragment.write_bytes(b"\xff")
+        with self.assertRaisesRegex(Exception, "UTF-8"):
+            deck_cli._materialize_sources([{"operation": "insert", "after": 0, "source_file": str(fragment)}], base)
+        fragment.write_text("# Section {#s .section}\n", encoding="utf-8")
+        with self.assertRaisesRegex(Exception, "invalid slide source"):
+            deck_cli._materialize_sources([{"operation": "insert", "after": 0, "source_file": str(fragment)}], base)
+        fragment.write_text("## Slide\n", encoding="utf-8")
+        with self.assertRaisesRegex(Exception, "source_revision"):
+            deck_cli._materialize_sources([{
+                "operation": "insert", "after": 0, "source_file": str(fragment), "source_revision": "bad",
+            }], base)
+        with mock.patch.object(deck_cli, "MAX_DECK_BYTES", 1), self.assertRaisesRegex(Exception, "byte limit"):
+            deck_cli._materialize_sources([{"operation": "insert", "after": 0, "source_file": str(fragment)}], base)
 
     def test_errors_are_structured_and_operation_indexed(self) -> None:
         transaction = Path(self.temporary.name) / "transaction.json"

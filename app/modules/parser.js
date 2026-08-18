@@ -90,7 +90,7 @@ function splitFrontMatter(source, diagnostics) {
   if (!source.startsWith("---")) return { metadata: {}, bodyStart: 0, raw: "" };
   const match = /^---\s*\r?\n([\s\S]*?)\r?\n---\s*(?:\r?\n|$)/.exec(source);
   if (!match) {
-    diagnostics.push({ level: "error", message: "Unclosed YAML front matter", line: 1 });
+    diagnostics.push({ level: "error", code: "unreliable_slide_boundaries", message: "Unclosed YAML front matter", line: 1 });
     return { metadata: {}, bodyStart: 0, raw: "" };
   }
   let metadata = {};
@@ -106,9 +106,23 @@ function splitFrontMatter(source, diagnostics) {
 function splitSlides(source, start) {
   const body = source.slice(start);
   const separators = [];
-  const pattern = /^\s*---\s*$/gm;
+  const pattern = /[^\r\n]*(?:\r\n|\r|\n|$)/g;
+  let fence = null;
   let match;
-  while ((match = pattern.exec(body))) separators.push({ start: start + match.index, end: start + pattern.lastIndex });
+  while ((match = pattern.exec(body)) && match[0]) {
+    const text = match[0].replace(/\r?\n$|\r$/, "");
+    if (fence) {
+      const close = /^ {0,3}([`~]+)[ \t]*$/.exec(text);
+      if (close && close[1][0] === fence.character && close[1].length >= fence.length) fence = null;
+      continue;
+    }
+    const open = /^ {0,3}([`~]{3,})/.exec(text);
+    if (open) {
+      fence = { character: open[1][0], length: open[1].length };
+      continue;
+    }
+    if (/^\s*---\s*$/.test(text)) separators.push({ start: start + match.index, end: start + match.index + text.length });
+  }
   const ranges = [];
   let cursor = start;
   for (const separator of separators) {
@@ -446,7 +460,18 @@ export function parseDeck(source) {
     if (item.kind === "section") {
       activeSection = item;
       activeSection.slideCount = 0;
-    } else if (activeSection) activeSection.slideCount += 1;
+    } else {
+      item.section = activeSection;
+      if (activeSection) activeSection.slideCount += 1;
+    }
+  }
+  for (const section of sections) {
+    if (!section.slideCount) diagnostics.push({
+      level: "warning",
+      code: "empty_section",
+      message: `Section '${section.title}' contains no slides`,
+      line: lineNumber(source, section.headingRange.start),
+    });
   }
   if (front.metadata.theme && !THEME_SET.has(String(front.metadata.theme))) diagnostics.push({ level: "warning", message: `Unknown deck theme '${front.metadata.theme}', using scientific-light` });
   for (const slide of slides) {

@@ -47,6 +47,7 @@ class ParserTests(unittest.TestCase):
                             "rows": list(slide.rows),
                             "notes": slide.notes,
                             "footer": slide.footer[0] if slide.footer else None,
+                            "section": None if slide.section is None else {"title": slide.section.title, "id": slide.section.id},
                         }
                         for slide in deck.slides
                     ],
@@ -60,6 +61,7 @@ class ParserTests(unittest.TestCase):
                         for section in deck.sections
                     ],
                     "diagnostics": [item.message for item in deck.diagnostics],
+                    "diagnosticCodes": [item.code for item in deck.diagnostics],
                 }
                 self.assert_fixture_subset(actual, fixture["expected"])
                 messages = actual["diagnostics"]

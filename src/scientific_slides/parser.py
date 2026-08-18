@@ -48,6 +48,7 @@ class Diagnostic:
     message: str
     line: int | None = None
     slide: int | None = None
+    code: str | None = None
 
 
 @dataclass(slots=True)
@@ -144,6 +145,7 @@ class Slide:
     footer: tuple[str, SourceRange] | None
     notes: str
     notes_range: SourceRange | None
+    section: Section | None = None
 
 
 @dataclass(slots=True)
@@ -221,7 +223,7 @@ def _front_matter(source: str, diagnostics: list[Diagnostic]) -> tuple[dict[str,
         return {}, 0
     match = re.match(r"^---\s*\r?\n([\s\S]*?)\r?\n---\s*(?:\r?\n|$)", source)
     if not match:
-        diagnostics.append(Diagnostic("error", "Unclosed YAML front matter", line=1))
+        diagnostics.append(Diagnostic("error", "Unclosed YAML front matter", line=1, code="unreliable_slide_boundaries"))
         return {}, 0
     try:
         metadata = yaml.safe_load(match.group(1)) or {}
@@ -235,11 +237,26 @@ def _front_matter(source: str, diagnostics: list[Diagnostic]) -> tuple[dict[str,
 
 
 def _item_ranges(source: str, start: int) -> list[SourceRange]:
-    separators = list(re.finditer(r"^\s*---\s*$", source[start:], re.MULTILINE))
     ranges: list[SourceRange] = []
     cursor = start
-    for separator in separators:
-        separator_start, separator_end = start + separator.start(), start + separator.end()
+    fence: tuple[str, int] | None = None
+    for line in re.finditer(r"[^\r\n]*(?:\r\n|\r|\n|$)", source[start:]):
+        if not line.group(0):
+            break
+        text = line.group(0).rstrip("\r\n")
+        if fence:
+            closing = re.fullmatch(r" {0,3}([`~]+)[ \t]*", text)
+            if closing and closing.group(1)[0] == fence[0] and len(closing.group(1)) >= fence[1]:
+                fence = None
+            continue
+        opening = re.match(r" {0,3}([`~]{3,})", text)
+        if opening:
+            fence = (opening.group(1)[0], len(opening.group(1)))
+            continue
+        if not re.fullmatch(r"\s*---\s*", text):
+            continue
+        separator_start = start + line.start()
+        separator_end = separator_start + len(text)
         if source[cursor:separator_start].strip():
             ranges.append(SourceRange(cursor, separator_start))
         cursor = separator_end
@@ -490,8 +507,16 @@ def parse_deck(source: str) -> Deck:
     for item in items:
         if isinstance(item, Section):
             active_section = item
-        elif active_section:
-            active_section.slide_count += 1
+        else:
+            item.section = active_section
+            if active_section:
+                active_section.slide_count += 1
+    for section in sections:
+        if section.slide_count == 0:
+            diagnostics.append(Diagnostic(
+                "warning", f"Section '{section.title}' contains no slides",
+                line=_line_number(source, section.heading_range.start), code="empty_section",
+            ))
     if metadata.get("theme") and str(metadata["theme"]) not in THEMES:
         diagnostics.append(Diagnostic("warning", f"Unknown deck theme '{metadata['theme']}', using scientific-light"))
     for slide in slides:

@@ -187,7 +187,8 @@
     "expected": {
       "slides": [],
       "sections": [{"title": "Empty", "id": "empty", "slideCount": 0, "isTrash": false}],
-      "diagnostics": ["The deck contains no slides"]
+      "diagnostics": ["Section 'Empty' contains no slides", "The deck contains no slides"],
+      "diagnosticCodes": ["empty_section", null]
     }
   },
   {
@@ -200,6 +201,31 @@
       ],
       "sections": [],
       "diagnostics": []
+    }
+  },
+  {
+    "name": "fenced slide delimiters and section membership",
+    "source": "# Examples {#examples .section}\r\n\r\n---\r\n\r\n## Fences\r\n\r\n```yaml\r\nkey: value\r\n---\r\nother: value\r\n```\r\n\r\n   ~~~~text\r\ninside\r\n---\r\n   ~~~~~\r\n\r\n---\r\n\r\n## After\r\n",
+    "expected": {
+      "slides": [
+        {"title": "Fences", "section": {"title": "Examples", "id": "examples"}},
+        {"title": "After", "section": {"title": "Examples", "id": "examples"}}
+      ],
+      "sections": [{"title": "Examples", "id": "examples", "slideCount": 2, "isTrash": false}],
+      "diagnostics": []
+    }
+  },
+  {
+    "name": "empty section warning",
+    "source": "# Empty {#empty .section}\n\n---\n\n# Filled {#filled .section}\n\n---\n\n## Slide\n",
+    "expected": {
+      "slides": [{"title": "Slide", "section": {"title": "Filled", "id": "filled"}}],
+      "sections": [
+        {"title": "Empty", "id": "empty", "slideCount": 0, "isTrash": false},
+        {"title": "Filled", "id": "filled", "slideCount": 1, "isTrash": false}
+      ],
+      "diagnostics": ["Section 'Empty' contains no slides"],
+      "diagnosticCodes": ["empty_section"]
     }
   }
 ]

@@ -519,6 +519,7 @@ function parserFixtureSummary(source) {
       rows: slide.rows,
       notes: slide.notes,
       footer: slide.footer?.source || null,
+      section: slide.section ? { title: slide.section.title, id: slide.section.id } : null,
     })),
     sections: deck.sections.map(section => ({
       title: section.title,
@@ -527,6 +528,7 @@ function parserFixtureSummary(source) {
       isTrash: section.isTrash,
     })),
     diagnostics: deck.diagnostics.map(item => item.message),
+    diagnosticCodes: deck.diagnostics.map(item => item.code || null),
   };
 }
 
@@ -713,6 +715,13 @@ try {
   assert(deck.metadata.title === "Test deck", "front matter parses");
   assert(deck.metadata.assets.figures === "artwork" && deck.metadata.assets.include[0] === "references", "asset folders parse from front matter");
   assert(deck.slides.length === 2, "slides split");
+  const fencedDeck = parseDeck("# Examples {#examples .section}\n\n---\n\n## Fenced\n\n```yaml\nkey: value\n---\nother: value\n```\n\n---\n\n## After\n");
+  assert(fencedDeck.slides.length === 2 && fencedDeck.slides[0].raw.includes("---\nother")
+    && fencedDeck.slides.every(slide => slide.section?.id === "examples"),
+  "fenced delimiters do not split slides and section membership is retained");
+  const emptySectionDeck = parseDeck("# Empty {#empty .section}\n\n---\n\n# Filled {#filled .section}\n\n---\n\n## Slide\n");
+  assert(emptySectionDeck.diagnostics.some(item => item.code === "empty_section")
+    && emptySectionDeck.slides[0].section?.id === "filled", "empty sections report a coded warning");
   assert(deck.slides[0].layout === "1-2", "layout parses");
   assert(Math.round(deck.slides[0].columns[0]) === 40, "column ratios parse");
   assert(deck.slides[0].cells.find(cell => cell.id === "top-right").image.attrs.values.fit === "cover", "image attributes parse");

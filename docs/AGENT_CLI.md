@@ -103,6 +103,11 @@ notes. With `--no-notes`, it is not the hash of the returned `source` field.
 The deck revision always identifies the exact complete file bytes and remains
 the write guard.
 
+Each projected slide also reports the governing section as an `id` and title,
+or `null` before the first section. If a structural parser error makes slide
+boundaries unreliable, numbered projection is rejected; use a full inspection
+to diagnose and repair the source.
+
 ### Apply a transaction
 
 Create a transaction containing the inspected revision and one or more
@@ -150,6 +155,10 @@ Supported operations are:
   beginning.
 - `delete`: delete `slide`. The final slide cannot be deleted.
 - `move`: move `slide` after `after`; zero moves it to the beginning.
+- `substitute`: replace literal `expect` text within one `slide`. The text must
+  occur exactly once by default; set `count` to another positive exact count.
+  A mismatch exits with status 4 and changes nothing. `replacement` may be
+  empty.
 
 For equation-heavy or otherwise complex Markdown, `replace` and `insert` may
 use `source_file` instead of `source`:
@@ -178,6 +187,20 @@ following replacement of slide 3 replaces the new slide. Trashed slides remain
 part of the numbering. Moving a slide after itself is invalid; moving it to its
 current position changes nothing.
 
+Number shifts caused by structural operations are not all listed as changed
+slides. For example, after deleting slide 2, the old slide 3 is now slide 2:
+
+```json
+{"operations": [
+  {"operation": "delete", "slide": 2},
+  {"operation": "substitute", "slide": 2, "expect": "Old third", "replacement": "Revised third"}
+]}
+```
+
+The second operation addresses the already-renumbered deck. Quiet results list
+surviving slides explicitly targeted by operations, while `operation_results`
+records moves, deletions, and final target numbers.
+
 On success, the command returns a new snapshot and revision as JSON. Add
 `--no-notes` to omit notes from that returned snapshot; it does not control the
 replacement policy. Use `--quiet` for the revision, changed slides,
@@ -187,12 +210,16 @@ validate every sequential operation without writing the presentation. Dry-run
 is not recommended for ordinary edits: normal apply performs the same
 validation, checks the exact deck revision, and commits only after the complete
 transaction succeeds. Use dry-run only when a separate preview is wanted.
+Quiet changed-slide records omit Markdown source; they retain the final number,
+section, title, layout, trash state, and exact stored-source fingerprint.
 
 Run `quarkfoil deck protocol` for the versioned, machine-readable contract.
 Successful data is written to standard output. Errors are JSON on standard
 error: status 2 means an invalid request, and status 3 is a revision conflict.
-Validation errors identify the failing operation. Parser warnings are returned
-as diagnostics; parser errors reject the transaction.
+Status 4 means a `substitute` expectation did not match its exact requested
+count. Validation errors identify the failing operation. Parser warnings are
+returned as diagnostics; parser errors reject the transaction. Deleting the
+last slide from a section succeeds but returns an `empty_section` warning.
 
 ### Conflict and safety behavior
 

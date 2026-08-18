@@ -17,7 +17,7 @@ from .storage import atomic_write, deck_file_lock
 MAX_DECK_BYTES = 20 * 1024 * 1024
 PROTOCOL_VERSION = 1
 CAPABILITIES = ("replace", "insert", "delete", "move", "notes_policy", "dry_run", "quiet", "compact",
-                "inspect_projection", "slide_fingerprints", "apply_results", "source_file")
+                "inspect_projection", "slide_fingerprints", "apply_results", "source_file", "substitute")
 GUIDE = """Quarkfoil agent protocol v1
 
 1. Read:
@@ -34,6 +34,7 @@ Operations:
 {"operation":"insert","after":N,"source":"..."}   # 0 = beginning
 {"operation":"delete","slide":N}
 {"operation":"move","slide":N,"after":N}           # 0 = beginning
+{"operation":"substitute","slide":N,"expect":"old","replacement":"new"}
 
 Operations are sequential. Always use the revision returned by inspect.
 Apply directly in normal use: it validates everything before one atomic write.
@@ -61,29 +62,45 @@ PROTOCOL = {
                        "optional": {"source_revision": "sha256:..."}, "after_zero": "beginning"},
             "delete": {"required": ["slide"]},
             "move": {"required": ["slide", "after"], "after_zero": "beginning"},
+            "substitute": {"required": ["slide", "expect", "replacement"], "optional": {"count": 1}},
         },
     },
     "io": {"success": "JSON on stdout", "error": "JSON on stderr"},
     "response_shapes": {
         "slide": {
             "type": "object",
-            "required": ["number", "slide_revision", "title", "layout", "trashed", "source"],
+            "required": ["number", "slide_revision", "title", "layout", "trashed", "section", "source"],
             "properties": {
                 "number": {"type": "integer", "minimum": 1},
                 "slide_revision": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
                 "title": {"type": "string"}, "layout": {"type": "string"},
                 "trashed": {"type": "boolean"}, "source": {"type": "string"},
+                "section": {"type": ["object", "null"]},
+            },
+            "additionalProperties": False,
+        },
+        "changed_slide": {
+            "type": "object",
+            "required": ["number", "slide_revision", "title", "layout", "trashed", "section"],
+            "properties": {
+                "number": {"type": "integer", "minimum": 1},
+                "slide_revision": {"type": "string"}, "title": {"type": "string"},
+                "layout": {"type": "string"}, "trashed": {"type": "boolean"},
+                "section": {"type": ["object", "null"]},
+                "source": {"type": "string", "notes": "omitted by --quiet"},
             },
             "additionalProperties": False,
         },
         "inspect": {
             "type": "object",
-            "required": ["protocol_version", "capabilities", "revision", "metadata", "slides", "diagnostics"],
+            "required": ["protocol_version", "capabilities", "revision", "metadata", "slides", "diagnostics",
+                         "slides_reliable"],
             "properties": {
                 "protocol_version": {"const": PROTOCOL_VERSION}, "capabilities": {"type": "array"},
                 "revision": {"type": "string"}, "metadata": {"type": "object"},
                 "slides": {"type": "array", "items": "slide"},
                 "diagnostics": {"type": "array"}, "source": {"type": "string"},
+                "slides_reliable": {"type": "boolean"},
             },
             "additionalProperties": False,
             "notes": "source is omitted with --no-source; projected slides are returned in deck order",
@@ -96,20 +113,20 @@ PROTOCOL = {
                 "protocol_version": {"const": PROTOCOL_VERSION}, "capabilities": {"type": "array"},
                 "revision": {"type": "string"}, "diagnostics": {"type": "array"},
                 "dry_run": {"type": "boolean"},
-                "changed_slides": {"type": "array", "items": "slide"},
+                "changed_slides": {"type": "array", "items": "changed_slide"},
                 "operation_results": {"type": "array", "items": "operation_result"},
                 "metadata": {"type": "object"},
                 "slides": {"type": "array", "items": "slide"},
-                "source": {"type": "string"},
+                "source": {"type": "string"}, "slides_reliable": {"type": "boolean"},
             },
             "additionalProperties": False,
-            "notes": "--quiet omits metadata, slides, and source; changed_slides remains",
+            "notes": "--quiet omits metadata, slides, source, and source within changed_slides",
         },
         "operation_result": {
             "type": "object", "required": ["operation", "type", "result_slide"],
             "properties": {
                 "operation": {"type": "integer", "minimum": 0},
-                "type": {"enum": ["replace", "insert", "delete", "move"]},
+                "type": {"enum": ["replace", "insert", "delete", "move", "substitute"]},
                 "result_slide": {"type": ["integer", "null"], "minimum": 1},
                 "deleted_slide": {"type": "integer", "minimum": 1},
                 "from_slide": {"type": "integer", "minimum": 1},
@@ -128,7 +145,7 @@ PROTOCOL = {
             "notes": "revision_mismatch includes expected_revision and actual_revision",
         },
     },
-    "exit_codes": {"0": "success", "2": "invalid request", "3": "revision conflict"},
+    "exit_codes": {"0": "success", "2": "invalid request", "3": "revision conflict", "4": "expectation mismatch"},
     "revision": "SHA-256 of the exact UTF-8 file bytes",
     "failure_guarantee": "A failed transaction leaves the presentation byte-for-byte unchanged.",
 }
@@ -161,6 +178,18 @@ class RevisionConflict(DeckCommandError):
         )
         self.expected = expected
         self.current = current
+
+
+class ExpectationMismatch(DeckCommandError):
+    def __init__(self, slide: int, expected_count: int, actual_count: int):
+        super().__init__(
+            f"slide {slide} contains the expected text {actual_count} times, not {expected_count}",
+            4,
+            code="expectation_mismatch",
+            slide=slide,
+            expected_count=expected_count,
+            actual_count=actual_count,
+        )
 
 
 class DeckArgumentParser(argparse.ArgumentParser):
@@ -206,6 +235,7 @@ def _diagnostics(deck: Deck) -> list[dict[str, Any]]:
             "message": item.message,
             "line": item.line,
             "slide": item.slide,
+            "code": item.code,
         }.items() if value is not None}
         for item in deck.diagnostics
     ]
@@ -220,6 +250,12 @@ def _summary(
     selected_slides: set[int] | None = None,
 ) -> dict[str, Any]:
     deck = parse_deck(source)
+    slides_reliable = not any(item.code == "unreliable_slide_boundaries" for item in deck.diagnostics)
+    if selected_slides is not None and not slides_reliable:
+        raise DeckCommandError(
+            "numbered slide projection is unsafe because slide boundaries are unreliable",
+            code="unreliable_slide_boundaries",
+        )
     if selected_slides is not None:
         missing = sorted(selected_slides - set(range(1, len(deck.slides) + 1)))
         if missing:
@@ -238,6 +274,7 @@ def _summary(
             "title": slide.title,
             "layout": slide.layout,
             "trashed": slide.trashed,
+            "section": None if slide.section is None else {"id": slide.section.id, "title": slide.section.title},
             "source": raw,
         })
     result = {
@@ -247,6 +284,7 @@ def _summary(
         "metadata": deck.metadata,
         "slides": slides,
         "diagnostics": _diagnostics(deck),
+        "slides_reliable": slides_reliable,
     }
     if include_source:
         result["source"] = source if include_notes else without_notes(source)
@@ -308,7 +346,7 @@ def _insert_slide(source: str, deck: Deck, after: int, slide_source: str) -> str
     target = deck.slides[after - 1]
     insertion = target.range.end
     slide = slide_source.strip()
-    suffix = _newline(source) if insertion == len(source) else ""
+    suffix = _newline(source)
     return source[:insertion] + _separator_after(source[:insertion]) + slide + suffix + source[insertion:]
 
 
@@ -385,6 +423,25 @@ def _apply_operation(source: str, operation: Any) -> str:
         reduced_deck = parse_deck(reduced)
         adjusted_after = after - 1 if number < after else after
         return _insert_slide(reduced, reduced_deck, adjusted_after, moved)
+    elif name == "substitute":
+        _check_fields(operation, {"slide", "expect", "replacement"}, {"count"})
+        number = _integer(operation, "slide")
+        _slide_position(deck, number)
+        expected = operation.get("expect")
+        replacement = operation.get("replacement")
+        if not isinstance(expected, str) or not expected:
+            raise DeckCommandError("operation field 'expect' must be a nonempty string")
+        if not isinstance(replacement, str):
+            raise DeckCommandError("operation field 'replacement' must be a string")
+        expected_count = operation.get("count", 1)
+        if isinstance(expected_count, bool) or not isinstance(expected_count, int) or expected_count < 1:
+            raise DeckCommandError("operation field 'count' must be a positive integer")
+        slide = deck.slides[number - 1]
+        actual_count = slide.raw.count(expected)
+        if actual_count != expected_count:
+            raise ExpectationMismatch(number, expected_count, actual_count)
+        replaced = slide.raw.replace(expected, replacement)
+        return source[:slide.range.start] + replaced + source[slide.range.end:]
     else:
         raise DeckCommandError(f"unknown operation '{name}'")
 
@@ -402,7 +459,7 @@ def _apply_transaction_details(source: str, operations: Any) -> tuple[str, list[
             raise error.at_operation(index) from error
         name = operation.get("operation", operation.get("op"))
         result: dict[str, Any] = {"operation": index, "type": name}
-        if name == "replace":
+        if name in ("replace", "substitute"):
             token = tokens[operation["slide"] - 1]
             touched.add(token)
             result["_token"] = token
@@ -442,20 +499,25 @@ def apply_transaction(source: str, operations: Any) -> str:
     return _apply_transaction_details(source, operations)[0]
 
 
-def _changed_slides(source: str, touched: set[str], tokens: list[str], *, include_notes: bool) -> list[dict[str, Any]]:
+def _changed_slides(
+    source: str, touched: set[str], tokens: list[str], *, include_notes: bool, include_source: bool,
+) -> list[dict[str, Any]]:
     deck = parse_deck(source)
     payload = []
     for index, (slide, token) in enumerate(zip(deck.slides, tokens), start=1):
         if token not in touched:
             continue
-        payload.append({
+        item = {
             "number": index,
             "slide_revision": revision(slide.raw.encode("utf-8")),
             "title": slide.title,
             "layout": slide.layout,
             "trashed": slide.trashed,
-            "source": slide.raw if include_notes else without_notes(slide.raw),
-        })
+            "section": None if slide.section is None else {"id": slide.section.id, "title": slide.section.title},
+        }
+        if include_source:
+            item["source"] = slide.raw if include_notes else without_notes(slide.raw)
+        payload.append(item)
     return payload
 
 
@@ -577,7 +639,7 @@ def _silence_broken_pipe() -> None:
 def _inspect(arguments: list[str]) -> int:
     parser = DeckArgumentParser(prog="quarkfoil deck inspect", description="Return a presentation snapshot for an editing agent")
     parser.add_argument("deck", type=Path)
-    parser.add_argument("--no-notes", action="store_true", help="Omit speaker notes from returned source")
+    parser.add_argument("--no-notes", action="store_true", help="Omit speaker notes from returned JSON")
     parser.add_argument("--no-source", action="store_true", help="Omit the whole-deck source field")
     parser.add_argument("--slides", help="Return only these comma-separated slide numbers")
     parser.add_argument("--compact", action="store_true", help="Emit compact JSON")
@@ -599,7 +661,7 @@ def _apply(arguments: list[str]) -> int:
                         help="Preview without writing; normal apply already validates atomically")
     parser.add_argument(
         "--quiet", action="store_true",
-        help="Omit the complete deck snapshot; return revision, changed slides, operation results, and diagnostics",
+        help="Omit Markdown source; return revision, changed-slide summaries, operation results, and diagnostics",
     )
     parser.add_argument("--compact", action="store_true", help="Emit compact JSON")
     args = parser.parse_args(arguments)
@@ -635,7 +697,9 @@ def _apply(arguments: list[str]) -> int:
         "revision": updated_revision,
         "diagnostics": _diagnostics(parse_deck(updated)),
         "dry_run": args.dry_run,
-        "changed_slides": _changed_slides(updated, touched, tokens, include_notes=not args.no_notes),
+        "changed_slides": _changed_slides(
+            updated, touched, tokens, include_notes=not args.no_notes, include_source=not args.quiet,
+        ),
         "operation_results": operation_results,
     }
     if args.quiet:
