@@ -136,6 +136,9 @@ BSD-3-Clause terms for Markdown-derived portions.
 
 ## Development workflow
 
+Before editing a presentation deck, run `quarkfoil deck guide` and use its
+revision-guarded workflow instead of modifying the deck Markdown directly.
+
 Use native `git` and `uv`. Do not introduce WSL, Node, npm, or generated
 dependency directories into the workflow.
 

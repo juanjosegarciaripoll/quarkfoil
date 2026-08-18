@@ -24,6 +24,7 @@ from pathlib import Path
 
 from .icons import ICON_COLLECTIONS, fetch_icon_svg, import_icon, search_icons
 from .paths import APP_ROOT, inside as _inside
+from .storage import deck_file_lock
 
 
 MAX_WRITE_BYTES = 20 * 1024 * 1024
@@ -787,25 +788,26 @@ class SlideHandler(SimpleHTTPRequestHandler):
             self._send_json({"error": str(error)}, HTTPStatus.BAD_REQUEST)
             return
         with self.server.deck_write_lock:  # type: ignore[attr-defined]
-            current = deck_path.read_bytes()
-            current_hash = hashlib.sha256(current).hexdigest()
-            if expected.strip('"') != current_hash:
-                self._send_json(
-                    {"error": "Deck changed on disk", "currentHash": current_hash},
-                    HTTPStatus.CONFLICT,
-                )
-                return
+            with deck_file_lock(deck_path):
+                current = deck_path.read_bytes()
+                current_hash = hashlib.sha256(current).hexdigest()
+                if expected.strip('"') != current_hash:
+                    self._send_json(
+                        {"error": "Deck changed on disk", "currentHash": current_hash},
+                        HTTPStatus.CONFLICT,
+                    )
+                    return
 
-            fd, temporary = tempfile.mkstemp(prefix=".slides-", suffix=".tmp", dir=deck_path.parent)
-            try:
-                with os.fdopen(fd, "wb") as stream:
-                    stream.write(body)
-                    stream.flush()
-                    os.fsync(stream.fileno())
-                os.replace(temporary, deck_path)
-            finally:
-                if os.path.exists(temporary):
-                    os.unlink(temporary)
+                fd, temporary = tempfile.mkstemp(prefix=".slides-", suffix=".tmp", dir=deck_path.parent)
+                try:
+                    with os.fdopen(fd, "wb") as stream:
+                        stream.write(body)
+                        stream.flush()
+                        os.fsync(stream.fileno())
+                    os.replace(temporary, deck_path)
+                finally:
+                    if os.path.exists(temporary):
+                        os.unlink(temporary)
         self._send_json({"ok": True, "hash": hashlib.sha256(body).hexdigest()})
 
     def do_POST(self) -> None:

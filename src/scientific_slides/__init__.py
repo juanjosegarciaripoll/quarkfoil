@@ -46,6 +46,10 @@ def main(argv: list[str] | None = None) -> int:
     arguments = list(sys.argv[1:] if argv is None else argv)
     if arguments[:1] == ["export"]:
         return _export(arguments[1:])
+    if arguments[:1] == ["deck"]:
+        from .deck_cli import main as deck
+
+        return deck(arguments[1:])
     from .server import main as serve
 
     return serve(arguments)
