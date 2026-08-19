@@ -197,6 +197,27 @@ def main() -> int:
         )
         if toolbar_layout["count"] != 5 or toolbar_layout["spread"] > 1 or toolbar_layout["left"] > 1 or toolbar_layout["right"] > 1:
             raise RuntimeError(f"Visible slide actions do not evenly fill their toolbar: {toolbar_layout}")
+        driver.find_element(By.ID, "import-slide").click()
+        presentation_choice = WebDriverWait(driver, 5).until(
+            lambda active_driver: active_driver.find_elements(
+                By.CSS_SELECTOR, "#project-file-dialog[open] .project-file-choice--presentation"
+            )[0]
+        )
+        presentation_choice.click()
+        WebDriverWait(driver, 5).until(
+            lambda active_driver: active_driver.find_element(By.ID, "project-file-title").text.startswith("Import slide from")
+        )
+        slide_import_layout = driver.execute_script(
+            "const gallery=document.querySelector('#project-file-gallery');"
+            "const status=document.querySelector('#project-file-status');"
+            "const form=gallery.closest('form');"
+            "return {gallery:gallery.getBoundingClientRect().height,status:status.getBoundingClientRect().height,"
+            "form:form.getBoundingClientRect().height,modifier:form.classList.contains('project-image-dialog__form--slide-import')};"
+        )
+        if (not slide_import_layout["modifier"] or slide_import_layout["gallery"] < slide_import_layout["form"] * 0.65
+                or slide_import_layout["status"] > 40):
+            raise RuntimeError(f"Slide import browser does not fill its dialog: {slide_import_layout}")
+        driver.find_element(By.CSS_SELECTOR, "#project-file-dialog button[value='cancel']").click()
         slide_buttons = driver.find_elements(By.CSS_SELECTOR, "#slide-list li:not(.section-entry) button")
         slide_buttons[1].click()
         WebDriverWait(driver, 5).until(lambda active_driver: "slide=2" in active_driver.current_url)
@@ -451,6 +472,18 @@ def main() -> int:
             raise RuntimeError("External comparison omitted the browser draft")
         if "External conflict" not in driver.find_element(By.ID, "external-disk-source").get_attribute("value"):
             raise RuntimeError("External comparison omitted the disk revision")
+        external_dialog_layout = driver.execute_script(
+            "const dialog=document.querySelector('#external-change-dialog');"
+            "const form=dialog.querySelector('form'); const actions=dialog.querySelector('.dialog-actions');"
+            "const box=dialog.getBoundingClientRect(); const formBox=form.getBoundingClientRect();"
+            "const actionBox=actions.getBoundingClientRect();"
+            "return {top:box.top,bottom:box.bottom,viewport:innerHeight,overflow:form.scrollHeight-form.clientHeight,"
+            "tail:formBox.bottom-actionBox.bottom,dialogTail:box.bottom-formBox.bottom};"
+        )
+        if (external_dialog_layout["top"] < -1 or external_dialog_layout["bottom"] > external_dialog_layout["viewport"] + 1
+                or external_dialog_layout["overflow"] > 1 or external_dialog_layout["tail"] > 20
+                or external_dialog_layout["dialogTail"] > 2):
+            raise RuntimeError(f"External conflict actions do not fit their dialog: {external_dialog_layout}")
         driver.find_element(By.ID, "external-use-disk").click()
         WebDriverWait(driver, 5).until(
             lambda active_driver: "External conflict" in active_driver.find_element(By.ID, "slide-list").text

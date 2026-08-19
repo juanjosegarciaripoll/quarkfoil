@@ -549,7 +549,9 @@ async function chooseSlideToImport(path) {
   const fatal = imported.diagnostics.find(item => item.level === "error");
   if (fatal) throw new Error(`Cannot import from ${path}: ${fatal.message}`);
   const dialog = document.querySelector("#project-file-dialog");
+  const form = dialog.querySelector(".project-image-dialog__form");
   const gallery = document.querySelector("#project-file-gallery");
+  form.classList.add("project-image-dialog__form--slide-import");
   document.querySelector("#project-file-title").textContent = `Import slide from ${path}`;
   document.querySelector("#project-file-search").closest(".project-asset-tools").hidden = true;
   document.querySelector("#project-file-new").hidden = true;
@@ -1006,6 +1008,7 @@ async function projectPathExists(path) {
 async function browseProjectFiles(kind, select, upload, { newFile: showNew = true, upload: showUpload = true } = {}) {
   if (!state.local) { upload(); return; }
   const dialog = document.querySelector("#project-file-dialog");
+  dialog.querySelector(".project-image-dialog__form").classList.remove("project-image-dialog__form--slide-import");
   const gallery = document.querySelector("#project-file-gallery");
   const status = document.querySelector("#project-file-status");
   const search = document.querySelector("#project-file-search");

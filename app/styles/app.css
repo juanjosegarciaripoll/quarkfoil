@@ -252,8 +252,8 @@ body.presenting .toolbar { display: none; }
 dialog { width: min(900px, 88vw); max-width: 88vw; padding: 0; color: #edf2f4; background: #20252b; border: 1px solid #697681; border-radius: 8px; }
 dialog::backdrop { background: #000a; }
 #color-dialog::backdrop { background: transparent; }
-#external-change-dialog { width: min(1100px, 94vw); max-width: 94vw; }
-.external-change-dialog__form { display: grid; gap: 0.7rem; width: 100%; height: min(820px, 90vh); padding: 1rem; overflow: hidden; }
+#external-change-dialog { width: min(1100px, 94vw); max-width: 94vw; max-height: calc(100dvh - 2rem); overflow: hidden; }
+.external-change-dialog__form { display: grid; grid-template-rows: auto auto minmax(80px, 0.8fr) minmax(0, auto) minmax(120px, 1fr) auto auto; gap: 0.7rem; width: 100%; height: min(820px, calc(100dvh - 2rem)); min-height: 0; padding: 1rem; overflow: hidden; }
 .external-change-dialog__form h2,
 .external-change-dialog__form p { margin: 0; }
 .external-change-versions { display: grid; grid-template-columns: 1fr 1fr; gap: 0.7rem; min-height: 0; }
@@ -271,13 +271,13 @@ dialog::backdrop { background: #000a; }
   border: 1px solid #56616d;
   font: 12px/1.4 "Cascadia Mono", Consolas, monospace;
 }
-.external-change-versions { min-height: 180px; }
+.external-change-versions { min-height: 0; }
 .external-merge-choices { display: grid; gap: 0.35rem; max-height: 150px; overflow: auto; }
 .external-merge-choice { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 0.7rem; align-items: center; padding: 0.4rem 0.55rem; background: #171b20; border: 1px solid #3d454e; border-radius: 4px; }
 .external-merge-choice strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .external-merge-choice label { display: flex; gap: 0.25rem; align-items: center; font-size: 0.78rem; }
 .external-merge-choice[data-conflict="true"] { border-color: #e6a23c; }
-.external-merge-label { min-height: 220px; }
+.external-merge-label { min-height: 0; }
 #external-merge-status { min-height: 1.2em; color: #b9c2ca; }
 #external-merge-status.error { color: #ff8787; }
 #bibliography-dialog { width: min(1050px, 92vw); max-width: 92vw; }
@@ -320,6 +320,7 @@ dialog::backdrop { background: #000a; }
 .video-conversion-dialog__form h2, .video-conversion-dialog__form p { margin: 0; }
 .video-conversion-dialog__form progress { width: 100%; }
 .project-image-dialog__form { display: grid; grid-template-rows: auto auto minmax(180px, 1fr) auto auto; gap: 0.7rem; width: 100%; min-width: 0; height: min(680px, 84vh); padding: 1rem; overflow: hidden; }
+.project-image-dialog__form--slide-import { grid-template-rows: auto minmax(180px, 1fr) auto auto; }
 .project-image-dialog__form h2 { margin: 0; }
 .project-asset-tools { display: grid; grid-template-columns: minmax(160px, 1fr) auto auto; gap: 0.5rem; }
 .project-asset-tools input { min-width: 0; padding: 0.45rem; }
