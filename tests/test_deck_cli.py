@@ -12,6 +12,8 @@ import tempfile
 import unittest
 from unittest import mock
 
+import yaml
+
 from scientific_slides import main
 from scientific_slides import deck_cli
 from scientific_slides.deck_cli import apply_transaction, revision, without_notes
@@ -97,6 +99,7 @@ class DeckCliTests(unittest.TestCase):
         self.assertIn("changed_slides", payload["response_shapes"]["apply"]["required"])
         self.assertEqual(payload["response_shapes"]["apply"]["properties"]["changed_slides"]["items"], "changed_slide")
         self.assertEqual(payload["exit_codes"]["4"], "expectation mismatch")
+        self.assertEqual(payload["edit_documents"]["exit_code_4"], "operation precondition mismatch")
         self.assertIn("substitute", payload["capabilities"])
 
     def test_apply_help_describes_quiet_result(self) -> None:
@@ -614,6 +617,144 @@ class DeckCliTests(unittest.TestCase):
         filtered = without_notes(source)
         self.assertIn("A literal `::: notes` remains", filtered)
         self.assertNotIn("Remove me", filtered)
+
+    def test_edit_format_round_trips_literal_markdown_and_preserves_hidden_notes(self) -> None:
+        result, visible_document, errors = self.invoke([
+            "deck", "inspect", str(self.deck), "--slides", "1", "--format", "edit",
+        ])
+        self.assertEqual((result, errors), (0, ""))
+        self.assertIn("notes: replace", visible_document)
+        self.assertIn("Private first note", visible_document)
+        result, document, errors = self.invoke([
+            "deck", "inspect", str(self.deck), "--slides", "1", "--format", "edit", "--no-notes",
+        ])
+        self.assertEqual((result, errors), (0, ""))
+        self.assertIn("quarkfoil_edit: 1", document)
+        self.assertIn("notes: preserve", document)
+        self.assertNotIn("Private first note", document)
+        edit = Path(self.temporary.name) / "slide.md"
+        edit.write_text(document.replace("First body.", r"Equation $\sum_i n_i$."), encoding="utf-8")
+
+        result, output, errors = self.invoke(["deck", "apply", str(self.deck), "--edit", str(edit)])
+
+        self.assertEqual((result, errors), (0, ""))
+        receipt = yaml.safe_load(output)
+        self.assertEqual(receipt["quarkfoil_result"], 1)
+        stored = self.deck.read_text(encoding="utf-8")
+        self.assertIn(r"Equation $\sum_i n_i$.", stored)
+        self.assertIn("Private first note", stored)
+
+    def test_substitute_edit_uses_literal_yaml_blocks(self) -> None:
+        deck = parse_deck(SOURCE)
+        edit = Path(self.temporary.name) / "substitute.yml"
+        edit.write_text(deck_cli._edit_text({
+            "quarkfoil_edit": 1,
+            "operation": "substitute",
+            "deck_revision": revision(SOURCE.encode()),
+            "slide": 2,
+            "slide_revision": revision(deck.slides[1].raw.encode()),
+            "count": 1,
+            "expect": "Second body.",
+            "replacement": r"Result $\ket{\mathbb{Z}_2}$.",
+        }), encoding="utf-8")
+
+        result, output, errors = self.invoke(["deck", "apply", str(self.deck), "--edit", str(edit)])
+
+        self.assertEqual((result, errors), (0, ""))
+        self.assertEqual(yaml.safe_load(output)["operations"][0]["operation"], "substitute")
+        self.assertIn(r"Result $\ket{\mathbb{Z}_2}$.", self.deck.read_text(encoding="utf-8"))
+
+    def test_insert_edit_uses_resulting_slide_position(self) -> None:
+        edit = Path(self.temporary.name) / "insert.md"
+        edit.write_text(deck_cli._edit_text({
+            "quarkfoil_edit": 1,
+            "operation": "insert",
+            "deck_revision": revision(SOURCE.encode()),
+            "slide": 2,
+        }, "## Inserted {.layout-1}\n\nLiteral body.\n"), encoding="utf-8")
+
+        result, output, errors = self.invoke(["deck", "apply", str(self.deck), "--edit", str(edit)])
+
+        self.assertEqual((result, errors), (0, ""))
+        self.assertEqual(parse_deck(self.deck.read_text(encoding="utf-8")).slides[1].title, "Inserted")
+        self.assertEqual(yaml.safe_load(output)["operations"][0]["result_slide"], 2)
+
+    def test_move_and_delete_edit_documents_use_yaml_only(self) -> None:
+        deck = parse_deck(SOURCE)
+        move = Path(self.temporary.name) / "move.yml"
+        move.write_text(deck_cli._edit_text({
+            "quarkfoil_edit": 1,
+            "operation": "move",
+            "deck_revision": revision(SOURCE.encode()),
+            "slide": 3,
+            "slide_revision": revision(deck.slides[2].raw.encode()),
+            "after": 0,
+        }), encoding="utf-8")
+        result, output, errors = self.invoke(["deck", "apply", str(self.deck), "--edit", str(move)])
+        self.assertEqual((result, errors), (0, ""))
+        self.assertEqual(parse_deck(self.deck.read_text(encoding="utf-8")).slides[0].title, "Third")
+        self.assertEqual(yaml.safe_load(output)["operations"][0]["result_slide"], 1)
+
+        moved_source = self.deck.read_text(encoding="utf-8")
+        moved_deck = parse_deck(moved_source)
+        delete = Path(self.temporary.name) / "delete.yml"
+        delete.write_text(deck_cli._edit_text({
+            "quarkfoil_edit": 1,
+            "operation": "delete",
+            "deck_revision": revision(moved_source.encode()),
+            "slide": 1,
+            "slide_revision": revision(moved_deck.slides[0].raw.encode()),
+        }), encoding="utf-8")
+        result, output, errors = self.invoke(["deck", "apply", str(self.deck), "--edit", str(delete)])
+        self.assertEqual((result, errors), (0, ""))
+        self.assertEqual([slide.title for slide in parse_deck(self.deck.read_text(encoding="utf-8")).slides],
+                         ["First", "Second"])
+        self.assertIsNone(yaml.safe_load(output)["operations"][0]["result_slide"])
+
+    def test_sequential_edit_rejects_stale_slide_fingerprint_without_writing(self) -> None:
+        deck = parse_deck(SOURCE)
+        delete = Path(self.temporary.name) / "delete.yml"
+        delete.write_text(deck_cli._edit_text({
+            "quarkfoil_edit": 1, "operation": "delete", "deck_revision": revision(SOURCE.encode()),
+            "slide": 1, "slide_revision": revision(deck.slides[0].raw.encode()),
+        }), encoding="utf-8")
+        substitute = Path(self.temporary.name) / "substitute.yml"
+        substitute.write_text(deck_cli._edit_text({
+            "quarkfoil_edit": 1, "operation": "substitute", "deck_revision": revision(SOURCE.encode()),
+            "slide": 2, "slide_revision": revision(deck.slides[1].raw.encode()),
+            "count": 1, "expect": "Second", "replacement": "Changed",
+        }), encoding="utf-8")
+
+        result, output, errors = self.invoke([
+            "deck", "apply", str(self.deck), "--edit", str(delete), "--edit", str(substitute),
+        ])
+
+        self.assertEqual((result, output), (4, ""))
+        payload = yaml.safe_load(errors)
+        self.assertEqual(payload["error"], "slide_revision_mismatch")
+        self.assertEqual(payload["operation"], 1)
+        self.assertEqual(self.deck.read_text(encoding="utf-8"), SOURCE)
+
+    def test_edit_yaml_is_strict_and_multi_slide_outputs_are_unambiguous(self) -> None:
+        duplicate = Path(self.temporary.name) / "duplicate.yml"
+        duplicate.write_text("---\nquarkfoil_edit: 1\nquarkfoil_edit: 1\n---\n", encoding="utf-8")
+        result, output, errors = self.invoke(["deck", "apply", str(self.deck), "--edit", str(duplicate)])
+        self.assertEqual((result, output), (2, ""))
+        self.assertIn("duplicate key", yaml.safe_load(errors)["message"])
+
+        result, output, errors = self.invoke([
+            "deck", "inspect", str(self.deck), "--slides", "1,2", "--format", "markdown",
+        ])
+        self.assertEqual((result, errors), (0, ""))
+        self.assertIn("<!-- quarkfoil slide 1 -->", output)
+        destination = Path(self.temporary.name) / "inspected"
+        result, output, errors = self.invoke([
+            "deck", "inspect", str(self.deck), "--slides", "1,2", "--format", "edit",
+            "--output", str(destination),
+        ])
+        self.assertEqual((result, errors), (0, ""))
+        self.assertTrue((destination / "manifest.yml").is_file())
+        self.assertTrue((destination / "slide-0002.md").is_file())
 
     def test_deck_lock_serializes_separate_processes(self) -> None:
         context = multiprocessing.get_context("spawn")

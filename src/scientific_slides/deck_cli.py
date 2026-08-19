@@ -7,8 +7,12 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shutil
 import sys
+import tempfile
 from typing import Any
+
+import yaml
 
 from .parser import Deck, parse_deck
 from .storage import atomic_write, deck_file_lock
@@ -18,33 +22,30 @@ MAX_DECK_BYTES = 20 * 1024 * 1024
 UNRELIABLE_BOUNDARY_CODES = frozenset(("unreliable_slide_boundaries", "unterminated_fence"))
 PROTOCOL_VERSION = 1
 CAPABILITIES = ("replace", "insert", "delete", "move", "notes_policy", "dry_run", "quiet", "compact",
-                "inspect_projection", "slide_fingerprints", "apply_results", "source_file", "substitute")
+                "inspect_projection", "slide_fingerprints", "apply_results", "source_file", "substitute",
+                "edit_documents", "yaml_results", "markdown_projection")
 GUIDE = """Quarkfoil agent protocol v1
 
-1. Read:
-   quarkfoil deck inspect DECK --no-source --slides N --compact [--no-notes]
+Read and edit literal Markdown:
+  quarkfoil deck inspect DECK --slides N --format edit [--no-notes] > slide.md
+  quarkfoil deck apply DECK --edit slide.md
 
-2. Apply:
-   quarkfoil deck apply DECK [TRANSACTION.json|-] --quiet --compact
+The edit document carries the guarded deck and slide revisions in a YAML
+header. Keep the header. Repeat --edit for one ordered atomic transaction.
+Use --format markdown for readable output without an edit receipt.
+
+JSON remains available:
+  quarkfoil deck inspect DECK --no-source --slides N --compact [--no-notes]
+  quarkfoil deck apply DECK [TRANSACTION.json|-] --quiet --compact
 
 Transaction:
 {"revision":"sha256:...","operations":[...]}
-
-Operations:
 {"operation":"replace","slide":N,"source":"...","notes":"preserve|replace|remove"}
-{"operation":"insert","after":N,"source":"..."}   # 0 = beginning
-{"operation":"delete","slide":N}
-{"operation":"move","slide":N,"after":N}           # 0 = beginning
-{"operation":"substitute","slide":N,"expect":"old","replacement":"new"}
 
-Operations are sequential. Always use the revision returned by inspect.
-Apply directly in normal use: it validates everything before one atomic write.
-Use --dry-run only when a separate preview is specifically needed.
+Operations are sequential and guarded by the inspected revision.
 Exit 3 means the deck changed: inspect again and rebuild the transaction.
-Errors are JSON on stderr. Run `quarkfoil deck protocol` for the full contract.
 --no-notes hides returned notes. Default notes policy preserves existing notes
-and ignores notes in replacement source; use "notes":"replace" to store them.
-For complex Markdown, use "source_file":"slide.md" instead of "source".
+in replacements. Run `quarkfoil deck protocol` for the full JSON contract.
 """
 
 PROTOCOL = {
@@ -65,6 +66,23 @@ PROTOCOL = {
             "move": {"required": ["slide", "after"], "after_zero": "beginning"},
             "substitute": {"required": ["slide", "expect", "replacement"], "optional": {"count": 1}},
         },
+    },
+    "edit_documents": {
+        "marker": {"quarkfoil_edit": 1},
+        "apply": "repeat --edit FILE for ordered atomic application",
+        "operations": {
+            "replace": {"header": ["deck_revision", "slide", "slide_revision", "notes"],
+                        "body": "exactly one Markdown slide"},
+            "insert": {"header": ["deck_revision", "slide"],
+                       "slide": "resulting insertion position", "body": "exactly one Markdown slide"},
+            "delete": {"header": ["deck_revision", "slide", "slide_revision"]},
+            "move": {"header": ["deck_revision", "slide", "slide_revision", "after"]},
+            "substitute": {"header": ["deck_revision", "slide", "slide_revision", "expect", "replacement"],
+                           "optional": {"count": 1}},
+        },
+        "operations_are_sequential": True,
+        "io": {"success": "YAML receipt on stdout", "error": "YAML on stderr"},
+        "exit_code_4": "operation precondition mismatch",
     },
     "io": {"success": "JSON on stdout", "error": "JSON on stderr"},
     "response_shapes": {
@@ -193,6 +211,18 @@ class ExpectationMismatch(DeckCommandError):
         )
 
 
+class SlideRevisionMismatch(DeckCommandError):
+    def __init__(self, slide: int, expected: str, actual: str):
+        super().__init__(
+            f"slide {slide} no longer identifies the inspected slide",
+            4,
+            code="slide_revision_mismatch",
+            slide=slide,
+            expected_slide_revision=expected,
+            actual_slide_revision=actual,
+        )
+
+
 class DeckArgumentParser(argparse.ArgumentParser):
     def error(self, message: str) -> None:
         raise DeckCommandError(message, code="usage_error")
@@ -200,6 +230,60 @@ class DeckArgumentParser(argparse.ArgumentParser):
 
 def revision(data: bytes) -> str:
     return f"sha256:{hashlib.sha256(data).hexdigest()}"
+
+
+def _strict_revision(value: Any, field: str) -> str:
+    if not isinstance(value, str) or len(value) != 71 or not value.startswith("sha256:") \
+            or any(character not in "0123456789abcdef" for character in value[7:]):
+        raise DeckCommandError(f"edit field '{field}' must be sha256 followed by 64 lowercase hexadecimal digits")
+    return value
+
+
+class _StrictYamlLoader(yaml.SafeLoader):
+    """Safe YAML loader which also rejects duplicate mapping keys."""
+
+
+def _strict_mapping(loader: _StrictYamlLoader, node: yaml.MappingNode, deep: bool = False) -> dict[Any, Any]:
+    result: dict[Any, Any] = {}
+    for key_node, value_node in node.value:
+        key = loader.construct_object(key_node, deep=deep)
+        try:
+            duplicate = key in result
+        except TypeError as error:
+            raise yaml.constructor.ConstructorError(
+                "while constructing a mapping", node.start_mark, "mapping keys must be scalar", key_node.start_mark,
+            ) from error
+        if duplicate:
+            raise yaml.constructor.ConstructorError(
+                "while constructing a mapping", node.start_mark, f"duplicate key {key!r}", key_node.start_mark,
+            )
+        result[key] = loader.construct_object(value_node, deep=deep)
+    return result
+
+
+_StrictYamlLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _strict_mapping)
+
+
+def _load_strict_yaml(source: str) -> Any:
+    try:
+        for token in yaml.scan(source):
+            if isinstance(token, (yaml.tokens.AliasToken, yaml.tokens.AnchorToken)):
+                raise DeckCommandError("YAML aliases and anchors are not allowed")
+        return yaml.load(source, Loader=_StrictYamlLoader)
+    except DeckCommandError:
+        raise
+    except yaml.YAMLError as error:
+        raise DeckCommandError(f"invalid YAML edit header: {error}") from error
+
+
+def _print_yaml(payload: Any, *, stream: Any = None) -> None:
+    output = yaml.safe_dump(payload, allow_unicode=True, sort_keys=False, default_flow_style=False)
+    print(output, end="", file=sys.stdout if stream is None else stream, flush=True)
+
+
+def _edit_text(header: dict[str, Any], body: str = "") -> str:
+    encoded = yaml.safe_dump(header, allow_unicode=True, sort_keys=False, default_flow_style=False).rstrip()
+    return f"---\n{encoded}\n---\n" + (f"\n{body.lstrip()}" if body else "")
 
 
 def _read_deck(path: Path) -> tuple[bytes, str]:
@@ -379,8 +463,15 @@ def _apply_operation(source: str, operation: Any) -> str:
     if not isinstance(name, str):
         raise DeckCommandError("each operation requires an 'operation' field")
     deck = parse_deck(source)
+    if "slide_revision" in operation:
+        number = _integer(operation, "slide")
+        _slide_position(deck, number)
+        expected_slide_revision = _strict_revision(operation["slide_revision"], "slide_revision")
+        actual_slide_revision = revision(deck.slides[number - 1].raw.encode("utf-8"))
+        if expected_slide_revision != actual_slide_revision:
+            raise SlideRevisionMismatch(number, expected_slide_revision, actual_slide_revision)
     if name == "replace":
-        _check_fields(operation, {"slide", "source"}, {"notes"})
+        _check_fields(operation, {"slide", "source"}, {"notes", "slide_revision"})
         number = _integer(operation, "slide")
         _slide_position(deck, number)
         replacement = _slide_source(operation.get("source"))
@@ -402,14 +493,14 @@ def _apply_operation(source: str, operation: Any) -> str:
             raise DeckCommandError(f"cannot insert after slide {after}; presentation has {len(deck.slides)} slides")
         return _insert_slide(source, deck, after, _slide_source(operation.get("source")))
     elif name == "delete":
-        _check_fields(operation, {"slide"})
+        _check_fields(operation, {"slide"}, {"slide_revision"})
         if len(deck.slides) == 1:
             raise DeckCommandError("a presentation must contain at least one slide")
         number = _integer(operation, "slide")
         _slide_position(deck, number)
         return _delete_slide(source, deck, number)
     elif name == "move":
-        _check_fields(operation, {"slide", "after"})
+        _check_fields(operation, {"slide", "after"}, {"slide_revision"})
         number = _integer(operation, "slide")
         after = _integer(operation, "after", minimum=0)
         if after > len(deck.slides):
@@ -425,7 +516,7 @@ def _apply_operation(source: str, operation: Any) -> str:
         adjusted_after = after - 1 if number < after else after
         return _insert_slide(reduced, reduced_deck, adjusted_after, moved)
     elif name == "substitute":
-        _check_fields(operation, {"slide", "expect", "replacement"}, {"count"})
+        _check_fields(operation, {"slide", "expect", "replacement"}, {"count", "slide_revision"})
         number = _integer(operation, "slide")
         _slide_position(deck, number)
         expected = operation.get("expect")
@@ -534,6 +625,95 @@ def _load_transaction(path: str) -> tuple[Any, Path]:
         raise DeckCommandError(f"cannot read transaction: {error}") from error
 
 
+_EDIT_COMMON_FIELDS = {"quarkfoil_edit", "operation", "deck_revision"}
+_EDIT_INFO_FIELDS = {"title", "layout", "section", "trashed"}
+_EDIT_OPERATION_FIELDS = {
+    "replace": {"slide", "slide_revision", "notes"},
+    "insert": {"slide"},
+    "delete": {"slide", "slide_revision"},
+    "move": {"slide", "slide_revision", "after"},
+    "substitute": {"slide", "slide_revision", "expect", "replacement", "count"},
+}
+
+
+def _split_edit_document(text: str) -> tuple[dict[str, Any], str]:
+    lines = text.splitlines(keepends=True)
+    if not lines or lines[0].rstrip("\r\n") != "---":
+        raise DeckCommandError("edit document must begin with a YAML '---' header")
+    closing = next((index for index, line in enumerate(lines[1:], start=1) if line.rstrip("\r\n") == "---"), None)
+    if closing is None:
+        raise DeckCommandError("edit document has no closing YAML '---' delimiter")
+    header = _load_strict_yaml("".join(lines[1:closing]))
+    if not isinstance(header, dict):
+        raise DeckCommandError("edit document header must be a YAML mapping")
+    return header, "".join(lines[closing + 1:]).lstrip("\r\n")
+
+
+def _parse_edit_document(text: str, label: str) -> tuple[str, dict[str, Any]]:
+    if len(text.encode("utf-8")) > MAX_DECK_BYTES:
+        raise DeckCommandError(f"edit document exceeds the {MAX_DECK_BYTES}-byte limit", input=label)
+    try:
+        header, body = _split_edit_document(text)
+        if header.get("quarkfoil_edit") != 1 or isinstance(header.get("quarkfoil_edit"), bool):
+            raise DeckCommandError("edit document requires 'quarkfoil_edit: 1'")
+        name = header.get("operation")
+        if name not in _EDIT_OPERATION_FIELDS:
+            raise DeckCommandError(f"unknown edit operation {name!r}")
+        allowed = _EDIT_COMMON_FIELDS | _EDIT_INFO_FIELDS | _EDIT_OPERATION_FIELDS[name]
+        unknown = header.keys() - allowed
+        if unknown:
+            raise DeckCommandError(f"unknown edit field {sorted(unknown, key=str)[0]!r}")
+        required = _EDIT_COMMON_FIELDS | _EDIT_OPERATION_FIELDS[name]
+        if name == "substitute":
+            required -= {"count"}
+        missing = required - header.keys()
+        if missing:
+            raise DeckCommandError(f"missing edit field '{sorted(missing)[0]}'")
+        deck_revision = _strict_revision(header["deck_revision"], "deck_revision")
+        if "slide_revision" in header:
+            _strict_revision(header["slide_revision"], "slide_revision")
+        operation = {key: header[key] for key in _EDIT_OPERATION_FIELDS[name] if key in header}
+        operation["operation"] = name
+        if name == "insert":
+            position = operation.pop("slide")
+            if isinstance(position, bool) or not isinstance(position, int) or position < 1:
+                raise DeckCommandError("edit field 'slide' must be a positive integer")
+            operation["after"] = position - 1
+        if name in ("replace", "insert"):
+            operation["source"] = _slide_source(body)
+            if name == "replace" and header["notes"] not in ("preserve", "replace", "remove"):
+                raise DeckCommandError("edit field 'notes' must be preserve, replace, or remove")
+        elif body.strip():
+            raise DeckCommandError(f"{name} edit document must not contain a Markdown body")
+        return deck_revision, operation
+    except DeckCommandError as error:
+        error.details.setdefault("input", label)
+        raise
+
+
+def _load_edit_documents(paths: list[str]) -> tuple[str, list[dict[str, Any]], list[str]]:
+    if paths.count("-") > 1:
+        raise DeckCommandError("standard input may be used for at most one edit document")
+    revisions: list[str] = []
+    operations: list[dict[str, Any]] = []
+    labels: list[str] = []
+    for path in paths:
+        label = "-" if path == "-" else str(Path(path))
+        try:
+            text = sys.stdin.read() if path == "-" else Path(path).read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as error:
+            raise DeckCommandError(f"cannot read edit document: {error}", input=label) from error
+        expected, operation = _parse_edit_document(text, label)
+        revisions.append(expected)
+        operations.append(operation)
+        labels.append(label)
+    if not revisions:
+        raise DeckCommandError("at least one --edit document is required")
+    if any(value != revisions[0] for value in revisions[1:]):
+        raise DeckCommandError("edit documents have different deck revisions", code="revision_disagreement")
+    return revisions[0], operations, labels
+
+
 def _materialize_sources(operations: Any, base: Path) -> Any:
     """Read each external slide fragment once and replace it with inline source."""
     if not isinstance(operations, list):
@@ -637,18 +817,98 @@ def _silence_broken_pipe() -> None:
         pass
 
 
+def _slide_edit_document(slide: dict[str, Any], deck_revision: str, *, include_notes: bool) -> str:
+    header = {
+        "quarkfoil_edit": 1,
+        "operation": "replace",
+        "deck_revision": deck_revision,
+        "slide": slide["number"],
+        "slide_revision": slide["slide_revision"],
+        "title": slide["title"],
+        "layout": slide["layout"],
+        "section": slide["section"],
+        "trashed": slide["trashed"],
+        "notes": "replace" if include_notes else "preserve",
+    }
+    return _edit_text(header, slide["source"])
+
+
+def _write_edit_directory(destination: Path, summary: dict[str, Any], *, include_notes: bool) -> None:
+    destination = destination.resolve()
+    if destination.exists():
+        raise DeckCommandError("edit output destination already exists", path=str(destination))
+    if not destination.parent.is_dir():
+        raise DeckCommandError("edit output parent directory does not exist", path=str(destination.parent))
+    temporary = Path(tempfile.mkdtemp(prefix=f".{destination.name}-", dir=destination.parent))
+    try:
+        entries = []
+        for slide in summary["slides"]:
+            filename = f"slide-{slide['number']:04d}.md"
+            (temporary / filename).write_text(
+                _slide_edit_document(slide, summary["revision"], include_notes=include_notes), encoding="utf-8",
+            )
+            entries.append({
+                "slide": slide["number"], "slide_revision": slide["slide_revision"], "file": filename,
+            })
+        manifest = {
+            "quarkfoil_edit_manifest": 1,
+            "deck_revision": summary["revision"],
+            "slides": entries,
+            "diagnostics": summary["diagnostics"],
+        }
+        (temporary / "manifest.yml").write_text(
+            yaml.safe_dump(manifest, allow_unicode=True, sort_keys=False), encoding="utf-8",
+        )
+        temporary.rename(destination)
+    except Exception:
+        shutil.rmtree(temporary, ignore_errors=True)
+        raise
+
+
 def _inspect(arguments: list[str]) -> int:
     parser = DeckArgumentParser(prog="quarkfoil deck inspect", description="Return a presentation snapshot for an editing agent")
     parser.add_argument("deck", type=Path)
-    parser.add_argument("--no-notes", action="store_true", help="Omit speaker notes from returned JSON")
-    parser.add_argument("--no-source", action="store_true", help="Omit the whole-deck source field")
+    parser.add_argument("--no-notes", action="store_true", help="Omit speaker notes from returned content")
+    parser.add_argument("--no-source", action="store_true", help="Omit the whole-deck source from JSON or YAML")
     parser.add_argument("--slides", help="Return only these comma-separated slide numbers")
     parser.add_argument("--compact", action="store_true", help="Emit compact JSON")
+    parser.add_argument("--format", choices=("json", "yaml", "edit", "markdown"), default="json",
+                        help="Output format; edit is guarded YAML followed by literal Markdown")
+    parser.add_argument("--output", type=Path, help="New directory for one or more editable slide documents")
     args = parser.parse_args(arguments)
+    selected = _selected_slides(args.slides)
+    if args.format in ("edit", "markdown") and selected is None:
+        raise DeckCommandError(f"--format {args.format} requires --slides", code="usage_error")
+    if args.output is not None and args.format != "edit":
+        raise DeckCommandError("--output requires --format edit", code="usage_error")
+    if args.compact and args.format != "json":
+        raise DeckCommandError("--compact is only available with --format json", code="usage_error")
     data, current = _read_deck(args.deck)
     summary = _summary(data.decode("utf-8"), current, include_notes=not args.no_notes,
-                       include_source=not args.no_source, selected_slides=_selected_slides(args.slides))
-    _print_json(summary, compact=args.compact)
+                       include_source=args.format in ("edit", "markdown") or not args.no_source,
+                       selected_slides=selected)
+    if args.format == "json":
+        _print_json(summary, compact=args.compact)
+    elif args.format == "yaml":
+        _print_yaml(summary)
+    elif args.format == "edit":
+        if args.output is not None:
+            _write_edit_directory(args.output, summary, include_notes=not args.no_notes)
+            _print_yaml({"quarkfoil_result": 1, "revision": current, "output": str(args.output),
+                         "slides": len(summary["slides"])})
+        elif len(summary["slides"]) != 1:
+            raise DeckCommandError("stdout edit format requires exactly one selected slide; use --output",
+                                   code="usage_error")
+        else:
+            print(_slide_edit_document(summary["slides"][0], current, include_notes=not args.no_notes),
+                  end="", flush=True)
+    else:
+        multiple = len(summary["slides"]) > 1
+        chunks = []
+        for slide in summary["slides"]:
+            prefix = f"<!-- quarkfoil slide {slide['number']} -->\n\n" if multiple else ""
+            chunks.append(prefix + slide["source"].strip())
+        print("\n\n".join(chunks) + "\n", end="", flush=True)
     return 0
 
 
@@ -656,6 +916,8 @@ def _apply(arguments: list[str]) -> int:
     parser = DeckArgumentParser(prog="quarkfoil deck apply", description="Atomically apply a revision-guarded slide transaction")
     parser.add_argument("deck", type=Path)
     parser.add_argument("transaction", nargs="?", default="-", help="JSON transaction file, or - for stdin (default)")
+    parser.add_argument("--edit", action="append", default=[], metavar="FILE",
+                        help="YAML edit document; repeat to apply several in order")
     parser.add_argument("--if-revision", help="Expected SHA-256 revision; may instead be present in transaction JSON")
     parser.add_argument("--no-notes", action="store_true", help="Omit notes from returned JSON; does not change stored notes")
     parser.add_argument("--dry-run", "--check", action="store_true",
@@ -666,26 +928,41 @@ def _apply(arguments: list[str]) -> int:
     )
     parser.add_argument("--compact", action="store_true", help="Emit compact JSON")
     args = parser.parse_args(arguments)
-    transaction, transaction_base = _load_transaction(args.transaction)
-    if isinstance(transaction, list):
-        operations, embedded_revision = transaction, None
-    elif isinstance(transaction, dict):
-        unknown = transaction.keys() - {"revision", "operations"}
-        if unknown:
-            raise DeckCommandError(f"unknown transaction field '{sorted(unknown)[0]}'")
-        operations, embedded_revision = transaction.get("operations"), transaction.get("revision")
+    edit_mode = bool(args.edit)
+    if edit_mode:
+        if args.transaction != "-":
+            raise DeckCommandError("a JSON transaction cannot be combined with --edit", code="usage_error")
+        if args.if_revision:
+            raise DeckCommandError("--if-revision cannot be combined with guarded edit documents", code="usage_error")
+        expected, operations, edit_labels = _load_edit_documents(args.edit)
     else:
-        raise DeckCommandError("transaction must be an object or an operations array")
-    operations = _materialize_sources(operations, transaction_base)
-    if args.if_revision and embedded_revision and _expected_revision(args.if_revision) != _expected_revision(embedded_revision):
-        raise DeckCommandError("--if-revision and transaction revision disagree", code="revision_disagreement")
-    expected = _expected_revision(args.if_revision or embedded_revision)
+        transaction, transaction_base = _load_transaction(args.transaction)
+        if isinstance(transaction, list):
+            operations, embedded_revision = transaction, None
+        elif isinstance(transaction, dict):
+            unknown = transaction.keys() - {"revision", "operations"}
+            if unknown:
+                raise DeckCommandError(f"unknown transaction field '{sorted(unknown)[0]}'")
+            operations, embedded_revision = transaction.get("operations"), transaction.get("revision")
+        else:
+            raise DeckCommandError("transaction must be an object or an operations array")
+        operations = _materialize_sources(operations, transaction_base)
+        if args.if_revision and embedded_revision and _expected_revision(args.if_revision) != _expected_revision(embedded_revision):
+            raise DeckCommandError("--if-revision and transaction revision disagree", code="revision_disagreement")
+        expected = _expected_revision(args.if_revision or embedded_revision)
+        edit_labels = []
     path = args.deck.resolve()
     with deck_file_lock(path):
         data, current = _read_deck(path)
         if current != expected:
             raise RevisionConflict(expected, current)
-        updated, operation_results, touched, tokens = _apply_transaction_details(data.decode("utf-8"), operations)
+        try:
+            updated, operation_results, touched, tokens = _apply_transaction_details(data.decode("utf-8"), operations)
+        except DeckCommandError as error:
+            operation_index = error.details.get("operation")
+            if edit_mode and isinstance(operation_index, int) and operation_index < len(edit_labels):
+                error.details.setdefault("input", edit_labels[operation_index])
+            raise
         encoded = updated.encode("utf-8")
         if len(encoded) > MAX_DECK_BYTES:
             raise DeckCommandError(f"updated presentation exceeds the {MAX_DECK_BYTES}-byte limit")
@@ -703,6 +980,19 @@ def _apply(arguments: list[str]) -> int:
         ),
         "operation_results": operation_results,
     }
+    if edit_mode:
+        yaml_operations = []
+        for index, result in enumerate(operation_results):
+            item = {"operation": result["type"], "input": edit_labels[index]}
+            item.update({key: value for key, value in result.items() if key not in ("operation", "type")})
+            result_slide = item.get("result_slide")
+            if result_slide is not None:
+                final_slide = parse_deck(updated).slides[result_slide - 1]
+                item["slide_revision"] = revision(final_slide.raw.encode("utf-8"))
+            yaml_operations.append(item)
+        _print_yaml({"quarkfoil_result": 1, "revision": updated_revision, "dry_run": args.dry_run,
+                     "operations": yaml_operations, "diagnostics": common["diagnostics"]})
+        return 0
     if args.quiet:
         payload = common
     else:
@@ -713,6 +1003,13 @@ def _apply(arguments: list[str]) -> int:
 
 
 def main(arguments: list[str]) -> int:
+    yaml_errors = (
+        bool(arguments) and arguments[0] == "apply" and "--edit" in arguments
+    ) or (
+        bool(arguments) and arguments[0] == "inspect"
+        and any(value in arguments for value in ("yaml", "edit", "markdown"))
+        and "--format" in arguments
+    )
     try:
         if not arguments or arguments[0] not in ("guide", "protocol", "inspect", "apply"):
             parser = DeckArgumentParser(prog="quarkfoil deck", description="Inspect or atomically edit a presentation for an LLM agent")
@@ -730,7 +1027,11 @@ def main(arguments: list[str]) -> int:
             return 0
         return _inspect(arguments[1:]) if arguments[0] == "inspect" else _apply(arguments[1:])
     except DeckCommandError as error:
-        _print_json({"error": error.code, "message": str(error), **error.details}, compact=True, stream=sys.stderr)
+        payload = {"error": error.code, "message": str(error), **error.details}
+        if yaml_errors:
+            _print_yaml({"quarkfoil_error": 1, **payload}, stream=sys.stderr)
+        else:
+            _print_json(payload, compact=True, stream=sys.stderr)
         return error.exit_code
     except BrokenPipeError:
         _silence_broken_pipe()

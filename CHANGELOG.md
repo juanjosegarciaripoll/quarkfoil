@@ -5,6 +5,10 @@ All notable changes to Quarkfoil are documented here. The project follows
 
 ## [Unreleased]
 
+- Inspect slides as guarded YAML-plus-Markdown edit documents and apply one or
+  more ordered documents atomically without composing escaped JSON. Add YAML
+  receipts, literal substitution blocks, and readable multi-slide Markdown
+  projections while retaining the JSON agent protocol.
 - Export deck metadata directly in static HTML and optionally create a
   link-sharing preview by capturing the first slide in a headless browser.
 - Copy only referenced files from `assets.figures` during static export while

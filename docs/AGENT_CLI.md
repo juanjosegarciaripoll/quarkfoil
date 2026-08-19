@@ -71,8 +71,203 @@ whole slide still deletes its notes with it.
 
 ## Command reference for tool builders
 
-The remainder of this page documents the machine-readable interface. Most
-users do not need to run these commands themselves.
+The preferred agent workflow uses editable YAML-and-Markdown documents. Agents
+should use this interface unless they specifically need the compatibility JSON
+protocol. It keeps Markdown and LaTeX literal, carries its own revision guards,
+and makes several edits in one atomic application without generating escaped
+strings.
+
+### Edit one slide without JSON
+
+Inspect one slide as a directly editable document:
+
+```console
+quarkfoil deck inspect lecture.md --slides 12 --format edit > slide-12.md
+```
+
+The output begins with a guarded YAML header and continues as literal Markdown:
+
+```yaml
+---
+quarkfoil_edit: 1
+operation: replace
+deck_revision: sha256:0123456789abcdef...
+slide: 12
+slide_revision: sha256:fedcba9876543210...
+title: Result
+layout: 1+1
+section: null
+trashed: false
+notes: replace
+---
+
+## Result {.layout-1-1}
+
+Literal Markdown and $\LaTeX$.
+```
+
+Edit the Markdown normally, keep the YAML header, and apply it:
+
+```console
+quarkfoil deck apply lecture.md --edit slide-12.md
+```
+
+The result is a concise YAML receipt. Quarkfoil checks both the exact deck
+revision and the exact source fingerprint of the addressed slide while holding
+the deck lock. A mismatch changes nothing. With `--no-notes`, inspection omits
+speaker notes and writes `notes: preserve`; otherwise it includes notes and
+writes `notes: replace` so visible note edits round-trip.
+
+Repeat `--edit` to apply several documents sequentially in one atomic write:
+
+```console
+quarkfoil deck apply lecture.md \
+  --edit revise-method.md \
+  --edit move-summary.yml \
+  --edit insert-outlook.md
+```
+
+Every document must carry the same deck revision. Slide numbers use sequential
+semantics, so each operation addresses the deck produced by the preceding one.
+Target fingerprints make stale target numbers fail instead of modifying a
+different slide. Positional `after` values remain the caller's responsibility.
+
+The five edit-document operations are:
+
+- `replace`: YAML fields `slide`, `slide_revision`, and `notes`, followed by
+  exactly one Markdown slide.
+- `insert`: YAML field `slide`, meaning the resulting slide position, followed
+  by exactly one Markdown slide.
+- `delete`: YAML fields `slide` and `slide_revision`, with no body.
+- `move`: YAML fields `slide`, `slide_revision`, and `after`, with no body.
+- `substitute`: YAML fields `slide`, `slide_revision`, `expect`, `replacement`,
+  and optional `count`. Use YAML literal blocks (`|-`) for multiline or
+  equation-heavy fragments.
+
+All operations also require `quarkfoil_edit: 1`, `operation`, and
+`deck_revision`. Unknown fields, duplicate YAML keys, aliases, anchors, and
+custom YAML tags are rejected.
+
+Insert a new slide at its resulting position with YAML followed by Markdown:
+
+```yaml
+---
+quarkfoil_edit: 1
+operation: insert
+deck_revision: sha256:0123456789abcdef...
+slide: 13
+---
+
+## Outlook {.layout-1}
+
+Literal Markdown and $\sum_i n_i$.
+```
+
+Delete and move documents contain YAML only:
+
+```yaml
+---
+quarkfoil_edit: 1
+operation: delete
+deck_revision: sha256:0123456789abcdef...
+slide: 12
+slide_revision: sha256:fedcba9876543210...
+---
+```
+
+```yaml
+---
+quarkfoil_edit: 1
+operation: move
+deck_revision: sha256:0123456789abcdef...
+slide: 12
+slide_revision: sha256:fedcba9876543210...
+after: 5
+---
+```
+
+For a literal substitution, keep both Markdown fragments in YAML block
+scalars. Backslashes and quotes need no JSON escaping:
+
+```yaml
+---
+quarkfoil_edit: 1
+operation: substitute
+deck_revision: sha256:0123456789abcdef...
+slide: 12
+slide_revision: sha256:fedcba9876543210...
+count: 1
+expect: |-
+  The phase is $\ket{\mathbb{Z}_2}$.
+replacement: |-
+  The phase is $\ket{\mathbb{Z}_2 \times \mathbb{Z}_2}$.
+---
+```
+
+`expect` must occur exactly `count` times within the addressed slide. The
+default count is one. A mismatch exits with status 4 and changes nothing.
+
+For a readable projection that is not intended to be applied, request several
+slides at once:
+
+```console
+quarkfoil deck inspect lecture.md --slides 8,9,10 --format markdown
+```
+
+Quarkfoil separates them with numbered HTML comments. To create independent,
+round-trippable files instead, select a new output directory:
+
+```console
+quarkfoil deck inspect lecture.md --slides 8,9,10 \
+  --format edit --output inspected-slides
+```
+
+Quarkfoil creates the directory atomically with `manifest.yml` and one edit
+document per slide. The destination must not already exist.
+
+### YAML results and failures
+
+Applying edit documents returns a short YAML receipt rather than echoing the
+deck or the edited Markdown:
+
+```yaml
+quarkfoil_result: 1
+revision: sha256:abcdef0123456789...
+dry_run: false
+operations:
+  - operation: replace
+    input: slide-12.md
+    result_slide: 12
+    slide_revision: sha256:9876543210abcdef...
+diagnostics: []
+```
+
+Edit-document errors are YAML on standard error. Exit status 3 means the deck
+changed after inspection. Exit status 4 means a narrower operation assumption
+failed, such as a stale slide fingerprint or an exact substitution mismatch:
+
+```yaml
+quarkfoil_error: 1
+error: slide_revision_mismatch
+message: Slide 12 no longer identifies the inspected slide
+operation: 1
+input: slide-12.md
+slide: 12
+expected_slide_revision: sha256:0123456789abcdef...
+actual_slide_revision: sha256:fedcba9876543210...
+```
+
+In every failure case, Quarkfoil leaves the presentation byte-for-byte
+unchanged. `--dry-run` remains available for an explicitly requested preview,
+but normal application already validates every ordered operation before its
+single atomic write.
+
+### Advanced compatibility: JSON protocol
+
+The remainder of this page documents the original JSON interface. It remains
+supported for existing integrations, callers that already produce structured
+transactions, and source-file workflows. Agents editing Markdown directly
+should prefer the YAML framework above.
 
 ### Inspect a presentation
 
