@@ -388,7 +388,7 @@ class DeckCliTests(unittest.TestCase):
 
     def test_section_membership_and_empty_section_warning_are_returned(self) -> None:
         source = "# Intro {#intro .section}\n\n---\n\n## One\n\n---\n\n# Results {#results .section}\n\n---\n\n## Two\n"
-        self.deck.write_text(source, encoding="utf-8")
+        self.deck.write_bytes(source.encode("utf-8"))
         result, output, errors = self.invoke(["deck", "inspect", str(self.deck), "--no-source", "--slides", "2"])
         self.assertEqual((result, errors), (0, ""))
         self.assertEqual(json.loads(output)["slides"][0]["section"], {"id": "results", "title": "Results"})
@@ -404,7 +404,7 @@ class DeckCliTests(unittest.TestCase):
 
     def test_projection_refuses_unreliable_slide_boundaries(self) -> None:
         source = "---\ntitle: unclosed\n\n## Apparent slide\n"
-        self.deck.write_text(source, encoding="utf-8")
+        self.deck.write_bytes(source.encode("utf-8"))
         result, output, errors = self.invoke(["deck", "inspect", str(self.deck)])
         self.assertEqual((result, errors), (0, ""))
         self.assertFalse(json.loads(output)["slides_reliable"])
@@ -442,7 +442,7 @@ class DeckCliTests(unittest.TestCase):
 
     def test_unterminated_ordinary_fence_marks_projection_unreliable(self) -> None:
         source = "## One\n\n~~~text\nunterminated\n---\n## swallowed\n"
-        self.deck.write_text(source, encoding="utf-8")
+        self.deck.write_bytes(source.encode("utf-8"))
         result, output, errors = self.invoke(["deck", "inspect", str(self.deck)])
         self.assertEqual((result, errors), (0, ""))
         payload = json.loads(output)
