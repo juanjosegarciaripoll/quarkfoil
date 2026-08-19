@@ -10,6 +10,7 @@ from selenium import webdriver
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
 from scientific_slides.server import create_server
@@ -34,9 +35,10 @@ def create_driver(browser: str) -> webdriver.Remote:
     if browser == "edge":
         options = webdriver.EdgeOptions()
         # Reveal's speaker window keeps loading two presentation previews. With
-        # the default "normal" strategy EdgeDriver can block an otherwise
-        # harmless command until every nested resource finishes loading.
-        options.page_load_strategy = "eager"
+        # the "normal" or "eager" strategies EdgeDriver can block an otherwise
+        # harmless command until every nested resource finishes loading. Each
+        # navigation below has its own application-level readiness wait.
+        options.page_load_strategy = "none"
         options.add_argument("--headless=new")
         options.add_argument("--disable-gpu")
         options.add_argument("--window-size=1440,1200")
@@ -199,9 +201,9 @@ def main() -> int:
             raise RuntimeError(f"Visible slide actions do not evenly fill their toolbar: {toolbar_layout}")
         driver.find_element(By.ID, "import-slide").click()
         presentation_choice = WebDriverWait(driver, 5).until(
-            lambda active_driver: active_driver.find_elements(
-                By.CSS_SELECTOR, "#project-file-dialog[open] .project-file-choice--presentation"
-            )[0]
+            EC.element_to_be_clickable(
+                (By.CSS_SELECTOR, "#project-file-dialog[open] .project-file-choice--presentation")
+            )
         )
         presentation_choice.click()
         WebDriverWait(driver, 5).until(
