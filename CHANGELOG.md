@@ -5,14 +5,76 @@ All notable changes to Quarkfoil are documented here. The project follows
 
 ## [Unreleased]
 
-- Inspect slides as guarded YAML-plus-Markdown edit documents and apply one or
-  more ordered documents atomically without composing escaped JSON. Add YAML
-  receipts, literal substitution blocks, and readable multi-slide Markdown
-  projections while retaining the JSON agent protocol.
+## [0.5.0] - 2026-08-19
+
+This release introduces a revision-safe interface for coding agents and LLM
+tools, expands presentation delivery with PDF printing and presenter view, and
+adds focused controls for slide styling, diagrams, export, and recovery.
+
+### Added
+
+- Add a first-class `quarkfoil deck` interface for coding agents and LLM tools.
+  A concise built-in guide lets an assistant discover the workflow, inspect a
+  presentation or selected slides, and safely apply structural edits without
+  learning Quarkfoil's internal parser or modifying the deck file directly.
+- Make guarded YAML-plus-Markdown edit documents the preferred agent format.
+  Literal Markdown and LaTeX remain readable and unescaped while agents replace,
+  insert, delete, move, or make exact substitutions within slides. Multiple
+  ordered edit documents apply as one validated, atomic write and return concise
+  YAML receipts.
+- Guard every agent transaction with a whole-deck SHA-256 revision and every
+  addressed slide with its own source fingerprint. Quarkfoil validates edits
+  while holding the deck lock, reports stale revisions and failed assumptions
+  as structured errors, and leaves the presentation byte-for-byte unchanged
+  when any operation fails.
+- Add readable multi-slide Markdown projections, strict YAML headers and literal
+  substitution blocks, external Markdown files for complex slide sources, and
+  `--no-notes` inspection that keeps private speaker notes out of agent context
+  while preserving them during replacement.
+- Retain the versioned JSON protocol for existing tool integrations, including
+  machine-readable capabilities, slide projections, sequential structural
+  operations, dry runs, compact output, and per-operation result mappings.
+- Reject agent operations when malformed fences make slide boundaries
+  unreliable, using the same presentation rules in the Python inspection layer
+  and the browser's canonical parser.
+- Print presentations as properly paginated PDFs through Reveal.js, with
+  print-specific layout that preserves slide geometry and local assets.
+- Open an automated Reveal.js presenter view with current/next-slide previews,
+  speaker notes, timing, and synchronization with the editor window.
+- Jump directly to the first or last slide with keyboard shortcuts, and keep the
+  current slide encoded in the browser URL for reliable reloads and navigation.
+- Control footer visibility independently on each slide and adjust text size for
+  structured slide panels from the Design properties.
+- Add left brace, right brace, and triangle diagram shapes, plus rotation for
+  overlays and shapes.
 - Export deck metadata directly in static HTML and optionally create a
   link-sharing preview by capturing the first slide in a headless browser.
+- Omit speaker notes from static exports with `--no-notes`.
+- Add Quarkfoil application icons to the packaged editor and project README.
+
+### Changed
+
 - Copy only referenced files from `assets.figures` during static export while
   retaining complete directories explicitly listed under `assets.include`.
+- Merge non-overlapping slide edits made in the browser and on disk, and present
+  slide-aware choices when both versions changed the same content.
+- Capture link-sharing previews directly from the static player without keeping
+  an editor server or browser-launch machinery running.
+- Improve toolbar grouping and sizing so the editor controls remain usable in
+  compact windows.
+- Prompt before overwriting an existing destination when importing a converted
+  video, and refresh generated video poster images when source media changes.
+
+### Fixed
+
+- Keep slide-import galleries tall when their search controls are hidden, and
+  keep file-conflict actions visible within compact browser windows.
+- Keep the presentation player responsive while optional resources initialize.
+- Keep resize handles reachable for media placed at slide edges and preserve
+  transparent video backgrounds in the editor and player.
+- Keep a running installed Quarkfoil process alive when `uv tool` replaces its
+  environment by waiting for files to stabilize and restarting through a valid
+  launcher.
 
 ## [0.4.0] - 2026-08-16
 
