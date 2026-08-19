@@ -801,28 +801,30 @@ export function updateHeadingLayout(deck, slideIndex, layout, columns, rows) {
   const hashes = slide.raw.match(/^\s*(#{1,6})/)?.[1] || "##";
   const heading = `${hashes} ${slide.title} {${serializeAttributes(attrs)}}`;
   const allowedCells = new Set(CELLS_BY_LAYOUT[layout] || ["core"]);
-  const core = slide.layout === "1" && ["1-1", "1-2", "2-1"].includes(layout)
+  const preservedCell = slide.layout === "1" && ["1-1", "1-2", "2-1"].includes(layout)
     ? slide.cells.find(cell => cell.id === "core")
-    : null;
-  const coreDestination = core ? largestLayoutCell(layout, columns, rows) : null;
-  const coreRanges = new Set(core ? (core.range ? [core.range] : core.sourceRanges || []) : []);
+    : slide.layout === "1-1" && layout === "1"
+      ? slide.cells.find(cell => cell.id === "left")
+      : null;
+  const cellDestination = preservedCell?.id === "core" ? largestLayoutCell(layout, columns, rows) : preservedCell ? "core" : null;
+  const preservedRanges = new Set(preservedCell ? (preservedCell.range ? [preservedCell.range] : preservedCell.sourceRanges || []) : []);
   const removals = slide.cells
     .filter(cell => !allowedCells.has(cell.id))
     .flatMap(cell => cell.range ? [cell.range] : (cell.sourceRanges || []))
-    .filter(range => !coreRanges.has(range));
-  const coreEdits = [];
-  if (coreDestination && core.range) {
-    const header = deck.source.slice(core.range.start, core.range.headerEnd)
-      .replace(/^(\s*:::\s*)core\b/i, `$1${coreDestination}`);
-    coreEdits.push({ start: core.range.start, end: core.range.headerEnd, replacement: header });
-  } else if (coreDestination && core.sourceRanges?.length) {
-    const [first, ...rest] = core.sourceRanges;
-    coreEdits.push({ start: first.start, end: first.end, replacement: directiveBlock(coreDestination, core.source) });
-    coreEdits.push(...rest.map(range => ({ start: range.start, end: range.end, replacement: "" })));
+    .filter(range => !preservedRanges.has(range));
+  const cellEdits = [];
+  if (cellDestination && preservedCell.range) {
+    const header = deck.source.slice(preservedCell.range.start, preservedCell.range.headerEnd)
+      .replace(new RegExp(`^(\\s*:::\\s*)${preservedCell.id}\\b`, "i"), `$1${cellDestination}`);
+    cellEdits.push({ start: preservedCell.range.start, end: preservedCell.range.headerEnd, replacement: header });
+  } else if (cellDestination && preservedCell.sourceRanges?.length) {
+    const [first, ...rest] = preservedCell.sourceRanges;
+    cellEdits.push({ start: first.start, end: first.end, replacement: directiveBlock(cellDestination, preservedCell.source) });
+    cellEdits.push(...rest.map(range => ({ start: range.start, end: range.end, replacement: "" })));
   }
   const edits = [
     { start: slide.headingRange.start, end: slide.headingRange.end, replacement: heading },
-    ...coreEdits,
+    ...cellEdits,
     ...removals.map(range => ({ start: range.start, end: range.end, replacement: "" })),
   ].sort((left, right) => right.start - left.start);
   let source = slide.raw;

@@ -1035,6 +1035,13 @@ Remove bottom
   const onePlusOneAgain = parseDeck(updateHeadingLayout(onePlusTwoCells, 0, "1-1", [50, 50], [50, 50]));
   assert(onePlusOneAgain.slides[0].cells.map(cell => cell.id).join(" ") === "left", "1+2 to 1+1 removes both obsolete stacked cells");
 
+  const collapsedOnePlusOne = parseDeck(updateHeadingLayout(onePlusOne, 0, "1", [50, 50], [50, 50]));
+  assert(collapsedOnePlusOne.slides[0].cells.find(cell => cell.id === "core")?.source === "Keep left",
+    "1+1 to 1 preserves the left panel as core content");
+  assert(!collapsedOnePlusOne.source.includes("Remove right"), "1+1 to 1 removes the right panel");
+  assert(collapsedOnePlusOne.slides[0].overlays.some(overlay => overlay.id === "keep"),
+    "1+1 to 1 retains overlays");
+
   const mixedCore = parseDeck(`## Ordinary {.layout-1}
 
 Ordinary core content.
