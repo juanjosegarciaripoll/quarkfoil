@@ -17,15 +17,20 @@ def _lock_path(path: Path) -> Path:
     return directory / f"{hashlib.sha256(identity).hexdigest()}.lock"
 
 
+def _ensure_lock_byte(stream: BinaryIO) -> None:
+    """Ensure byte zero exists without reading a region another process may hold."""
+    stream.seek(0, os.SEEK_END)
+    if stream.tell() == 0:
+        stream.write(b"\0")
+        stream.flush()
+    stream.seek(0)
+
+
 def _lock(stream: BinaryIO) -> None:
     if os.name == "nt":
         import msvcrt
 
-        stream.seek(0)
-        if not stream.read(1):
-            stream.write(b"\0")
-            stream.flush()
-        stream.seek(0)
+        _ensure_lock_byte(stream)
         msvcrt.locking(stream.fileno(), msvcrt.LK_LOCK, 1)
     else:
         import fcntl
