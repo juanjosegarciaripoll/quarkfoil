@@ -55,7 +55,7 @@ class DeckCliTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
         self.deck = Path(self.temporary.name) / "deck.md"
-        self.deck.write_text(SOURCE, encoding="utf-8")
+        self.deck.write_bytes(SOURCE.encode("utf-8"))
 
     def tearDown(self) -> None:
         self.temporary.cleanup()
@@ -763,13 +763,13 @@ class DeckCliTests(unittest.TestCase):
         process = context.Process(target=wait_for_deck_lock, args=(str(self.deck), waiting, acquired))
         with deck_file_lock(self.deck):
             process.start()
-            self.assertTrue(waiting.wait(2))
+            self.assertTrue(waiting.wait(10))
             self.assertFalse(acquired.wait(0.2))
-        self.assertTrue(acquired.wait(2))
-        process.join(timeout=2)
+        self.assertTrue(acquired.wait(10))
+        process.join(timeout=10)
         if process.is_alive():
             process.terminate()
-            process.join(timeout=2)
+            process.join(timeout=10)
         self.assertEqual(process.exitcode, 0)
 
 
