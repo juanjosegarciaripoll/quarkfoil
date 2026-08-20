@@ -55,7 +55,7 @@ function markdown(source, bibliography = null, { breaks = false, preserveBlankLi
   try {
     const equations = [];
     let protectedSource = String(source || "").replace(
-      /\\\[([\s\S]*?)\\\]|\$\$([\s\S]*?)\$\$|\\\(([\s\S]*?)\\\)|(?<!\\)\$([^\n$]+?)(?<!\\)\$/g,
+      /\\\[([\s\S]*?)\\\]|\$\$([\s\S]*?)\$\$|\\\(([\s\S]*?)\\\)|(?<!\\)\$((?:(?!\r?\n[ \t]*\r?\n)[^$])+?)(?<!\\)\$/g,
       (whole, bracketDisplay, dollarDisplay, bracketInline, dollarInline) => {
         const display = bracketDisplay !== undefined || dollarDisplay !== undefined;
         const expression = bracketDisplay ?? dollarDisplay ?? bracketInline ?? dollarInline ?? "";

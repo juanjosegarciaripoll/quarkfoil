@@ -30,7 +30,7 @@ import {
   updateSlideProperties,
   updateSlideNotes,
 } from "./parser.js";
-import { renderDeck, syncVideoPlayback } from "./render.js";
+import { renderDeck, renderMarkdownPreview, syncVideoPlayback } from "./render.js";
 import { applyMarkdownStyle, arrowGeometry, bindRangeControl, boundarySlideShortcut, buildShapePalette, buildShapeSelect, canvasLinkTarget, canvasStartsMarquee, clipboardImageFile, deleteKey, DesignEditor, dialogDragPosition, handleMarkdownShortcut, initialImageGeometry, moveGeometryGroup, overlayPasteOffset, pageSlideIndex, projectAssetPage, rectanglesIntersect, refreshConvertedVideoAssets, renameClipboardImage, repeatedActivation, resolveImportDestination, storeOverlayClipboard, storedOverlayClipboard, videoConflictDestination, videoFile, videoPathAttributes } from "./editor.js";
 import { briefReference, formatBibliography, parseBibliography, prepareBibliography, renameBibliographyEntry, uniqueCitationKey } from "./bibliography.js";
 import { compileExpression, createPlotSvg } from "./plot.js";
@@ -392,6 +392,17 @@ function assertCitations() {
   assert(getComputedStyle(fixture.querySelector(".overlay-citation .citation")).color === attributionStyle.color
     && getComputedStyle(attributionPdf).color === attributionStyle.color, "attribution links inherit the assigned overlay text color");
   fixture.remove();
+}
+
+function assertMultilineInlineMath() {
+  const fixture = document.createElement("div");
+  renderMarkdownPreview("A soft-wrapped equation $a +\nb = c$ remains inline.", fixture);
+  assert(fixture.querySelectorAll(".katex").length === 1,
+    "inline dollar math accepts a soft source line break");
+
+  renderMarkdownPreview("An unclosed equation $a +\n\nb = c$ does not cross a paragraph boundary.", fixture);
+  assert(!fixture.querySelector(".katex") && fixture.textContent.includes("$a +") && fixture.textContent.includes("b = c$"),
+    "inline dollar math does not span separate Markdown paragraphs");
 }
 
 function assertThemes() {
@@ -933,6 +944,7 @@ try {
   assertShapes();
   assertArrows();
   assertCitations();
+  assertMultilineInlineMath();
   assertThemes();
   assertSidebarVisibility();
   assertTables();
