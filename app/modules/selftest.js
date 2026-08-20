@@ -37,6 +37,7 @@ import { compileExpression, createPlotSvg } from "./plot.js";
 import { externalDeckAction, externalMergePlan, renderExternalMerge } from "./external.js";
 import { initialShapeGeometry, makeShapeSvg, shapeLabelInsets, SHAPES } from "./shapes.js";
 import { pdfPrintUrl, pdfPrintView, printShortcut } from "./print.js";
+import { keepListItemVisible } from "./sidebar.js";
 
 const source = `---
 title: Test deck
@@ -76,6 +77,19 @@ const checks = [];
 function assert(condition, message) {
   if (!condition) throw new Error(message);
   checks.push(`PASS ${message}`);
+}
+
+function assertSidebarVisibility() {
+  const container = {
+    scrollTop: 100,
+    getBoundingClientRect: () => ({ top: 20, bottom: 220 }),
+  };
+  keepListItemVisible(container, { getBoundingClientRect: () => ({ top: -10, bottom: 40 }) });
+  assert(container.scrollTop === 70, "opening a slide above the browser viewport scrolls it into view");
+  keepListItemVisible(container, { getBoundingClientRect: () => ({ top: 210, bottom: 260 }) });
+  assert(container.scrollTop === 110, "moving a slide below the browser viewport keeps it in view");
+  keepListItemVisible(container, { getBoundingClientRect: () => ({ top: 80, bottom: 140 }) });
+  assert(container.scrollTop === 110, "a visible slide does not move the browser viewport");
 }
 
 function assertCompoundLayout(layout, cellIds, spanningCellId) {
@@ -918,6 +932,7 @@ try {
   assertArrows();
   assertCitations();
   assertThemes();
+  assertSidebarVisibility();
   assertTables();
   assertTypography();
 

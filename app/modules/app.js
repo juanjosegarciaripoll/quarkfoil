@@ -5,6 +5,7 @@ import { saveSnapshot } from "./storage.js";
 import { briefReference, formatBibliography, parseBibliography, prepareBibliography, renameBibliographyEntry, uniqueCitationKey } from "./bibliography.js";
 import { externalDeckAction, externalMergePlan, renderExternalMerge, responseRevision } from "./external.js";
 import { pdfPrintUrl, printShortcut } from "./print.js";
+import { keepListItemVisible } from "./sidebar.js";
 
 const STARTER = `---
 title: Quarkfoil
@@ -488,6 +489,9 @@ function rebuildSlideList() {
     entries.push(li);
   }
   elements.slideList.replaceChildren(...entries);
+  if (!state.selectedSection) {
+    keepListItemVisible(elements.slideList, elements.slideList.querySelector("button.current")?.closest("li"));
+  }
   const selectedSection = state.deck.sections.find(section => section.id === state.selectedSection);
   const selectedSlide = selectedSection ? null : state.deck.slides[state.currentSlide];
   const trashed = Boolean(selectedSlide?.trashed);
