@@ -440,4 +440,6 @@ attribution's Design properties. Attributions have a transparent background,
 without a border or shadow, so they can be placed over other slide content.
 DOI and URL fields become links. In the local editor, an attribution also shows
 a small document link when its bibliography entry has an available `file` or
-`pdf` attachment. Missing keys are shown as visible errors.
+`pdf` attachment. Entries with an `eprint` field show their archive and
+identifier, for example `arXiv:2501.12345`. Missing keys are shown as visible
+errors.

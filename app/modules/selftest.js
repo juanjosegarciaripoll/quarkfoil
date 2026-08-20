@@ -373,6 +373,8 @@ function assertCitations() {
   assert(thesisReference === "Doe, PhD thesis, Example University, (2020)", "thesis attributions identify their type and institution");
   const mastersReference = briefReference(parseBibliography("@mastersthesis{roe2021, author={Roe, Richard}, school={Example College}, year={2021}}")[0]);
   assert(mastersReference === "Roe, Master's thesis, Example College, (2021)", "master's thesis attributions identify their type and institution");
+  const eprintReference = briefReference(parseBibliography("@article{mark2025, author={Mark, A. and Other, B.}, year={2025}, eprint={2501.12345}, archivePrefix={arXiv}, primaryClass={quant-ph}}")[0]);
+  assert(eprintReference === "Mark et al., arXiv:2501.12345, (2025)", "e-print attributions include their archive and identifier");
   let bibliographyError = "";
   try { parseBibliography("@article{broken, month=Sept}"); } catch (error) { bibliographyError = error.message; }
   assert(bibliographyError.startsWith("Invalid BibTeX:"), "BibTeX parser failures produce visible error messages");

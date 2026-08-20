@@ -29,7 +29,8 @@ function plain(value = "") {
 
 const BIBLIOGRAPHY_FIELD_ORDER = [
   "author", "editor", "title", "journal", "booktitle", "publisher", "school", "institution",
-  "series", "edition", "volume", "number", "pages", "address", "month", "year", "doi", "url", "note",
+  "series", "edition", "volume", "number", "pages", "address", "month", "year", "eprint", "archiveprefix",
+  "primaryclass", "doi", "url", "note",
 ];
 const BIBLIOGRAPHY_FIELD_POSITION = new Map(BIBLIOGRAPHY_FIELD_ORDER.map((field, index) => [field, index]));
 
@@ -111,9 +112,12 @@ export function briefReference(entry) {
   const type = String(entry?.type || "").toLocaleLowerCase();
   const thesis = type === "phdthesis" ? "PhD thesis" : type === "mastersthesis" ? "Master's thesis" : "";
   const venue = fields.journal || fields.booktitle || fields.publisher || fields.school || fields.institution || "";
+  const archive = fields.eprint
+    ? `${fields.archiveprefix || "arXiv"}:${fields.eprint.replace(/^arxiv:\s*/i, "")}`
+    : "";
   const details = thesis
     ? [thesis, venue].filter(Boolean).join(", ")
-    : [venue, fields.volume, fields.pages || fields.number].filter(Boolean).join(" ");
+    : [[venue, fields.volume, fields.pages || fields.number].filter(Boolean).join(" "), archive].filter(Boolean).join(", ");
   return [author, details, fields.year ? `(${fields.year})` : ""].filter(Boolean).join(", ");
 }
 
