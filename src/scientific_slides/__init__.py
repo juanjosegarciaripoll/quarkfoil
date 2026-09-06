@@ -29,6 +29,11 @@ def _export(arguments: list[str]) -> int:
         action="store_true",
         help="Remove speaker notes from the exported presentation",
     )
+    parser.add_argument(
+        "--trim-bibliography",
+        action="store_true",
+        help="Keep only cited bibliography entries and their dependencies",
+    )
     args = parser.parse_args(arguments)
     destination = export_presentation(
         args.deck,
@@ -36,6 +41,7 @@ def _export(arguments: list[str]) -> int:
         assets=args.assets,
         preview=args.preview,
         include_notes=not args.no_notes,
+        trim_bibliography=args.trim_bibliography,
     )
     print(f"Exported Quarkfoil presentation to {destination}")
     print(f"Serve {destination / 'index.html'} from any static web server")

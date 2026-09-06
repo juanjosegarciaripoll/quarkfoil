@@ -244,6 +244,61 @@ class ExporterTests(unittest.TestCase):
         self.assertTrue((output / "quarkfoil/bibliography.js").is_file())
         self.assertTrue((output / "quarkfoil/vendor/bibtex/bibtexParse.js").is_file())
 
+    def test_trim_bibliography_local_and_cdn(self) -> None:
+        references = self.project / "references"
+        references.mkdir()
+        bibliography = references / "library.bib"
+        used = '@article{used, title={A {nested} title}, crossref={parent}}'
+        parent = '@book(parent, title="Collected {Works}", crossref={grandparent})'
+        grandparent = '@book{grandparent, title={Collection}, crossref={parent}}'
+        brief = '@misc{brief, author={García, A.}, year={2026}}'
+        numbered = '@misc{numbered, title={Numbered}}'
+        directives = '@string{venue = "Journal"}\n@preamble{"Preamble"}\n@comment{Keep this comment}'
+        original = "\n".join([directives, used, parent, grandparent, brief, numbered,
+                              '@misc{unused, title={Unused}}', '@misc{code, title={Code}}']) + "\n"
+        bibliography.write_text(original, encoding="utf-8")
+        source = (
+            '---\nbibliography: references/library.bib\nassets:\n  include: [references]\n---\n'
+            '## Citations\n\n[@used; @numbered] `[@code]` \\[@unused]\n'
+            '```text\n[@code]\n```\n'
+            '::: overlay {type=citation keys="brief; used"}\n:::\n'
+            '::: overlay {type=citation key=numbered display=number}\n:::\n'
+        )
+        self.deck.write_text(source, encoding="utf-8")
+        for assets in ("local", "cdn"):
+            with self.subTest(assets=assets):
+                output = export_presentation(self.deck, self.root / f"trim-{assets}", assets=assets, trim_bibliography=True)
+                result = (output / "references/library.bib").read_text(encoding="utf-8")
+                for entry in (directives, used, parent, grandparent, brief, numbered):
+                    self.assertIn(entry, result)
+                self.assertNotIn('@misc{unused', result)
+                self.assertNotIn('@misc{code', result)
+                self.assertEqual((output / "presentation.md").read_text(encoding="utf-8"), source)
+        self.assertEqual(bibliography.read_text(encoding="utf-8"), original)
+
+    def test_trim_bibliography_respects_no_notes_and_cli(self) -> None:
+        (self.project / "references.bib").write_text('@misc{note, title={Notes only}}\n', encoding="utf-8")
+        self.deck.write_text('---\nbibliography: references.bib\n---\n## Notes\n\n::: notes\n[@note]\n:::\n', encoding="utf-8")
+        with_notes = export_presentation(self.deck, self.root / "with-notes", trim_bibliography=True)
+        self.assertIn('@misc{note', (with_notes / "references.bib").read_text(encoding="utf-8"))
+        output = self.root / "without-notes"
+        self.assertEqual(main(["export", str(self.deck), "--output", str(output), "--trim-bibliography", "--no-notes"]), 0)
+        self.assertEqual((output / "references.bib").read_text(encoding="utf-8").strip(), "")
+
+    def test_trim_without_bibliography(self) -> None:
+        output = export_presentation(self.deck, self.root / "no-bibliography", trim_bibliography=True)
+        self.assertTrue((output / "index.html").is_file())
+
+    def test_invalid_trimmed_bibliography_leaves_no_export(self) -> None:
+        bibliography = self.project / "references.bib"
+        bibliography.write_text('@misc{used, title={Unclosed}\n', encoding="utf-8")
+        self.deck.write_text('---\nbibliography: references.bib\n---\n## Citation\n[@used]\n', encoding="utf-8")
+        output = self.root / "invalid-trim"
+        with self.assertRaisesRegex(ValueError, "Cannot trim bibliography"):
+            export_presentation(self.deck, output, trim_bibliography=True)
+        self.assertFalse(output.exists())
+        self.assertEqual(list(self.root.glob(".invalid-trim-*")), [])
+
     def test_configured_asset_folder_cannot_leave_project(self) -> None:
         self.deck.write_text(
             "---\nassets:\n  include:\n    - ../outside\n---\n\n## Unsafe\n",

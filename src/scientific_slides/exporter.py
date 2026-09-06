@@ -16,6 +16,7 @@ from urllib.parse import quote, unquote, urlsplit
 import yaml
 
 from .icons import icon_notices
+from .bibliography import citation_keys, trim_bibliography as _trim_bibliography
 from .paths import APP_ROOT, inside as _inside
 
 
@@ -199,7 +200,7 @@ def _folder_files(project: Path, relative: str) -> set[str]:
     }
 
 
-def _copy_project_assets(deck: Path, source: str, destination: Path) -> None:
+def _copy_project_assets(deck: Path, source: str, destination: Path, *, trim_bibliography: bool = False) -> None:
     project = deck.parent.resolve()
     references = _asset_references(source)
     front = _front_matter(source)
@@ -218,6 +219,10 @@ def _copy_project_assets(deck: Path, source: str, destination: Path) -> None:
             raise FileNotFoundError(f"Referenced asset not found: {relative}")
         target = destination / Path(relative)
         _copy_entry(asset, target)
+    if trim_bibliography and isinstance(bibliography, str) and bibliography:
+        target = destination / bibliography
+        trimmed = _trim_bibliography(target.read_text(encoding="utf-8"), citation_keys(source))
+        target.write_text(trimmed, encoding="utf-8")
 
 
 def _third_party_notice(project: Path | None = None, references: set[str] | None = None) -> str:
@@ -424,6 +429,7 @@ def export_presentation(
     assets: str = "local",
     preview: bool = False,
     include_notes: bool = True,
+    trim_bibliography: bool = False,
 ) -> Path:
     resolved = deck.resolve()
     if not resolved.is_file():
@@ -452,7 +458,7 @@ def export_presentation(
     temporary = Path(tempfile.mkdtemp(prefix=f".{destination.name}-", dir=destination.parent))
     try:
         (temporary / "presentation.md").write_text(source, encoding="utf-8")
-        _copy_project_assets(resolved, source, temporary)
+        _copy_project_assets(resolved, source, temporary, trim_bibliography=trim_bibliography)
         for source_name, target_name in EXPORT_FILES.items():
             _copy_entry(APP_ROOT / source_name, temporary / target_name)
         if assets == "local":

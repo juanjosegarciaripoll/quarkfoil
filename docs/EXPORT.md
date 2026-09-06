@@ -45,6 +45,33 @@ lecture-site/
 Upload that directory unchanged to GitHub Pages, CERN web hosting, Apache,
 nginx, or another static host.
 
+## Trim the bibliography
+
+The bibliography configured in front matter is copied in full by default.
+To export only entries used by the presentation:
+
+```console
+quarkfoil export lecture.md --output lecture-site --trim-bibliography
+```
+
+This includes inline citations (`[@key]`, `[@first; @second]`) and citation
+overlays, including brief attributions. Citations inside code or escaped with
+a backslash are ignored. References in speaker notes are retained unless
+`--no-notes` is also supplied. With no citations, all ordinary entries are
+removed.
+
+Retained entries keep their original fields, formatting, and order. Entries
+referenced by literal keys in `crossref`, `xref`, or `xdata` are retained recursively;
+comments, `@string`, and `@preamble` directives are preserved. This option
+does not remove fields such as local attachment paths from retained entries.
+Dependency keys expressed using BibTeX macros or concatenation are not resolved.
+Malformed BibTeX record boundaries abort the export.
+
+Trimming changes only the exported bibliography, including when its directory
+is listed in `assets.include`. The original bibliography is untouched. The
+option works with both local and CDN exports and has no effect when no
+bibliography is configured.
+
 ## Compact CDN export
 
 To reference pinned packages on jsDelivr instead of copying the browser
