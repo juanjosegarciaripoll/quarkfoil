@@ -13,6 +13,29 @@ function assetPath(source) {
   return localPlayer ? `/project/${path}` : path;
 }
 
+function embeddedSource() {
+  const element = document.querySelector("#quarkfoil-source");
+  if (!element) return null;
+  try {
+    return JSON.parse(element.textContent);
+  } catch {
+    return null;
+  }
+}
+
+// Exports embed the deck so the site also opens straight from the file system,
+// where fetch() has no origin to read from.
+async function readSource(url, embedded) {
+  try {
+    const response = await fetch(url, { cache: "no-store" });
+    if (response.ok) return await response.text();
+    if (embedded == null) throw new Error(`${url} returned HTTP ${response.status}`);
+  } catch (error) {
+    if (embedded == null) throw error;
+  }
+  return embedded;
+}
+
 function showError(error) {
   const loading = document.querySelector("#loading");
   loading.className = "player-error";
@@ -21,12 +44,11 @@ function showError(error) {
 
 async function initialize() {
   const requestedDeck = search.get("deck");
+  const embedded = localPlayer ? null : embeddedSource();
   const deckUrl = localPlayer
     ? `/api/deck${requestedDeck ? `?path=${encodeURIComponent(requestedDeck)}` : ""}`
     : "presentation.md";
-  const response = await fetch(deckUrl, { cache: "no-store" });
-  if (!response.ok) throw new Error(`${deckUrl} returned HTTP ${response.status}`);
-  const deck = parseDeck(await response.text());
+  const deck = parseDeck(await readSource(deckUrl, embedded?.deck ?? null));
   const errors = deck.diagnostics.filter(item => item.level === "error");
   if (errors.length) throw new Error(errors.map(item => item.message).join("; "));
 
@@ -35,16 +57,14 @@ async function initialize() {
   let bibliographySource = "";
   let bibliographyPdfs = {};
   if (bibliographyPath) {
-    const bibliographyUrl = localPlayer
-      ? `/api/bibliography?path=${encodeURIComponent(bibliographyPath)}`
-      : assetPath(bibliographyPath);
-    const bibliographyResponse = await fetch(bibliographyUrl, { cache: "no-store" });
-    if (!bibliographyResponse.ok) throw new Error(`Bibliography returned HTTP ${bibliographyResponse.status}`);
     if (localPlayer) {
+      const bibliographyUrl = `/api/bibliography?path=${encodeURIComponent(bibliographyPath)}`;
+      const bibliographyResponse = await fetch(bibliographyUrl, { cache: "no-store" });
+      if (!bibliographyResponse.ok) throw new Error(`Bibliography returned HTTP ${bibliographyResponse.status}`);
       const bibliography = await bibliographyResponse.json();
       bibliographySource = bibliography.source;
       bibliographyPdfs = bibliography.pdfs || {};
-    } else bibliographySource = await bibliographyResponse.text();
+    } else bibliographySource = await readSource(assetPath(bibliographyPath), embedded?.bibliography ?? null);
   }
   renderDeck(deck, document.querySelector("#slides"), assetPath, prepareBibliography(bibliographySource, deck, bibliographyPdfs), { includeTrashed: false });
   const reveal = new window.Reveal(document.querySelector(".reveal"), {

@@ -5,6 +5,25 @@ All notable changes to Quarkfoil are documented here. The project follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Open exported presentations directly from the file system. The exported
+  player is now one classic script rather than ES modules, and `index.html`
+  embeds the deck and bibliography, so double-clicking `index.html` works in
+  browsers that refuse module loading and `fetch` on `file://` pages. Serving
+  the export over HTTP is unchanged: the player still reads `presentation.md`
+  and the bibliography from the server and only falls back to the embedded
+  copy when there is no server to ask.
+
+### Changed
+
+- Reuse an existing `--output` directory when exporting. Quarkfoil still builds
+  the site in a temporary sibling folder and publishes it only after a complete
+  export, but it now writes into a directory that already exists instead of
+  refusing to run. Exported files replace the previous export, unrelated files
+  in the folder are kept, and an existing file at the destination is still
+  never overwritten.
+
 ## [0.5.0] - 2026-08-19
 
 This release introduces a revision-safe interface for coding agents and LLM

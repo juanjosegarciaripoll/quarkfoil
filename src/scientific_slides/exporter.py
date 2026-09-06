@@ -4,6 +4,7 @@ import base64
 import hashlib
 import html
 import http.server
+import json
 import os
 import re
 import shutil
@@ -22,12 +23,6 @@ from .paths import APP_ROOT, inside as _inside
 
 EXPORT_FILES = {
     "assets/quarkfoil-mark.svg": "quarkfoil/quarkfoil-mark.svg",
-    "modules/parser.js": "quarkfoil/parser.js",
-    "modules/render.js": "quarkfoil/render.js",
-    "modules/shapes.js": "quarkfoil/shapes.js",
-    "modules/bibliography.js": "quarkfoil/bibliography.js",
-    "modules/player.js": "quarkfoil/player.js",
-    "modules/print.js": "quarkfoil/print.js",
     "styles/layout.css": "quarkfoil/layout.css",
     "styles/themes.css": "quarkfoil/themes.css",
     "styles/player.css": "quarkfoil/player.css",
@@ -85,6 +80,18 @@ CDN_FILES = {
     ),
 }
 
+PLAYER_MODULE = "player"
+PLAYER_BUNDLE = "quarkfoil/player.js"
+
+MODULE_IMPORT_PATTERN = re.compile(
+    r'(?m)^import[ \t]*\{(?P<names>[^}]*)\}[ \t]*from[ \t]*"\./(?P<module>[\w.-]+)\.js";[ \t]*$'
+)
+MODULE_EXPORT_PATTERN = re.compile(
+    r'(?m)^export[ \t]+'
+    r'(?P<declaration>(?:async[ \t]+)?(?:function|const|let|var|class)[ \t]+(?P<name>[A-Za-z_$][\w$]*)\b)'
+)
+MODULE_STATEMENT_PATTERN = re.compile(r"(?m)^[ \t]*(?:import|export)\b")
+
 ASSET_PATTERN = re.compile(r"!?\[[^\]]*\]\(([^)\s]+)")
 ATTRIBUTE_ASSET_PATTERN = re.compile(r"\b(?:src|poster)=(?:\"([^\"]+)\"|'([^']+)'|([^\s}]+))")
 NOTES_BLOCK_PATTERN = re.compile(
@@ -111,6 +118,99 @@ def _copy_entry(source: Path, destination: Path) -> None:
         shutil.copytree(source, destination)
     else:
         shutil.copy2(source, destination)
+
+
+def _module_chunk(name: str) -> tuple[str, list[str]]:
+    source = (APP_ROOT / "modules" / f"{name}.js").read_text(encoding="utf-8")
+    dependencies: list[str] = []
+    bindings: list[str] = []
+
+    def bind(match: re.Match[str]) -> str:
+        dependencies.append(match.group("module"))
+        names = ", ".join(
+            part.strip().replace(" as ", ": ")
+            for part in match.group("names").split(",")
+            if part.strip()
+        )
+        bindings.append(f'const {{ {names} }} = modules["{match.group("module")}"];')
+        return ""
+
+    body = MODULE_IMPORT_PATTERN.sub(bind, source)
+    exported = [match.group("name") for match in MODULE_EXPORT_PATTERN.finditer(body)]
+    body = MODULE_EXPORT_PATTERN.sub(lambda match: match.group("declaration"), body)
+    if MODULE_STATEMENT_PATTERN.search(body):
+        raise ValueError(f"Unsupported module syntax in {name}.js; the export bundler needs plain imports and exports")
+    chunk = "\n".join((
+        f'modules["{name}"] = (() => {{',
+        *bindings,
+        body.strip("\n"),
+        f'return {{ {", ".join(exported)} }};',
+        "})();",
+    ))
+    return chunk, dependencies
+
+
+def _player_bundle(entry: str = PLAYER_MODULE) -> str:
+    """Combine the player module graph into one classic script.
+
+    Browsers refuse to load ES modules and to fetch neighbouring files from
+    ``file://`` pages, so the exported player is a single ordinary script and
+    the deck travels inside ``index.html``.
+    """
+    chunks: list[str] = []
+    done: set[str] = set()
+
+    def visit(name: str, pending: tuple[str, ...]) -> None:
+        if name in done:
+            return
+        if name in pending:
+            raise ValueError(f"Cyclic player module import: {' -> '.join((*pending, name))}")
+        chunk, dependencies = _module_chunk(name)
+        for dependency in dependencies:
+            visit(dependency, (*pending, name))
+        done.add(name)
+        chunks.append(chunk)
+
+    visit(entry, ())
+    body = "\n\n".join(chunks)
+    return (
+        "// Quarkfoil static player: app/modules/*.js combined into one classic\n"
+        "// script so the exported presentation also opens from the file system.\n"
+        "(() => {\n"
+        '"use strict";\n'
+        "const modules = {};\n\n"
+        f"{body}\n"
+        "})();\n"
+    )
+
+
+def _embedded_source(deck: str, bibliography: str | None) -> str:
+    payload = json.dumps({"deck": deck, "bibliography": bibliography}, ensure_ascii=False)
+    for character, escape in (("<", "\\u003c"), (">", "\\u003e"), ("&", "\\u0026")):
+        payload = payload.replace(character, escape)
+    return payload
+
+
+def _merge_entry(source: Path, destination: Path) -> None:
+    if source.is_dir() and destination.is_dir() and not destination.is_symlink():
+        for entry in source.iterdir():
+            _merge_entry(entry, destination / entry.name)
+        source.rmdir()
+        return
+    if destination.is_dir() and not destination.is_symlink():
+        shutil.rmtree(destination)
+    elif destination.is_symlink() or destination.exists():
+        destination.unlink()
+    os.replace(source, destination)
+
+
+def _publish(temporary: Path, destination: Path) -> None:
+    if not destination.exists():
+        os.replace(temporary, destination)
+        return
+    for entry in sorted(temporary.iterdir()):
+        _merge_entry(entry, destination / entry.name)
+    temporary.rmdir()
 
 
 def _asset_references(source: str) -> set[str]:
@@ -225,6 +325,14 @@ def _copy_project_assets(deck: Path, source: str, destination: Path, *, trim_bib
         target.write_text(trimmed, encoding="utf-8")
 
 
+def _exported_bibliography(destination: Path, source: str) -> str | None:
+    relative = _front_matter(source).get("bibliography")
+    if not isinstance(relative, str) or not relative:
+        return None
+    exported = destination / Path(unquote(relative).replace("\\", "/"))
+    return exported.read_text(encoding="utf-8") if exported.is_file() else None
+
+
 def _third_party_notice(project: Path | None = None, references: set[str] | None = None) -> str:
     inventory = APP_ROOT.parent / "THIRD_PARTY_LICENSES.md"
     sections = [inventory.read_text(encoding="utf-8").rstrip()] if inventory.is_file() else []
@@ -294,7 +402,12 @@ def _resource_tags(assets: str) -> tuple[str, str, str]:
     return styles, scripts, "'self' https://cdn.jsdelivr.net"
 
 
-def _index_html(assets: str, metadata: dict[str, str], preview_path: str | None = None) -> str:
+def _index_html(
+    assets: str,
+    metadata: dict[str, str],
+    preview_path: str | None = None,
+    embedded: str | None = None,
+) -> str:
     styles, scripts, external = _resource_tags(assets)
     # Reveal's notes plugin writes this pinned inline speaker-controller script
     # into its popup; the hash avoids enabling arbitrary inline JS.
@@ -329,6 +442,11 @@ def _index_html(assets: str, metadata: dict[str, str], preview_path: str | None 
             f'  <meta name="twitter:image" content="{preview_url}">',
         ))
     metadata_tags = "\n".join(meta)
+    # A JSON data block, not a script: it needs no CSP hash because browsers
+    # never execute it, and it lets the player start without fetching.
+    embedded_tag = (
+        f'  <script type="application/json" id="quarkfoil-source">{embedded}</script>\n' if embedded else ""
+    )
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -350,8 +468,8 @@ def _index_html(assets: str, metadata: dict[str, str], preview_path: str | None 
     <div id="slides" class="slides"></div>
   </main>
   <div id="loading" role="status">Loading presentation…</div>
-{scripts}
-  <script type="module" src="quarkfoil/player.js"></script>
+{embedded_tag}{scripts}
+  <script src="{PLAYER_BUNDLE}"></script>
 </body>
 </html>
 """
@@ -440,8 +558,8 @@ def export_presentation(
         raise ValueError(f"Unknown asset strategy: {assets}")
 
     destination = output.resolve()
-    if destination.exists():
-        raise FileExistsError(f"Export destination already exists: {destination}")
+    if destination.exists() and not destination.is_dir():
+        raise FileExistsError(f"Export destination is not a directory: {destination}")
     destination.parent.mkdir(parents=True, exist_ok=True)
     source = resolved.read_text(encoding="utf-8")
     if not include_notes:
@@ -461,16 +579,22 @@ def export_presentation(
         _copy_project_assets(resolved, source, temporary, trim_bibliography=trim_bibliography)
         for source_name, target_name in EXPORT_FILES.items():
             _copy_entry(APP_ROOT / source_name, temporary / target_name)
+        bundle = temporary / PLAYER_BUNDLE
+        bundle.parent.mkdir(parents=True, exist_ok=True)
+        bundle.write_text(_player_bundle(), encoding="utf-8")
         if assets == "local":
             for source_name, target_name in LOCAL_FILES.items():
                 _copy_entry(APP_ROOT / source_name, temporary / target_name)
         (temporary / "THIRD_PARTY_LICENSES.txt").write_text(
             _third_party_notice(resolved.parent, _asset_references(source)), encoding="utf-8"
         )
-        (temporary / "index.html").write_text(_index_html(assets, metadata, preview_path), encoding="utf-8")
+        embedded = _embedded_source(source, _exported_bibliography(temporary, source))
+        (temporary / "index.html").write_text(
+            _index_html(assets, metadata, preview_path, embedded), encoding="utf-8"
+        )
         if preview_path:
             _create_preview(temporary, preview_path)
-        os.replace(temporary, destination)
+        _publish(temporary, destination)
     except Exception:
         shutil.rmtree(temporary, ignore_errors=True)
         raise

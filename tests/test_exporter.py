@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 import subprocess
@@ -61,8 +62,6 @@ class ExporterTests(unittest.TestCase):
         self.assertEqual((output / "presentation.md").read_text(encoding="utf-8"), self.deck.read_text(encoding="utf-8"))
         self.assertTrue((output / "figures/diagram.svg").is_file())
         self.assertTrue((output / "quarkfoil/player.js").is_file())
-        self.assertTrue((output / "quarkfoil/print.js").is_file())
-        self.assertTrue((output / "quarkfoil/shapes.js").is_file())
         self.assertTrue((output / "quarkfoil/layout.css").is_file())
         self.assertTrue((output / "quarkfoil/themes.css").is_file())
         self.assertTrue((output / "quarkfoil/quarkfoil-mark.svg").is_file())
@@ -73,6 +72,48 @@ class ExporterTests(unittest.TestCase):
         player = (output / "quarkfoil/player.js").read_text(encoding="utf-8")
         self.assertIn('document.body.dataset.playerSource === "local"', player)
         self.assertNotIn('data-player-source="local"', index)
+
+    def test_player_is_a_single_classic_script_with_the_deck_embedded(self) -> None:
+        bibliography = self.project / "references.bib"
+        bibliography.write_text("@article{test, title={Test}}\n", encoding="utf-8")
+        self.deck.write_text(
+            "---\nbibliography: references.bib\n---\n\n## Cited\n\n[@test] <script>alert(1)</script>\n",
+            encoding="utf-8",
+        )
+        output = export_presentation(self.deck, self.root / "bundle-site")
+        index = (output / "index.html").read_text(encoding="utf-8")
+        player = (output / "quarkfoil/player.js").read_text(encoding="utf-8")
+
+        # Browsers refuse to load ES modules from file:// pages, so the export
+        # ships one classic script that carries every player module.
+        self.assertIn('<script src="quarkfoil/player.js"></script>', index)
+        self.assertNotIn("type=\"module\"", index)
+        self.assertNotRegex(player, r"(?m)^[ \t]*(?:import|export)\b")
+        for module in ("shapes", "parser", "bibliography", "render", "print", "player"):
+            self.assertIn(f'modules["{module}"] = (() => {{', player)
+        self.assertLess(player.index('modules["parser"]'), player.index('modules["render"]'))
+
+        # The embedded copy lets the same page open without a web server.
+        marker = '<script type="application/json" id="quarkfoil-source">'
+        self.assertIn(marker, index)
+        payload = index.split(marker, 1)[1].split("</script>", 1)[0]
+        self.assertNotIn("<", payload)
+        embedded = json.loads(payload)
+        self.assertEqual(embedded["deck"], self.deck.read_text(encoding="utf-8"))
+        self.assertEqual(embedded["bibliography"], bibliography.read_text(encoding="utf-8"))
+
+    def test_embedded_deck_follows_the_export_options(self) -> None:
+        self.deck.write_text(
+            "## First\n\nVisible.\n\n::: notes\nPrivate note.\n:::\n",
+            encoding="utf-8",
+        )
+        output = export_presentation(self.deck, self.root / "embedded-options", include_notes=False)
+        index = (output / "index.html").read_text(encoding="utf-8")
+        payload = index.split('id="quarkfoil-source">', 1)[1].split("</script>", 1)[0]
+        embedded = json.loads(payload)
+        self.assertNotIn("Private note.", embedded["deck"])
+        self.assertIsNone(embedded["bibliography"])
+        self.assertEqual(embedded["deck"], (output / "presentation.md").read_text(encoding="utf-8"))
 
     def test_export_can_remove_speaker_notes(self) -> None:
         self.deck.write_text(
@@ -180,14 +221,37 @@ class ExporterTests(unittest.TestCase):
         self.assertFalse((output / "quarkfoil/vendor").exists())
         self.assertTrue((output / "THIRD_PARTY_LICENSES.txt").is_file())
 
-    def test_existing_destination_is_never_overwritten(self) -> None:
+    def test_existing_destination_is_reused_and_unrelated_files_are_kept(self) -> None:
         output = self.root / "existing"
-        output.mkdir()
+        (output / "figures").mkdir(parents=True)
         marker = output / "keep.txt"
         marker.write_text("keep", encoding="utf-8")
+        stale = output / "figures/stale.svg"
+        stale.write_text("<svg/>", encoding="utf-8")
+        (output / "index.html").write_text("old", encoding="utf-8")
+        self.assertEqual(export_presentation(self.deck, output), output)
+        self.assertEqual(marker.read_text(encoding="utf-8"), "keep")
+        self.assertEqual(stale.read_text(encoding="utf-8"), "<svg/>")
+        self.assertNotEqual((output / "index.html").read_text(encoding="utf-8"), "old")
+        self.assertEqual((output / "figures/diagram.svg").read_bytes(), (self.project / "figures/diagram.svg").read_bytes())
+        self.assertTrue((output / "quarkfoil/player.js").is_file())
+        self.assertEqual(list(self.root.glob(".existing-*")), [])
+
+    def test_export_replaces_a_stale_entry_of_a_different_kind(self) -> None:
+        output = self.root / "kinds"
+        (output / "presentation.md").mkdir(parents=True)
+        (output / "presentation.md/inner.txt").write_text("inner", encoding="utf-8")
+        (output / "figures").write_text("not a folder", encoding="utf-8")
+        export_presentation(self.deck, output)
+        self.assertIn("Diagram", (output / "presentation.md").read_text(encoding="utf-8"))
+        self.assertTrue((output / "figures/diagram.svg").is_file())
+
+    def test_destination_file_is_never_overwritten(self) -> None:
+        output = self.root / "existing.html"
+        output.write_text("keep", encoding="utf-8")
         with self.assertRaises(FileExistsError):
             export_presentation(self.deck, output)
-        self.assertEqual(marker.read_text(encoding="utf-8"), "keep")
+        self.assertEqual(output.read_text(encoding="utf-8"), "keep")
 
     def test_missing_referenced_figure_leaves_no_export(self) -> None:
         self.deck.write_text("## Missing\n\n![](figures/missing.svg)\n", encoding="utf-8")
@@ -241,7 +305,6 @@ class ExporterTests(unittest.TestCase):
         self.deck.write_text("---\nbibliography: references.bib\n---\n\n## Cited\n\n[@test]\n", encoding="utf-8")
         output = export_presentation(self.deck, self.root / "bibliography-site")
         self.assertEqual((output / "references.bib").read_text(encoding="utf-8"), bibliography.read_text(encoding="utf-8"))
-        self.assertTrue((output / "quarkfoil/bibliography.js").is_file())
         self.assertTrue((output / "quarkfoil/vendor/bibtex/bibtexParse.js").is_file())
 
     def test_trim_bibliography_local_and_cdn(self) -> None:

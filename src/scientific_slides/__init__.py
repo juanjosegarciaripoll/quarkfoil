@@ -15,7 +15,7 @@ def _export(arguments: list[str]) -> int:
         description="Export a Quarkfoil presentation as a static website",
     )
     parser.add_argument("deck", type=Path, help="Markdown presentation to export")
-    parser.add_argument("--output", "-o", type=Path, required=True, help="New directory to create")
+    parser.add_argument("--output", "-o", type=Path, required=True, help="Directory to create or update")
     assets = parser.add_mutually_exclusive_group()
     assets.add_argument("--assets", choices=("local", "cdn"), default="local", help="Dependency source (default: local)")
     assets.add_argument("--cdn", dest="assets", action="store_const", const="cdn", help="Use pinned jsDelivr dependencies")
@@ -44,7 +44,7 @@ def _export(arguments: list[str]) -> int:
         trim_bibliography=args.trim_bibliography,
     )
     print(f"Exported Quarkfoil presentation to {destination}")
-    print(f"Serve {destination / 'index.html'} from any static web server")
+    print(f"Open {destination / 'index.html'} directly or serve it from any static web server")
     return 0
 
 

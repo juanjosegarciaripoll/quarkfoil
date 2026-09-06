@@ -13,9 +13,17 @@ reproducible deployments:
 quarkfoil export lecture.md --output lecture-site
 ```
 
-The destination must not already exist. Quarkfoil creates it atomically and
-copies the Markdown source, referenced project images, player files, pinned
-browser libraries, fonts, and complete third-party notices.
+Quarkfoil builds the site in a temporary sibling folder and publishes it only
+after a complete, successful export. It copies the Markdown source, referenced
+project images, player files, pinned browser libraries, fonts, and complete
+third-party notices.
+
+An existing destination directory is reused: exported files replace the entries
+of the previous export, and unrelated files already in the folder, such as
+`CNAME`, `.nojekyll`, or an extra deployment script, are kept. Files that a
+former export wrote but the current one no longer produces are also kept, so
+delete the folder first when you want a pristine site. The destination may not
+be an existing file.
 
 When a referenced SVG was downloaded by the online icon picker, its collection
 notice and full license text are appended to `THIRD_PARTY_LICENSES.txt`. Unused
@@ -35,12 +43,14 @@ lecture-site/
 ├── THIRD_PARTY_LICENSES.txt
 └── quarkfoil/
     ├── player.js
-    ├── parser.js
-    ├── render.js
     ├── layout.css
     ├── themes.css
+    ├── player.css
     └── vendor/
 ```
+
+`quarkfoil/player.js` is the editor's own `parser.js`, `render.js`, and player
+modules combined into a single classic script.
 
 Upload that directory unchanged to GitHub Pages, CERN web hosting, Apache,
 nginx, or another static host.
@@ -94,11 +104,19 @@ the selected CDN. KaTeX fonts are loaded from the same pinned package.
 Both modes retain `THIRD_PARTY_LICENSES.txt`. CDN mode changes where executable
 dependencies are fetched; it does not remove their notices.
 
-## Preview locally
+## Open it locally
 
-Exported presentations must be served over HTTP because browsers normally
-block module and Markdown loading from `file://` pages. One simple preview
-server is:
+An export opens by double-clicking `lecture-site/index.html`, with no web
+server: the player ships as one ordinary script instead of ES modules, which
+browsers refuse to load from `file://` pages, and `index.html` carries a copy
+of the deck and its bibliography because those pages cannot fetch neighbouring
+files either. Use a `local` export for this; a `--cdn` export still needs the
+network for its libraries.
+
+Serving the folder over HTTP works exactly as before and stays the right way
+to share it. Over HTTP the player reads `presentation.md` and the bibliography
+from the server, so editing those files in an exported site keeps working; the
+embedded copy is only the fallback for `file://`. One simple preview server is:
 
 ```console
 python -m http.server --directory lecture-site

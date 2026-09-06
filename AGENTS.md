@@ -100,9 +100,17 @@ The distribution and command-line tool are named `quarkfoil`.
 
 - `quarkfoil export DECK --output DIRECTORY` creates a presentation-only static
   website with local assets by default.
-- The destination must not already exist. Export through a temporary sibling
-  and rename only after success; never partially overwrite a user directory.
-- The static player must reuse `parser.js` and `render.js`.
+- Export through a temporary sibling and publish only after success; never
+  partially overwrite a user directory. A new destination is renamed into place
+  atomically; an existing destination directory is reused entry by entry, so
+  unrelated files in it survive. The destination may not be an existing file.
+- The static player must reuse `parser.js` and `render.js`. The export bundles
+  that module graph into one classic `quarkfoil/player.js` and embeds the deck
+  in `index.html`, because browsers load neither ES modules nor `fetch` from
+  `file://` pages. Served over HTTP the player still reads `presentation.md`
+  and the bibliography from the server; the embedded copy is only a fallback.
+  The bundler accepts plain `import { … } from "./module.js";` and `export`
+  declarations only, and fails the export on anything else.
 - Copy referenced assets only within the presentation-directory boundary.
 - Local export must contain all runtime libraries, KaTeX fonts, and notices.
 - `--cdn`/`--assets cdn` is explicit and network-dependent. Use exact package
@@ -196,9 +204,8 @@ uv run --no-sync quarkfoil export example/deck.md --output site/example --cdn
 ```
 
 `site/`, `dist/`, and browser captures are generated artifacts and remain
-ignored. If a generated output directory already exists, rebuild the parent
-site or select a new destination rather than weakening the exporter's
-no-overwrite guarantee.
+ignored. Re-running the export refreshes an existing output directory in place;
+delete it first when a build must not inherit files from an earlier export.
 
 Build distributions:
 
