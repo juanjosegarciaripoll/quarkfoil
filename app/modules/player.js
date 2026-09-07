@@ -7,9 +7,24 @@ const localPlayer = document.body.dataset.playerSource === "local";
 const search = new URLSearchParams(location.search);
 const previewView = search.has("preview");
 
+// Published decks share one asset pool, so the page carries a map from the
+// deck's own paths to it. Exports and the editor have none and resolve as before.
+const assetMap = (() => {
+  const element = document.querySelector("#quarkfoil-assets");
+  if (!element) return null;
+  try {
+    return JSON.parse(element.textContent);
+  } catch {
+    return null;
+  }
+})();
+
 function assetPath(source) {
   if (!source || /^(?:javascript|data:text\/html):/i.test(source)) return "";
-  const path = source.replaceAll("\\", "/").split("/").map(part => encodeURIComponent(part)).join("/");
+  const raw = source.replaceAll("\\", "/");
+  const pooled = assetMap?.[raw];
+  if (pooled) return pooled;
+  const path = raw.split("/").map(part => encodeURIComponent(part)).join("/");
   return localPlayer ? `/project/${path}` : path;
 }
 

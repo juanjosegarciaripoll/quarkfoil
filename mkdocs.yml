@@ -47,6 +47,7 @@ nav:
       - Editor: USER_GUIDE.md
       - Export a static website: EXPORT.md
       - Pack a project folder: PACK.md
+      - Publish a collection: PUBLISH.md
       - Presentation format: FORMAT.md
   - Reference:
       - Security: SECURITY.md

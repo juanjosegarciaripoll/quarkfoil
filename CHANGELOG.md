@@ -7,6 +7,16 @@ All notable changes to Quarkfoil are documented here. The project follows
 
 ### Added
 
+- `quarkfoil publish DECK --site TARGET` publishes a talk into a collection
+  that shares one player runtime and one content-addressed asset pool, with a
+  static listing page grouped by year, newest first. Identical figures are
+  stored once however many talks use them, while two different files with the
+  same name never collide. The deck's Markdown is published unchanged; the page
+  carries a map from its paths to the pool. `--site` takes a local directory or
+  an rsync destination such as `homepage:talks/`, in which case the pool is
+  pushed append-only and only the talk's own folder is mirrored. New front
+  matter: `date` (required to publish), `event`, and `unlisted`.
+
 - `quarkfoil pack DECK --output DIRECTORY` copies a presentation, its
   referenced figures, its bibliography, and its `assets.include` folders into a
   separate project folder that stays editable. The copy keeps the deck's own

@@ -89,12 +89,72 @@ def _pack(arguments: list[str]) -> int:
     return 0
 
 
+def _publish(arguments: list[str]) -> int:
+    from .publisher import PublishError, publish_index, publish_presentation
+
+    parser = argparse.ArgumentParser(
+        prog="quarkfoil publish",
+        description="Publish a presentation into a collection that shares one runtime and asset pool",
+    )
+    parser.add_argument("deck", nargs="?", type=Path, help="Markdown presentation to publish")
+    parser.add_argument(
+        "--site", required=True, metavar="TARGET",
+        help="collection directory, or an rsync destination such as host:talks/",
+    )
+    parser.add_argument("--name", help="Folder name for the talk (default: the deck's file name)")
+    parser.add_argument("--no-notes", action="store_true", help="Remove speaker notes from the published deck")
+    parser.add_argument(
+        "--trim-bibliography", action="store_true",
+        help="Keep only cited bibliography entries and their dependencies",
+    )
+    parser.add_argument("--index-only", action="store_true", help="Rebuild the listing without publishing a deck")
+    parser.add_argument("--no-index", action="store_true", help="Publish the deck without rebuilding the listing")
+    parser.add_argument("--index-title", help="Heading of the listing; remembered by the collection (default: Talks)")
+    parser.add_argument("--index-lede", help="Sentence under the listing heading; remembered by the collection")
+    parser.add_argument("--dry-run", action="store_true", help="Report what would be published, change nothing")
+    parser.add_argument("--rsync", default="rsync", help="rsync program to use for a remote site")
+    args = parser.parse_args(arguments)
+    if args.index_only and args.deck is not None:
+        parser.error("--index-only takes no deck")
+    if not args.index_only and args.deck is None:
+        parser.error("a deck is required unless --index-only is given")
+    try:
+        if args.index_only:
+            publish_index(
+                args.site, title=args.index_title, lede=args.index_lede,
+                dry_run=args.dry_run, rsync=args.rsync,
+            )
+        else:
+            meta = publish_presentation(
+                args.deck,
+                args.site,
+                name=args.name,
+                include_notes=not args.no_notes,
+                trim_bibliography=args.trim_bibliography,
+                index=not args.no_index,
+                index_title=args.index_title,
+                index_lede=args.index_lede,
+                dry_run=args.dry_run,
+                rsync=args.rsync,
+            )
+            print(f"Published {meta['title']} as {meta['slug']}/ ({meta['date']})")
+    except PublishError as error:
+        print(f"quarkfoil publish: {error}", file=sys.stderr)
+        return 1
+    except (FileNotFoundError, ValueError) as error:
+        print(f"quarkfoil publish: {error}", file=sys.stderr)
+        return 1
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     arguments = list(sys.argv[1:] if argv is None else argv)
     if arguments[:1] == ["export"]:
         return _export(arguments[1:])
     if arguments[:1] == ["pack"]:
         return _pack(arguments[1:])
+    if arguments[:1] == ["publish"]:
+        return _publish(arguments[1:])
     if arguments[:1] == ["deck"]:
         from .deck_cli import main as deck
 

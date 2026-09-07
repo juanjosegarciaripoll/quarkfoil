@@ -136,6 +136,33 @@ The distribution and command-line tool are named `quarkfoil`.
 - Keep `pack` and `export` as separate verbs. Their option sets, output kinds,
   and overwrite rules differ on purpose.
 
+### Publishing a collection
+
+- `quarkfoil publish DECK --site TARGET` adds a talk to a collection that shares
+  one runtime and one asset pool, with a generated listing. Keep it a separate
+  verb from `export` and `pack`: its output is a shared tree, not a folder that
+  stands alone.
+- Assets are content addressed. A name in `assets/f/` implies its bytes, which
+  is what makes deduplication exact, name collisions impossible, and the shared
+  half safe to push without ever deleting. Do not key the pool by file name.
+- The runtime lives in `assets/quarkfoil/<version>/` and is never replaced in
+  place; a new Quarkfoil version adds a folder so published talks keep working.
+- Published Markdown is never rewritten. The page carries a map from the deck's
+  own paths to the pool, resolved in `assetPath()` in `app/modules/player.js`.
+  A reference the renderer does not route through that resolver, such as an
+  image inside prose, gets a private copy beside the deck and a warning.
+- Each deck carries its own `meta.json`; the listing is rebuilt from those. The
+  collection has no central manifest to keep in sync, and its state lives with
+  the published site, so any machine can publish.
+- A published talk requires `date` in its front matter. Refuse to guess.
+- The listing is static HTML, generated at publish time. Do not make it depend
+  on JavaScript: it must be readable by search engines.
+- Remote targets are rsync destinations, read with rsync's own meanings.
+  Reaching a network host is a deliberate exception to the local-only rule,
+  explicit per invocation, with no credentials handled by Quarkfoil. Push the
+  pool append-only (`--ignore-existing`), mirror only the deck's own folder
+  (`--delete --delay-updates`), and never run `--delete` at the collection root.
+
 ## Dependencies and licensing
 
 Vendored browser dependencies are pinned and fetched without Node/npm:

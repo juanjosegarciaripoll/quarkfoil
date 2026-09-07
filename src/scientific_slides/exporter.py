@@ -386,16 +386,16 @@ def _third_party_notice(project: Path | None = None, references: set[str] | None
     return "\n\n---\n\n".join(sections) + "\n"
 
 
-def _resource_tags(assets: str) -> tuple[str, str, str]:
+def _resource_tags(assets: str, runtime: str = "quarkfoil") -> tuple[str, str, str]:
     if assets == "local":
         styles = "\n".join(
             (
-                '  <link rel="stylesheet" href="quarkfoil/vendor/reveal/reveal.css">',
-                '  <link rel="stylesheet" href="quarkfoil/vendor/katex/katex.min.css">',
+                f'  <link rel="stylesheet" href="{runtime}/vendor/reveal/reveal.css">',
+                f'  <link rel="stylesheet" href="{runtime}/vendor/katex/katex.min.css">',
             )
         )
         scripts = "\n".join(
-            f'  <script src="quarkfoil/vendor/{path}"></script>'
+            f'  <script src="{runtime}/vendor/{path}"></script>'
             for path in (
                 "reveal/reveal.js",
                 "reveal/notes.js",
@@ -424,8 +424,11 @@ def _index_html(
     metadata: dict[str, str],
     preview_path: str | None = None,
     embedded: str | None = None,
+    *,
+    runtime: str = "quarkfoil",
+    asset_map: str | None = None,
 ) -> str:
-    styles, scripts, external = _resource_tags(assets)
+    styles, scripts, external = _resource_tags(assets, runtime)
     # Reveal's notes plugin writes this pinned inline speaker-controller script
     # into its popup; the hash avoids enabling arbitrary inline JS.
     policy = (
@@ -464,6 +467,11 @@ def _index_html(
     embedded_tag = (
         f'  <script type="application/json" id="quarkfoil-source">{embedded}</script>\n' if embedded else ""
     )
+    # Published decks share one asset pool, so the deck's own paths are mapped
+    # to it here instead of being rewritten in the Markdown the player reads.
+    asset_tag = (
+        f'  <script type="application/json" id="quarkfoil-assets">{asset_map}</script>\n' if asset_map else ""
+    )
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -473,11 +481,11 @@ def _index_html(
   <meta http-equiv="Content-Security-Policy" content="{html.escape(policy, quote=True)}">
   <title>{title}</title>
 {metadata_tags}
-  <link rel="icon" href="quarkfoil/quarkfoil-mark.svg" type="image/svg+xml">
+  <link rel="icon" href="{runtime}/quarkfoil-mark.svg" type="image/svg+xml">
 {styles}
-  <link rel="stylesheet" href="quarkfoil/layout.css">
-  <link rel="stylesheet" href="quarkfoil/themes.css">
-  <link rel="stylesheet" href="quarkfoil/player.css">
+  <link rel="stylesheet" href="{runtime}/layout.css">
+  <link rel="stylesheet" href="{runtime}/themes.css">
+  <link rel="stylesheet" href="{runtime}/player.css">
 </head>
 <body>
   <button id="print-button" type="button" title="Print or save as PDF">Print / PDF</button>
@@ -485,8 +493,8 @@ def _index_html(
     <div id="slides" class="slides"></div>
   </main>
   <div id="loading" role="status">Loading presentation…</div>
-{embedded_tag}{scripts}
-  <script src="{PLAYER_BUNDLE}"></script>
+{embedded_tag}{asset_tag}{scripts}
+  <script src="{runtime}/player.js"></script>
 </body>
 </html>
 """

@@ -28,6 +28,9 @@ The supported preface fields are:
 | `author` | Presentation author metadata | Empty, except in a generated starter |
 | `subtitle` | Presentation description used by exported link-sharing metadata | Empty |
 | `description` | Explicit exported description; takes precedence over `subtitle` | Empty |
+| `date` | Date of the talk (`YYYY-MM-DD`), required to [publish](PUBLISH.md) it | Empty |
+| `event` | Occasion shown beside the date in a published listing | Empty |
+| `unlisted` | Publish the talk without listing it | `false` |
 | `aspect-ratio` | Intended slide aspect ratio | `16:9` |
 | `theme` | Default presentation theme (`scientific-light` or `scientific-dark`) | `scientific-light` |
 | `defaults.footer` | Markdown footer inherited by slides | Empty |

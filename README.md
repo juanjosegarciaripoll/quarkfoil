@@ -83,6 +83,16 @@ This gathers the presentation, its figures, and its bibliography into a new
 project folder that opens in the editor like any other. See the
 [packing guide](docs/PACK.md).
 
+## Publish a collection of talks
+
+```powershell
+quarkfoil publish path\to\presentation.md --site homepage:talks/
+```
+
+Many talks share one player and one pool of figures behind a generated listing,
+locally or on a web host over rsync. See the
+[publishing guide](docs/PUBLISH.md).
+
 ## Documentation
 
 - [Installation and command-line use](docs/INSTALLATION.md)
