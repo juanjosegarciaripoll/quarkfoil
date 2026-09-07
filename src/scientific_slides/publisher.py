@@ -338,6 +338,10 @@ def _copy_tree(source: Path, destination: Path, *, replace: bool) -> None:
 # that does not exist yet looks like.
 RSYNC_PARTIAL = 23
 
+# A published collection is served by a web server, so its modes must not
+# depend on the umask of whoever publishes, nor on a staging directory's.
+RSYNC_MODES = ("-rltpL", "--chmod=D755,F644")
+
 
 def _rsync(command: list[str], dry_run: bool, *, tolerate: tuple[int, ...] = (), quiet: bool = False) -> int:
     if shutil.which(command[0]) is None:
@@ -355,11 +359,28 @@ def _rsync(command: list[str], dry_run: bool, *, tolerate: tuple[int, ...] = (),
     return result.returncode
 
 
+def _ensure_root(target: Target, rsync: str) -> None:
+    """Create the collection folder itself.
+
+    rsync creates the last component of a destination but not the ones above
+    it, so the first publish into a new collection would fail on `.../assets`.
+    Sending an empty directory to the root first works on every rsync version,
+    unlike `--mkpath`, and adds nothing to an existing collection.
+    """
+    empty = Path(tempfile.mkdtemp(prefix=".quarkfoil-root-"))
+    try:
+        _rsync([rsync, *RSYNC_MODES, f"{empty}/", f"{target.raw}/"], False, quiet=True)
+    finally:
+        shutil.rmtree(empty, ignore_errors=True)
+
+
 def _push(staging: Path, target: Target, names: list[str], dry_run: bool, rsync: str) -> None:
     """Send the staged tree: the shared half append-only, each deck folder mirrored."""
-    base = [rsync, "-rltL", "--human-readable"]
+    base = [rsync, *RSYNC_MODES, "--human-readable"]
     if dry_run:
         base += ["--dry-run", "--itemize-changes"]
+    else:
+        _ensure_root(target, rsync)
     if (staging / ASSETS_DIR).is_dir():
         _rsync(base + ["--ignore-existing", f"{staging / ASSETS_DIR}/", f"{target.child(ASSETS_DIR)}/"], dry_run)
     for name in names:

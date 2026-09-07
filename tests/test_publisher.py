@@ -209,15 +209,20 @@ class RemotePublishTests(unittest.TestCase):
              mock.patch("scientific_slides.publisher.subprocess.run", side_effect=fake_run):
             publish_presentation(self.deck, "homepage:talks/", index=False)
 
-        self.assertEqual(len(calls), 2)
-        assets, deck = calls
+        self.assertEqual(len(calls), 3)
+        root, assets, deck = calls
+        self.assertTrue(root[-1].endswith("homepage:talks/"))
+        self.assertNotIn("--delete", root)
         self.assertIn("--ignore-existing", assets)
         self.assertNotIn("--delete", assets)
         self.assertTrue(assets[-1].endswith("homepage:talks/assets/"))
         self.assertIn("--delete", deck)
         self.assertIn("--delay-updates", deck)
         self.assertTrue(deck[-1].endswith("homepage:talks/lecture/"))
-        self.assertIn("-rltL", deck)
+        self.assertIn("-rltpL", deck)
+        # a web server has to be able to read what was published
+        for command in calls:
+            self.assertIn("--chmod=D755,F644", command)
 
     def test_a_missing_rsync_is_reported_clearly(self) -> None:
         with mock.patch("scientific_slides.publisher.shutil.which", return_value=None):
