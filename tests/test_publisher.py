@@ -285,3 +285,53 @@ class CollectionSettingsTests(unittest.TestCase):
         self.assertEqual(
             json.loads((self.site / "collection.json").read_text(encoding="utf-8"))["title"], "Seminars"
         )
+
+
+class FirstPublishTests(unittest.TestCase):
+    """A collection that does not exist yet reads as empty, not as a failure."""
+
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory()
+        self.root = Path(self.temporary.name)
+        (self.root / "figures").mkdir()
+        (self.root / "figures" / "diagram.svg").write_text("<svg/>", encoding="utf-8")
+        self.deck = self.root / "lecture.md"
+        self.deck.write_text(
+            DECK.format(title="First", description="d", event="e", date="2026-01-02"), encoding="utf-8",
+        )
+
+    def tearDown(self) -> None:
+        self.temporary.cleanup()
+
+    def _rsync(self, missing: bool):
+        def run(command, capture_output=False, text=False):
+            reading = "--list-only" in command or "--include=meta.json" in command or "--ignore-missing-args" in command
+            code = 23 if reading and missing else 0
+            return mock.Mock(returncode=code, stdout="", stderr="No such file or directory")
+        return run
+
+    def test_a_dry_run_against_a_new_collection_succeeds(self) -> None:
+        with mock.patch("scientific_slides.publisher.shutil.which", return_value="/usr/bin/rsync"), \
+             mock.patch("scientific_slides.publisher.subprocess.run", side_effect=self._rsync(missing=True)):
+            meta = publish_presentation(self.deck, "homepage:talks/", dry_run=True)
+        self.assertEqual(meta["slug"], "lecture")
+
+    def test_an_unreadable_collection_never_blanks_its_listing(self) -> None:
+        calls = []
+
+        def run(command, capture_output=False, text=False):
+            calls.append(command)
+            reading = "--include=meta.json" in command or "--ignore-missing-args" in command
+            listing = "--list-only" in command
+            if reading:
+                return mock.Mock(returncode=23, stdout="", stderr="connection dropped")
+            if listing:  # the collection does have an index.html already
+                return mock.Mock(returncode=0, stdout="index.html", stderr="")
+            return mock.Mock(returncode=0, stdout="", stderr="")
+
+        with mock.patch("scientific_slides.publisher.shutil.which", return_value="/usr/bin/rsync"), \
+             mock.patch("scientific_slides.publisher.subprocess.run", side_effect=run):
+            self.assertEqual(publish_index("homepage:talks/"), 0)
+
+        self.assertFalse(any(str(command[-1]).endswith("talks/index.html") and "--list-only" not in command
+                             for command in calls))

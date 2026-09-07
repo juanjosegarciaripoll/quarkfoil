@@ -334,19 +334,25 @@ def _copy_tree(source: Path, destination: Path, *, replace: bool) -> None:
         shutil.copy2(entry, target)  # follows the staged symlink
 
 
-def _rsync(command: list[str], dry_run: bool) -> None:
+# rsync reports a missing source with 23, which is what reading a collection
+# that does not exist yet looks like.
+RSYNC_PARTIAL = 23
+
+
+def _rsync(command: list[str], dry_run: bool, *, tolerate: tuple[int, ...] = (), quiet: bool = False) -> int:
     if shutil.which(command[0]) is None:
         raise PublishError(
             f"{command[0]} is required to publish to a remote target; install it or use a local --site"
         )
-    printable = " ".join(command)
-    print(f"  {printable}")
+    if not quiet:
+        print(f"  {' '.join(command)}")
     result = subprocess.run(command, capture_output=True, text=True)
-    if result.returncode != 0:
+    if result.returncode != 0 and result.returncode not in tolerate:
         raise PublishError(f"rsync failed ({result.returncode}): {result.stderr.strip()}")
     if dry_run and result.stdout.strip():
         for line in result.stdout.splitlines()[:20]:
             print(f"    {line}")
+    return result.returncode
 
 
 def _push(staging: Path, target: Target, names: list[str], dry_run: bool, rsync: str) -> None:
@@ -424,17 +430,26 @@ def publish_presentation(
 # --------------------------------------------------------------------- index
 
 
-def _gather(target: Target, rsync: str) -> list[dict[str, object]]:
-    """Read every published deck's own metadata; the collection needs no manifest."""
+def _gather(target: Target, rsync: str) -> tuple[list[dict[str, object]], bool]:
+    """Read every published deck's own metadata; the collection needs no manifest.
+
+    Returns the entries and whether the collection could be read at all: a
+    target that does not exist yet reads as empty, which is not the same as a
+    collection whose listing must not be replaced by an empty one.
+    """
     entries: list[dict[str, object]] = []
+    complete = True
     if target.remote:
         temporary = Path(tempfile.mkdtemp(prefix=".quarkfoil-index-"))
         try:
-            _rsync(
+            code = _rsync(
                 [rsync, "-rm", "--include=*/", f"--include={META_NAME}", "--exclude=*",
                  f"{target.raw}/", f"{temporary}/"],
                 False,
+                tolerate=(RSYNC_PARTIAL,),
+                quiet=True,
             )
+            complete = code == 0
             files = sorted(temporary.rglob(META_NAME))
             entries = [json.loads(path.read_text(encoding="utf-8")) for path in files]
         finally:
@@ -442,7 +457,16 @@ def _gather(target: Target, rsync: str) -> list[dict[str, object]]:
     elif target.path.is_dir():
         for path in sorted(target.path.glob(f"*/{META_NAME}")):
             entries.append(json.loads(path.read_text(encoding="utf-8")))
-    return [entry for entry in entries if not entry.get("unlisted")]
+    return [entry for entry in entries if not entry.get("unlisted")], complete
+
+
+def _has(target: Target, name: str, rsync: str) -> bool:
+    """Whether the collection already holds *name*, without fetching it."""
+    if not target.remote:
+        return (target.path / name).exists()
+    return _rsync(
+        [rsync, "--list-only", f"{target.raw}/{name}"], False, tolerate=(RSYNC_PARTIAL,), quiet=True
+    ) == 0
 
 
 def _human_date(value: str) -> str:
@@ -595,6 +619,8 @@ def _settings(target: Target, rsync: str) -> dict[str, str]:
         _rsync(
             [rsync, "-q", "--ignore-missing-args", f"{target.raw}/{SETTINGS_NAME}", f"{temporary}/"],
             False,
+            tolerate=(RSYNC_PARTIAL,),
+            quiet=True,
         )
         path = temporary / SETTINGS_NAME
         return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
@@ -620,7 +646,10 @@ def publish_index(
         "title": title or str(settings.get("title") or "Talks"),
         "lede": lede if lede is not None else str(settings.get("lede") or ""),
     }
-    entries = _gather(target, rsync)
+    entries, complete = _gather(target, rsync)
+    if not entries and not complete and _has(target, INDEX_NAME, rsync):
+        print("  warning: the collection could not be read; its listing is left unchanged")
+        return 0
     page = index_page(entries, resolved["title"], resolved["lede"])
     staging = Path(tempfile.mkdtemp(prefix=".quarkfoil-index-"))
     try:
