@@ -340,3 +340,44 @@ class FirstPublishTests(unittest.TestCase):
 
         self.assertFalse(any(str(command[-1]).endswith("talks/index.html") and "--list-only" not in command
                              for command in calls))
+
+
+class PublishedNotesTests(unittest.TestCase):
+    """A published deck's Markdown is public, so its notes are opt-in."""
+
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory()
+        self.root = Path(self.temporary.name)
+        (self.root / "figures").mkdir()
+        (self.root / "figures" / "diagram.svg").write_text("<svg/>", encoding="utf-8")
+        self.deck = self.root / "lecture.md"
+        self.deck.write_text(
+            DECK.format(title="Noted", description="d", event="e", date="2026-03-04")
+            + "\n::: notes\nRemember the derivation.\n:::\n",
+            encoding="utf-8",
+        )
+        self.site = self.root / "talks"
+
+    def tearDown(self) -> None:
+        self.temporary.cleanup()
+
+    def published(self) -> str:
+        return (self.site / "lecture" / "presentation.md").read_text(encoding="utf-8")
+
+    def test_notes_are_left_out_by_default(self) -> None:
+        publish_presentation(self.deck, str(self.site))
+
+        self.assertNotIn("Remember the derivation", self.published())
+        self.assertIn("Remember the derivation", self.deck.read_text(encoding="utf-8"))
+
+    def test_notes_are_published_when_asked_for(self) -> None:
+        publish_presentation(self.deck, str(self.site), include_notes=True)
+
+        self.assertIn("Remember the derivation", self.published())
+
+    def test_the_command_line_keeps_them_out_unless_notes_is_given(self) -> None:
+        self.assertEqual(main(["publish", str(self.deck), "--site", str(self.site)]), 0)
+        self.assertNotIn("Remember the derivation", self.published())
+
+        self.assertEqual(main(["publish", str(self.deck), "--site", str(self.site), "--notes"]), 0)
+        self.assertIn("Remember the derivation", self.published())

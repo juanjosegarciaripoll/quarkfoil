@@ -77,6 +77,21 @@ them, and editing that file changes the page on the next publish.
 Use `--index-only` to rebuild the listing without publishing a deck, and
 `--no-index` to publish a deck without touching it.
 
+## Speaker notes are left out
+
+A published deck's `presentation.md` is a file anyone can open, and speaker
+notes are written for the presenter, so publishing omits them. The deck on
+disk is untouched: only the published copy loses them, and the notes you
+present from stay where they are.
+
+Add `--notes` to publish them anyway, which also restores Reveal.js's speaker
+view on the published page. `--no-notes` is accepted and is the default.
+
+This is the one place `publish` deliberately differs from
+[`export`](EXPORT.md), which keeps notes unless `--no-notes` is given: an
+export is a folder you hand to someone, while publishing puts the deck at a
+public URL.
+
 ## Publishing to a web host
 
 A remote `--site` is an ordinary rsync destination:

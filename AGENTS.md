@@ -155,6 +155,9 @@ The distribution and command-line tool are named `quarkfoil`.
   collection has no central manifest to keep in sync, and its state lives with
   the published site, so any machine can publish.
 - A published talk requires `date` in its front matter. Refuse to guess.
+- Publishing omits speaker notes unless `--notes` is given, unlike `export`.
+  The published Markdown is world-readable, so exposing the presenter's notes
+  must be the case someone asks for, not the default.
 - The listing is static HTML, generated at publish time. Do not make it depend
   on JavaScript: it must be readable by search engines.
 - Remote targets are rsync destinations, read with rsync's own meanings.

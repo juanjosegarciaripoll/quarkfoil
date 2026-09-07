@@ -16,6 +16,7 @@ All notable changes to Quarkfoil are documented here. The project follows
   an rsync destination such as `homepage:talks/`, in which case the pool is
   pushed append-only and only the talk's own folder is mirrored. New front
   matter: `date` (required to publish), `event`, and `unlisted`.
+  Speaker notes are left out of a published deck unless `--notes` is given.
 
 - `quarkfoil pack DECK --output DIRECTORY` copies a presentation, its
   referenced figures, its bibliography, and its `assets.include` folders into a

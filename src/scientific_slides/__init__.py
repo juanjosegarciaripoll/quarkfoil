@@ -102,7 +102,15 @@ def _publish(arguments: list[str]) -> int:
         help="collection directory, or an rsync destination such as host:talks/",
     )
     parser.add_argument("--name", help="Folder name for the talk (default: the deck's file name)")
-    parser.add_argument("--no-notes", action="store_true", help="Remove speaker notes from the published deck")
+    notes = parser.add_mutually_exclusive_group()
+    notes.add_argument(
+        "--notes", dest="notes", action="store_true", default=False,
+        help="Publish the speaker notes too; they are readable by anyone",
+    )
+    notes.add_argument(
+        "--no-notes", dest="notes", action="store_false",
+        help="Leave the speaker notes out of the published deck (default)",
+    )
     parser.add_argument(
         "--trim-bibliography", action="store_true",
         help="Keep only cited bibliography entries and their dependencies",
@@ -129,7 +137,7 @@ def _publish(arguments: list[str]) -> int:
                 args.deck,
                 args.site,
                 name=args.name,
-                include_notes=not args.no_notes,
+                include_notes=args.notes,
                 trim_bibliography=args.trim_bibliography,
                 index=not args.no_index,
                 index_title=args.index_title,

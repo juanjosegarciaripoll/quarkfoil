@@ -418,7 +418,7 @@ def publish_presentation(
     site: str,
     *,
     name: str | None = None,
-    include_notes: bool = True,
+    include_notes: bool = False,
     trim_bibliography: bool = False,
     index: bool = True,
     index_title: str | None = None,
@@ -426,7 +426,11 @@ def publish_presentation(
     dry_run: bool = False,
     rsync: str = "rsync",
 ) -> dict[str, object]:
-    """Publish *deck* into the collection at *site*, sharing its runtime and assets."""
+    """Publish *deck* into the collection at *site*, sharing its runtime and assets.
+
+    Speaker notes are left out unless asked for: a published deck's Markdown is
+    a public file, and its notes are written for the presenter.
+    """
     target = Target.parse(site)
     print(f"Publishing to {target.description}")
     staging = Path(tempfile.mkdtemp(prefix=".quarkfoil-publish-"))
