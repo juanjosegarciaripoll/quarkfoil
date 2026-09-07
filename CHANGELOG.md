@@ -5,6 +5,17 @@ All notable changes to Quarkfoil are documented here. The project follows
 
 ## [Unreleased]
 
+### Added
+
+- `quarkfoil pack DECK --output DIRECTORY` copies a presentation, its
+  referenced figures, its bibliography, and its `assets.include` folders into a
+  separate project folder that stays editable. The copy keeps the deck's own
+  file name and contains no player, browser library, or `index.html`, so it
+  opens in the editor like any other presentation. `--no-notes` and
+  `--trim-bibliography` work as in `export`, an existing destination is reused
+  with unrelated files kept, and a destination file that differs is reported as
+  a conflict rather than overwritten unless `--force` is given.
+
 ### Fixed
 
 - Open exported presentations directly from the file system. The exported

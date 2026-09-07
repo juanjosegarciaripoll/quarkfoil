@@ -98,6 +98,18 @@ Add `--cdn` for a smaller, network-dependent export. See the
 [static export guide](EXPORT.md) for the generated structure, deployment, and
 security trade-offs.
 
+## Copy a presentation project
+
+To move or hand over a presentation you intend to keep editing, copy it with
+its figures and bibliography into a new project folder:
+
+```console
+quarkfoil pack lecture.md --output ~/talks/cern-2026
+```
+
+The result is source, not a website, and opens like any other presentation.
+See the [packing guide](PACK.md).
+
 To let a coding assistant make safe, structured slide changes, follow
 [Use Quarkfoil with an AI assistant](AGENT_CLI.md). No additional plugin or
 service is required beyond an assistant that can run local terminal commands.

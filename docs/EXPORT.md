@@ -4,6 +4,9 @@ Quarkfoil can turn a presentation project into a presentation-only website.
 The exported site has no editor, Python server, saving API, or cloud
 dependency and can be hosted by any ordinary static web server.
 
+To copy a presentation into another folder and go on editing it there, use
+[`quarkfoil pack`](PACK.md) instead.
+
 ## Self-contained export
 
 Local assets are the default and are recommended for teaching, archiving, and

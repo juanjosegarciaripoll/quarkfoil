@@ -118,8 +118,23 @@ The distribution and command-line tool are named `quarkfoil`.
 - Verify CDN bytes against the corresponding vendored files before changing
   URLs or integrity generation.
 - Both export strategies include `THIRD_PARTY_LICENSES.txt`.
-- Exported folders are meant to be served over HTTP; reliable `file://`
-  operation is not currently promised.
+
+### Project packing
+
+- `quarkfoil pack DECK --output DIRECTORY` copies a presentation and the assets
+  it references into a separate editable project, not a website. It writes the
+  deck under its own name and adds no player, library, `index.html`, or notice
+  file.
+- Packing shares the export asset rules: the same references, `assets.include`
+  folders, bibliography, `--no-notes`, and `--trim-bibliography` behavior, and
+  the same presentation-directory boundary.
+- Pack through a temporary sibling and publish only after success. An existing
+  destination is reused and unrelated files in it survive, but a destination
+  file whose content differs is a conflict reported by path; only `--force`
+  replaces it. The destination may be neither an existing file nor the
+  presentation's own directory.
+- Keep `pack` and `export` as separate verbs. Their option sets, output kinds,
+  and overwrite rules differ on purpose.
 
 ## Dependencies and licensing
 

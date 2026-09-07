@@ -46,6 +46,7 @@ nav:
       - Use with AI assistants: AGENT_CLI.md
       - Editor: USER_GUIDE.md
       - Export a static website: EXPORT.md
+      - Pack a project folder: PACK.md
       - Presentation format: FORMAT.md
   - Reference:
       - Security: SECURITY.md

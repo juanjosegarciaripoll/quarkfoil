@@ -213,6 +213,23 @@ def _publish(temporary: Path, destination: Path) -> None:
     temporary.rmdir()
 
 
+def _pack_conflicts(source: Path, destination: Path, relative: Path = Path()) -> list[str]:
+    """Return the destination entries a pack would replace with different content."""
+    conflicts: list[str] = []
+    for entry in sorted(source.iterdir()):
+        target = destination / entry.name
+        location = relative / entry.name
+        if not target.exists() and not target.is_symlink():
+            continue
+        if target.is_symlink() or entry.is_dir() != target.is_dir():
+            conflicts.append(location.as_posix())
+        elif entry.is_dir():
+            conflicts.extend(_pack_conflicts(entry, target, location))
+        elif entry.read_bytes() != target.read_bytes():
+            conflicts.append(location.as_posix())
+    return conflicts
+
+
 def _asset_references(source: str) -> set[str]:
     references = set()
     values = [match.group(1) for match in ASSET_PATTERN.finditer(source)]
@@ -594,6 +611,49 @@ def export_presentation(
         )
         if preview_path:
             _create_preview(temporary, preview_path)
+        _publish(temporary, destination)
+    except Exception:
+        shutil.rmtree(temporary, ignore_errors=True)
+        raise
+    return destination
+
+
+def pack_presentation(
+    deck: Path,
+    output: Path,
+    *,
+    include_notes: bool = True,
+    trim_bibliography: bool = False,
+    force: bool = False,
+) -> Path:
+    """Copy *deck* and the assets it uses into a separate editable project folder."""
+    resolved = deck.resolve()
+    if not resolved.is_file():
+        raise FileNotFoundError(f"Presentation not found: {resolved}")
+    if resolved.suffix.lower() not in {".md", ".markdown"}:
+        raise ValueError("Presentation source must be Markdown")
+
+    destination = output.resolve()
+    if destination.exists() and not destination.is_dir():
+        raise FileExistsError(f"Pack destination is not a directory: {destination}")
+    if destination == resolved.parent:
+        raise ValueError("Pack destination is the presentation directory; choose another folder")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    source = resolved.read_text(encoding="utf-8")
+    if not include_notes:
+        source = _without_speaker_notes(source)
+
+    temporary = Path(tempfile.mkdtemp(prefix=f".{destination.name}-", dir=destination.parent))
+    try:
+        (temporary / resolved.name).write_text(source, encoding="utf-8")
+        _copy_project_assets(resolved, source, temporary, trim_bibliography=trim_bibliography)
+        if destination.exists() and not force:
+            conflicts = _pack_conflicts(temporary, destination)
+            if conflicts:
+                listing = ", ".join(conflicts[:5]) + (", ..." if len(conflicts) > 5 else "")
+                raise FileExistsError(
+                    "Destination already holds different files; pass --force to replace them: " + listing
+                )
         _publish(temporary, destination)
     except Exception:
         shutil.rmtree(temporary, ignore_errors=True)

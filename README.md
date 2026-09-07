@@ -73,6 +73,16 @@ server. Add `--cdn` to reference exact, integrity-checked jsDelivr packages
 instead of copying the browser libraries. See the
 [export guide](docs/EXPORT.md) for details.
 
+## Copy a project you keep editing
+
+```powershell
+quarkfoil pack path\to\presentation.md --output presentation-copy
+```
+
+This gathers the presentation, its figures, and its bibliography into a new
+project folder that opens in the editor like any other. See the
+[packing guide](docs/PACK.md).
+
 ## Documentation
 
 - [Installation and command-line use](docs/INSTALLATION.md)

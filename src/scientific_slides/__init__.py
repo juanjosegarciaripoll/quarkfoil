@@ -48,10 +48,53 @@ def _export(arguments: list[str]) -> int:
     return 0
 
 
+def _pack(arguments: list[str]) -> int:
+    from .exporter import pack_presentation
+
+    parser = argparse.ArgumentParser(
+        prog="quarkfoil pack",
+        description="Copy a Quarkfoil presentation and its assets into an editable project folder",
+    )
+    parser.add_argument("deck", type=Path, help="Markdown presentation to pack")
+    parser.add_argument("--output", "-o", type=Path, required=True, help="Directory to create or update")
+    parser.add_argument(
+        "--no-notes",
+        action="store_true",
+        help="Remove speaker notes from the packed presentation",
+    )
+    parser.add_argument(
+        "--trim-bibliography",
+        action="store_true",
+        help="Keep only cited bibliography entries and their dependencies",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Replace destination files that differ from the packed ones",
+    )
+    args = parser.parse_args(arguments)
+    try:
+        destination = pack_presentation(
+            args.deck,
+            args.output,
+            include_notes=not args.no_notes,
+            trim_bibliography=args.trim_bibliography,
+            force=args.force,
+        )
+    except (FileExistsError, FileNotFoundError, ValueError) as error:
+        print(f"quarkfoil pack: {error}", file=sys.stderr)
+        return 1
+    print(f"Packed Quarkfoil presentation into {destination}")
+    print(f"Keep editing it with: quarkfoil {destination / args.deck.name}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     arguments = list(sys.argv[1:] if argv is None else argv)
     if arguments[:1] == ["export"]:
         return _export(arguments[1:])
+    if arguments[:1] == ["pack"]:
+        return _pack(arguments[1:])
     if arguments[:1] == ["deck"]:
         from .deck_cli import main as deck
 
