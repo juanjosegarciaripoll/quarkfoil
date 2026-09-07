@@ -233,6 +233,16 @@ Run all Python tests:
 uv run python -m unittest discover -s tests -v
 ```
 
+macOS hands out temporary directories under a symlink, so a test that compares
+a returned, resolved path against one built from `tempfile` passes on Linux and
+fails there. Resolve the temporary root in the test, and reproduce that
+platform locally by pointing `TMPDIR` at a symlink:
+
+```console
+mkdir /tmp/real && ln -s real /tmp/link
+TMPDIR=/tmp/link uv run python -m unittest discover -s tests
+```
+
 Run the browser self-test on Windows with Microsoft Edge available:
 
 ```console

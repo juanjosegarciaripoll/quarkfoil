@@ -36,7 +36,7 @@ date: {date}
 class PublisherTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
-        self.root = Path(self.temporary.name)
+        self.root = Path(self.temporary.name).resolve()
         self.site = self.root / "talks"
         self.project = self.root / "project"
         (self.project / "figures").mkdir(parents=True)
@@ -189,7 +189,7 @@ class TargetTests(unittest.TestCase):
 class RemotePublishTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
-        self.root = Path(self.temporary.name)
+        self.root = Path(self.temporary.name).resolve()
         (self.root / "figures").mkdir()
         (self.root / "figures" / "diagram.svg").write_text("<svg/>", encoding="utf-8")
         self.deck = self.root / "lecture.md"
@@ -236,7 +236,7 @@ class RemotePublishTests(unittest.TestCase):
 class PublishCommandTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
-        self.root = Path(self.temporary.name)
+        self.root = Path(self.temporary.name).resolve()
         (self.root / "figures").mkdir()
         (self.root / "figures" / "diagram.svg").write_text("<svg/>", encoding="utf-8")
         self.deck = self.root / "lecture.md"
@@ -265,7 +265,7 @@ if __name__ == "__main__":
 class CollectionSettingsTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
-        self.root = Path(self.temporary.name)
+        self.root = Path(self.temporary.name).resolve()
         (self.root / "figures").mkdir()
         (self.root / "figures" / "diagram.svg").write_text("<svg/>", encoding="utf-8")
         self.deck = self.root / "lecture.md"
@@ -299,7 +299,7 @@ class FirstPublishTests(unittest.TestCase):
 
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
-        self.root = Path(self.temporary.name)
+        self.root = Path(self.temporary.name).resolve()
         (self.root / "figures").mkdir()
         (self.root / "figures" / "diagram.svg").write_text("<svg/>", encoding="utf-8")
         self.deck = self.root / "lecture.md"
@@ -349,7 +349,7 @@ class PublishedNotesTests(unittest.TestCase):
 
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
-        self.root = Path(self.temporary.name)
+        self.root = Path(self.temporary.name).resolve()
         (self.root / "figures").mkdir()
         (self.root / "figures" / "diagram.svg").write_text("<svg/>", encoding="utf-8")
         self.deck = self.root / "lecture.md"
@@ -406,7 +406,7 @@ series-description: {series_description}
 class SeriesTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
-        self.root = Path(self.temporary.name)
+        self.root = Path(self.temporary.name).resolve()
         (self.root / "figures").mkdir()
         (self.root / "figures" / "diagram.svg").write_text("<svg/>", encoding="utf-8")
         self.site = self.root / "talks"

@@ -15,7 +15,7 @@ from scientific_slides.exporter import _asset_references, _preview_command, expo
 class ExporterTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
-        self.root = Path(self.temporary.name)
+        self.root = Path(self.temporary.name).resolve()
         self.project = self.root / "project"
         figures = self.project / "figures"
         figures.mkdir(parents=True)
