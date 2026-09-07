@@ -77,6 +77,46 @@ them, and editing that file changes the page on the next publish.
 Use `--index-only` to rebuild the listing without publishing a deck, and
 `--no-index` to publish a deck without touching it.
 
+## A course is one entry, not nine
+
+A talk that belongs to a course, a school, or any other run of related talks
+names it:
+
+```yaml
+series: Quantum Simulation Platforms
+part: 3
+series-description: Nine lectures on the platforms that simulate quantum matter.
+```
+
+The listing then shows **one card for the series** — its name, the occasion,
+how many talks it holds, and the range of dates — instead of burying single
+talks under nine siblings. The card links to a page of its own at
+`series/<name>/`, which lists the talks in the order they were given: by
+`part` when every member has one, and by date otherwise.
+
+`series-description` is read from whichever member defines it first, so it
+need not be repeated in each deck. A series is filed under the year of its
+most recent talk, so one that runs across New Year appears once. `series` is
+the only field needed; `part` and `series-description` are optional.
+
+The pages under `series/` are regenerated from the talks on every publish, so
+a series whose talks are gone loses its page. A talk may not be named
+`series`, which is reserved for them.
+
+## Publishing a course in one go
+
+Several decks can be published together, which is how a course is meant to go
+up:
+
+```console
+quarkfoil publish presentations/0*.md --site homepage:talks/
+```
+
+They are staged as one collection update: the shared figures cross the wire
+once for the whole course rather than once per lecture, and the listing is
+rebuilt a single time at the end. Each deck's folder is named after its file;
+`--name` renames one, and so applies only when publishing a single deck.
+
 ## Speaker notes are left out
 
 A published deck's `presentation.md` is a file anyone can open, and speaker

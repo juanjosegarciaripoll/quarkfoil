@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
@@ -10,6 +11,7 @@ from unittest import mock
 from scientific_slides import main
 from scientific_slides.publisher import (
     PublishError,
+    publish_presentations,
     Target,
     index_page,
     publish_index,
@@ -381,3 +383,109 @@ class PublishedNotesTests(unittest.TestCase):
 
         self.assertEqual(main(["publish", str(self.deck), "--site", str(self.site), "--notes"]), 0)
         self.assertIn("Remember the derivation", self.published())
+
+
+SERIES_DECK = """---
+title: {title}
+description: {description}
+event: {event}
+date: {date}
+series: {series}
+part: {part}
+series-description: {series_description}
+---
+
+## Slide {{.layout-1}}
+
+::: core
+![](figures/diagram.svg){{fit=contain}}
+:::
+"""
+
+
+class SeriesTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory()
+        self.root = Path(self.temporary.name)
+        (self.root / "figures").mkdir()
+        (self.root / "figures" / "diagram.svg").write_text("<svg/>", encoding="utf-8")
+        self.site = self.root / "talks"
+        self.decks = []
+        for number, (day, title) in enumerate(((8, "Why quantum simulation"), (12, "Cold atoms")), start=1):
+            deck = self.root / f"0{number}-lecture.md"
+            deck.write_text(
+                SERIES_DECK.format(
+                    title=title, description=f"Lecture {number}.", event="CERN, Geneva",
+                    date=f"2026-06-{day:02d}", series="Quantum Simulation Platforms", part=number,
+                    series_description="Nine lectures on simulating matter.",
+                ),
+                encoding="utf-8",
+            )
+            self.decks.append(deck)
+        self.single = self.root / "seminar.md"
+        self.single.write_text(
+            DECK.format(title="A single seminar", description="One off.", event="Madrid", date="2026-09-07"),
+            encoding="utf-8",
+        )
+
+    def tearDown(self) -> None:
+        self.temporary.cleanup()
+
+    def test_several_decks_publish_together(self) -> None:
+        published = publish_presentations(self.decks, str(self.site))
+
+        self.assertEqual([meta["slug"] for meta in published], ["01-lecture", "02-lecture"])
+        for slug in ("01-lecture", "02-lecture"):
+            self.assertTrue((self.site / slug / "index.html").is_file())
+        # the shared figure is stored once for the whole series
+        self.assertEqual(len(sorted((self.site / "assets" / "f").rglob("*.svg"))), 1)
+
+    def test_a_series_is_one_card_linking_to_its_own_page(self) -> None:
+        publish_presentations(self.decks + [self.single], str(self.site))
+
+        page = (self.site / "index.html").read_text(encoding="utf-8")
+        self.assertIn('href="series/quantum-simulation-platforms/"', page)
+        self.assertIn("Quantum Simulation Platforms", page)
+        self.assertIn("2 talks · 8–12 June", page)
+        self.assertIn("Nine lectures on simulating matter.", page)
+        self.assertIn("A single seminar", page)
+        # the members are not also listed at the top level
+        self.assertNotIn('href="01-lecture/"', page)
+        self.assertNotIn("<script", page)
+
+    def test_the_series_page_lists_its_talks_in_order(self) -> None:
+        publish_presentations(self.decks, str(self.site))
+
+        page = (self.site / "series" / "quantum-simulation-platforms" / "index.html").read_text(encoding="utf-8")
+        self.assertLess(page.index("Why quantum simulation"), page.index("Cold atoms"))
+        self.assertIn('href="../../01-lecture/"', page)
+        self.assertIn("CERN, Geneva · 8–12 June", page)
+        self.assertNotIn("<script", page)
+
+    def test_the_series_is_filed_under_its_latest_year(self) -> None:
+        older = self.root / "00-older.md"
+        older.write_text(
+            SERIES_DECK.format(title="Older", description="d", event="CERN, Geneva", date="2025-11-30",
+                               series="Quantum Simulation Platforms", part=0,
+                               series_description="Nine lectures on simulating matter."),
+            encoding="utf-8",
+        )
+        publish_presentations(self.decks + [older], str(self.site))
+
+        page = (self.site / "index.html").read_text(encoding="utf-8")
+        self.assertIn("<h2>2026</h2>", page)
+        self.assertNotIn("<h2>2025</h2>", page)
+
+    def test_series_pages_of_removed_series_do_not_survive(self) -> None:
+        publish_presentations(self.decks, str(self.site))
+        self.assertTrue((self.site / "series" / "quantum-simulation-platforms").is_dir())
+
+        for slug in ("01-lecture", "02-lecture"):
+            shutil.rmtree(self.site / slug)
+        publish_index(str(self.site))
+
+        self.assertFalse((self.site / "series" / "quantum-simulation-platforms").exists())
+
+    def test_a_deck_may_not_be_named_series(self) -> None:
+        with self.assertRaises(PublishError):
+            publish_presentations([self.single], str(self.site), names=["series"])

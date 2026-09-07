@@ -31,6 +31,9 @@ The supported preface fields are:
 | `date` | Date of the talk (`YYYY-MM-DD`), required to [publish](PUBLISH.md) it | Empty |
 | `event` | Occasion shown beside the date in a published listing | Empty |
 | `unlisted` | Publish the talk without listing it | `false` |
+| `series` | Course or school this talk belongs to; groups it in a published listing | Empty |
+| `part` | Position within the series, used to order it | Empty |
+| `series-description` | Sentence describing the series, read from any member | Empty |
 | `aspect-ratio` | Intended slide aspect ratio | `16:9` |
 | `theme` | Default presentation theme (`scientific-light` or `scientific-dark`) | `scientific-light` |
 | `defaults.footer` | Markdown footer inherited by slides | Empty |

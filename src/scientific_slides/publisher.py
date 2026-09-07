@@ -10,6 +10,7 @@ import os
 import re
 import shutil
 import subprocess
+import unicodedata
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -36,6 +37,7 @@ ASSETS_DIR = "assets"
 RUNTIME_DIR = f"{ASSETS_DIR}/quarkfoil"
 POOL_DIR = f"{ASSETS_DIR}/f"
 MARK_FILE = f"{ASSETS_DIR}/quarkfoil-mark.svg"
+SERIES_DIR = "series"
 META_NAME = "meta.json"
 INDEX_NAME = "index.html"
 SETTINGS_NAME = "collection.json"
@@ -96,11 +98,19 @@ class Target:
         return Path(self.raw)
 
 
+def _slugify(value: str, fallback: str) -> str:
+    ascii_value = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
+    cleaned = re.sub(r"[^\w.-]+", "-", ascii_value.strip().lower()).strip("-.")
+    return cleaned or fallback
+
+
 def _slug(deck: Path, name: str | None) -> str:
     candidate = name or deck.stem
     cleaned = re.sub(r"[^\w.-]+", "-", candidate.strip()).strip("-.")
     if not cleaned:
         raise PublishError(f"Cannot derive a folder name from {candidate!r}; pass --name")
+    if cleaned == SERIES_DIR:
+        raise PublishError(f"{SERIES_DIR!r} is reserved for series pages; pass a different --name")
     return cleaned
 
 
@@ -287,6 +297,8 @@ def _stage_deck(
     }
     date = _date(front.get("date"), resolved)
     event = _metadata_text(front.get("event"))
+    series = _metadata_text(front.get("series"))
+    part = front.get("part")
     (folder / INDEX_NAME).write_text(
         _index_html(
             "local",
@@ -308,6 +320,10 @@ def _stage_deck(
         "author": metadata["author"],
         "event": event,
         "date": date,
+        "series": series,
+        "series_slug": _slugify(series, "series") if series else "",
+        "series_description": _metadata_text(front.get("series-description")),
+        "part": int(part) if isinstance(part, int) or (isinstance(part, str) and part.isdigit()) else None,
         "unlisted": bool(front.get("unlisted")),
         "runtime": version,
         "published": _datetime.datetime.now(_datetime.timezone.utc).date().isoformat(),
@@ -411,6 +427,50 @@ def _install(staging: Path, target: Target, names: list[str], dry_run: bool, rsy
         elif entry.is_file():
             (root / name).parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(entry, root / name)
+
+
+def publish_presentations(
+    decks: list[Path],
+    site: str,
+    *,
+    names: list[str] | None = None,
+    include_notes: bool = False,
+    trim_bibliography: bool = False,
+    index: bool = True,
+    index_title: str | None = None,
+    index_lede: str | None = None,
+    dry_run: bool = False,
+    rsync: str = "rsync",
+) -> list[dict[str, object]]:
+    """Publish several decks as one collection update.
+
+    They are staged together, so a course of lectures sends its shared assets
+    once and rebuilds the listing once, however many decks it holds.
+    """
+    if not decks:
+        raise PublishError("No presentation to publish")
+    target = Target.parse(site)
+    print(f"Publishing to {target.description}")
+    staging = Path(tempfile.mkdtemp(prefix=".quarkfoil-publish-"))
+    published: list[dict[str, object]] = []
+    try:
+        for position, deck in enumerate(decks):
+            staged = _stage_deck(
+                deck,
+                staging,
+                name=names[position] if names else None,
+                include_notes=include_notes,
+                trim_bibliography=trim_bibliography,
+            )
+            for warning in staged.warnings:
+                print(f"  warning: {staged.slug}: {warning}")
+            published.append(staged.meta)
+        _install(staging, target, [str(meta["slug"]) for meta in published], dry_run, rsync)
+    finally:
+        shutil.rmtree(staging, ignore_errors=True)
+    if index:
+        publish_index(site, title=index_title, lede=index_lede, dry_run=dry_run, rsync=rsync)
+    return published
 
 
 def publish_presentation(
@@ -554,7 +614,11 @@ ul { list-style: none; margin: 0; padding: 0; display: grid; gap: .75rem; }
   transform: translateY(-1px);
   box-shadow: 0 6px 20px -12px rgba(15, 111, 116, .55);
 }
+.talk.series { border-left: 3px solid var(--accent); }
 .talk-title { display: block; font-size: 1.16rem; font-weight: 600; letter-spacing: -.01em; }
+.back { margin: 0 0 .9rem; font-size: .9rem; }
+.back a { color: var(--muted); text-decoration: none; }
+.back a:hover { color: var(--accent); }
 .talk-meta { display: block; margin-top: .2rem; font-size: .88rem; color: var(--accent); }
 .talk-description { display: block; margin-top: .5rem; color: var(--muted); }
 footer { margin-top: 3rem; padding-top: 1.2rem; border-top: 1px solid var(--rule); color: var(--muted); font-size: .85rem; }
@@ -562,62 +626,136 @@ footer a { color: inherit; }
 """
 
 
-def index_page(entries: list[dict[str, object]], title: str = "Talks", lede: str = "") -> str:
-    """One static page: years descending, talks descending inside each year."""
-    ordered = sorted(
-        entries,
-        key=lambda entry: (str(entry.get("date", "")), str(entry.get("title", ""))),
-        reverse=True,
-    )
-    years: dict[str, list[dict[str, object]]] = {}
-    for entry in ordered:
-        years.setdefault(str(entry.get("date", ""))[:4] or "Undated", []).append(entry)
 
-    sections = []
-    for year, talks in years.items():
-        items = []
-        for talk in talks:
-            slug = quote(str(talk.get("slug", "")), safe="")
-            name = html.escape(str(talk.get("title", slug)))
-            description = html.escape(str(talk.get("description", "")))
-            event = html.escape(str(talk.get("event", "")))
-            when = _human_date(str(talk.get("date", "")))
-            meta = " · ".join(part for part in (event, when) if part)
-            items.append(
-                f'        <li><a class="talk" href="{slug}/">\n'
-                f'          <span class="talk-title">{name}</span>\n'
-                + (f'          <span class="talk-meta">{meta}</span>\n' if meta else "")
-                + (f'          <span class="talk-description">{description}</span>\n' if description else "")
-                + "        </a></li>"
-            )
-        sections.append(
-            f'      <section class="year">\n        <h2>{html.escape(year)}</h2>\n'
-            f"        <ul>\n" + "\n".join(items) + "\n        </ul>\n      </section>"
-        )
-    body = "\n".join(sections) if sections else '      <p class="lede">No talks published yet.</p>'
+def _entry_date(entry: dict[str, object]) -> str:
+    return str(entry.get("date", ""))
+
+
+def _date_range(dates: list[str]) -> str:
+    """A series spans days; say so without repeating the year in every card."""
+    parsed = sorted(_datetime.date.fromisoformat(value) for value in dates if value)
+    if not parsed:
+        return ""
+    first, last = parsed[0], parsed[-1]
+    if first == last:
+        return f"{first.day} {MONTHS[first.month - 1]}"
+    if (first.year, first.month) == (last.year, last.month):
+        return f"{first.day}–{last.day} {MONTHS[first.month - 1]}"
+    if first.year == last.year:
+        return f"{first.day} {MONTHS[first.month - 1]} – {last.day} {MONTHS[last.month - 1]}"
+    return (f"{first.day} {MONTHS[first.month - 1]} {first.year} – "
+            f"{last.day} {MONTHS[last.month - 1]} {last.year}")
+
+
+def _order_talks(talks: list[dict[str, object]]) -> list[dict[str, object]]:
+    """Lectures read forwards: by `part` when given, otherwise by date."""
+    numbered = [talk for talk in talks if talk.get("part") is not None]
+    if len(numbered) == len(talks):
+        return sorted(talks, key=lambda talk: int(talk["part"]))
+    return sorted(talks, key=lambda talk: (_entry_date(talk), str(talk.get("title", ""))))
+
+
+def _cards(entries: list[dict[str, object]]) -> list[dict[str, object]]:
+    """One card per single talk, and one per series however many talks it holds."""
+    cards: list[dict[str, object]] = []
+    series: dict[str, dict[str, object]] = {}
+    for entry in entries:
+        name = str(entry.get("series") or "")
+        if not name:
+            cards.append({"kind": "talk", "date": _entry_date(entry), "talk": entry})
+            continue
+        card = series.setdefault(name, {
+            "kind": "series",
+            "name": name,
+            "slug": str(entry.get("series_slug") or _slugify(name, "series")),
+            "description": "",
+            "talks": [],
+        })
+        card["talks"].append(entry)
+        if not card["description"]:
+            card["description"] = str(entry.get("series_description") or "")
+    for card in series.values():
+        talks = card["talks"]
+        card["date"] = max(_entry_date(talk) for talk in talks)
+        events = {str(talk.get("event") or "") for talk in talks}
+        card["event"] = events.pop() if len(events) == 1 else ""
+        card["talks"] = _order_talks(talks)
+        cards.append(card)
+    return sorted(cards, key=lambda card: (str(card["date"]), str(card.get("name", ""))), reverse=True)
+
+
+def _talk_item(talk: dict[str, object], prefix: str = "") -> str:
+    slug = quote(str(talk.get("slug", "")), safe="")
+    name = html.escape(str(talk.get("title", slug)))
+    description = html.escape(str(talk.get("description", "")))
+    event = html.escape(str(talk.get("event", "")))
+    meta = " · ".join(part for part in (event, _human_date(_entry_date(talk))) if part)
+    return (
+        f'        <li><a class="talk" href="{prefix}{slug}/">\n'
+        f'          <span class="talk-title">{name}</span>\n'
+        + (f'          <span class="talk-meta">{meta}</span>\n' if meta else "")
+        + (f'          <span class="talk-description">{description}</span>\n' if description else "")
+        + "        </a></li>"
+    )
+
+
+def _series_item(card: dict[str, object]) -> str:
+    talks = card["talks"]
+    name = html.escape(str(card["name"]))
+    description = html.escape(str(card.get("description", "")))
+    count = f"{len(talks)} talk{'' if len(talks) == 1 else 's'}"
+    meta = " · ".join(part for part in (
+        html.escape(str(card.get("event", ""))), count, _date_range([_entry_date(t) for t in talks]),
+    ) if part)
+    slug = quote(str(card["slug"]), safe="")
+    return (
+        f'        <li><a class="talk series" href="{SERIES_DIR}/{slug}/">\n'
+        f'          <span class="talk-title">{name}</span>\n'
+        f'          <span class="talk-meta">{meta}</span>\n'
+        + (f'          <span class="talk-description">{description}</span>\n' if description else "")
+        + "        </a></li>"
+    )
+
+
+def _sections(cards: list[dict[str, object]]) -> str:
+    years: dict[str, list[str]] = {}
+    for card in cards:
+        year = str(card["date"])[:4] or "Undated"
+        item = _series_item(card) if card["kind"] == "series" else _talk_item(card["talk"])
+        years.setdefault(year, []).append(item)
+    return "\n".join(
+        f'      <section class="year">\n        <h2>{html.escape(year)}</h2>\n'
+        f"        <ul>\n" + "\n".join(items) + "\n        </ul>\n      </section>"
+        for year, items in years.items()
+    )
+
+
+def _page(heading: str, lede: str, body: str, *, depth: int = 0, back: str = "") -> str:
     policy = (
         "default-src 'none'; style-src 'unsafe-inline'; img-src 'self'; "
         "base-uri 'none'; form-action 'none'"
     )
-    heading = html.escape(title)
-    description = html.escape(lede or f"{len(ordered)} presentations")
+    up = "../" * depth
+    title = html.escape(heading)
+    description = html.escape(lede) if lede else title
+    back_link = f'      <p class="back"><a href="{up}">← {html.escape(back)}</a></p>\n' if back else ""
     return f"""<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta http-equiv="Content-Security-Policy" content="{html.escape(policy, quote=True)}">
-  <title>{heading}</title>
+  <title>{title}</title>
   <meta name="description" content="{description}">
   <meta property="og:type" content="website">
-  <meta property="og:title" content="{heading}">
-  <link rel="icon" href="{MARK_FILE}" type="image/svg+xml">
+  <meta property="og:title" content="{title}">
+  <link rel="icon" href="{up}{MARK_FILE}" type="image/svg+xml">
   <style>{INDEX_STYLE}</style>
 </head>
 <body>
   <div class="page">
     <header>
-      <h1>{heading}</h1>
+{back_link}      <h1>{title}</h1>
 {f'      <p class="lede">{html.escape(lede)}</p>' if lede else ""}
     </header>
     <main>
@@ -627,6 +765,37 @@ def index_page(entries: list[dict[str, object]], title: str = "Talks", lede: str
 </body>
 </html>
 """
+
+
+def index_page(entries: list[dict[str, object]], title: str = "Talks", lede: str = "") -> str:
+    """One static page: years descending, a series folded into a single card."""
+    cards = _cards(entries)
+    body = _sections(cards) if cards else '      <p class="lede">No talks published yet.</p>'
+    return _page(title, lede, body)
+
+
+def series_page(card: dict[str, object], collection: str = "Talks") -> str:
+    """A series reads forwards: its talks in the order they were given."""
+    items = "\n".join(_talk_item(talk, prefix="../../") for talk in card["talks"])
+    meta = " · ".join(part for part in (
+        html.escape(str(card.get("event", ""))),
+        _date_range([_entry_date(talk) for talk in card["talks"]]),
+    ) if part)
+    body = (
+        f'      <section class="year">\n        <h2>{meta}</h2>\n'
+        f"        <ul>\n{items}\n        </ul>\n      </section>"
+    )
+    return _page(str(card["name"]), str(card.get("description", "")), body, depth=2, back=collection)
+
+
+def index_pages(entries: list[dict[str, object]], title: str = "Talks", lede: str = "") -> dict[str, str]:
+    """The listing and one page per series, all of them plain HTML."""
+    pages = {INDEX_NAME: index_page(entries, title, lede)}
+    for card in _cards(entries):
+        if card["kind"] == "series":
+            pages[f"{SERIES_DIR}/{card['slug']}/{INDEX_NAME}"] = series_page(card, title)
+    return pages
+
 
 
 def _settings(target: Target, rsync: str) -> dict[str, str]:
@@ -675,18 +844,33 @@ def publish_index(
     if not entries and not complete and _has(target, INDEX_NAME, rsync):
         print("  warning: the collection could not be read; its listing is left unchanged")
         return 0
-    page = index_page(entries, resolved["title"], resolved["lede"])
+    pages = index_pages(entries, resolved["title"], resolved["lede"])
     staging = Path(tempfile.mkdtemp(prefix=".quarkfoil-index-"))
     try:
-        (staging / INDEX_NAME).write_text(page, encoding="utf-8")
+        for relative, page in pages.items():
+            destination = staging / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_text(page, encoding="utf-8")
+        # Always present, even with no series left, so mirroring removes the
+        # pages of a series whose talks are gone.
+        (staging / SERIES_DIR).mkdir(exist_ok=True)
         (staging / SETTINGS_NAME).write_text(
             json.dumps(resolved, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
         )
-        _install(staging, target, [INDEX_NAME, SETTINGS_NAME], dry_run, rsync)
+        _install(staging, target, [INDEX_NAME, SETTINGS_NAME, SERIES_DIR], dry_run, rsync)
     finally:
         shutil.rmtree(staging, ignore_errors=True)
     print(f"  listed {len(entries)} talk{'' if len(entries) == 1 else 's'}")
     return len(entries)
 
 
-__all__ = ["PublishError", "Target", "index_page", "publish_index", "publish_presentation"]
+__all__ = [
+    "PublishError",
+    "Target",
+    "index_page",
+    "index_pages",
+    "publish_index",
+    "publish_presentation",
+    "publish_presentations",
+    "series_page",
+]

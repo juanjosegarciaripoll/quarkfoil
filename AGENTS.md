@@ -158,6 +158,13 @@ The distribution and command-line tool are named `quarkfoil`.
 - Publishing omits speaker notes unless `--notes` is given, unlike `export`.
   The published Markdown is world-readable, so exposing the presenter's notes
   must be the case someone asks for, not the default.
+- `series` folds a course into one card that links to a generated page under
+  `series/`, rebuilt from the talks on every publish so a vanished series
+  loses its page. Order members by `part`, falling back to date, and file a
+  series under the year of its most recent talk. `series` is a reserved deck
+  name.
+- Publishing several decks at once stages them together: their shared assets
+  are sent once and the listing is rebuilt once, however many decks there are.
 - The listing is static HTML, generated at publish time. Do not make it depend
   on JavaScript: it must be readable by search engines.
 - Remote targets are rsync destinations, read with rsync's own meanings.

@@ -110,6 +110,33 @@ quarkfoil pack lecture.md --output ~/talks/cern-2026
 The result is source, not a website, and opens like any other presentation.
 See the [packing guide](PACK.md).
 
+## Publish a talk to a website
+
+To put a talk on a site where many of them live together, sharing one player
+and one pool of figures behind a generated listing:
+
+```console
+quarkfoil publish lecture.md --site homepage:talks/
+```
+
+The destination is a local directory or an rsync destination. Several decks
+can go up at once, and a `series` field folds a course into a single entry.
+See the [publishing guide](PUBLISH.md).
+
+## Which command produces what
+
+Quarkfoil writes a presentation out in three ways, and they do not overlap:
+
+| Command | Produces | Use it to |
+|---|---|---|
+| `quarkfoil export` | one self-contained folder, openable from the file system | hand a deck over, archive it, or deploy it on its own |
+| `quarkfoil pack` | an editable project folder | move a presentation, or split one folder into one project per talk |
+| `quarkfoil publish` | one talk inside a shared collection | build up a site of talks that share a runtime and their figures |
+
+`export` and `publish` both produce a website; the difference is whether the
+deck stands alone or joins others. `pack` produces no website at all: its
+output is source you go on editing.
+
 To let a coding assistant make safe, structured slide changes, follow
 [Use Quarkfoil with an AI assistant](AGENT_CLI.md). No additional plugin or
 service is required beyond an assistant that can run local terminal commands.

@@ -17,6 +17,10 @@ All notable changes to Quarkfoil are documented here. The project follows
   pushed append-only and only the talk's own folder is mirrored. New front
   matter: `date` (required to publish), `event`, and `unlisted`.
   Speaker notes are left out of a published deck unless `--notes` is given.
+  A `series` field folds a course into a single listing card linking to its
+  own generated page, ordered by `part` or by date, described once through
+  `series-description`. Several decks can be published in one command, staging
+  them together so shared assets are sent once and the listing rebuilt once.
 
 - `quarkfoil pack DECK --output DIRECTORY` copies a presentation, its
   referenced figures, its bibliography, and its `assets.include` folders into a

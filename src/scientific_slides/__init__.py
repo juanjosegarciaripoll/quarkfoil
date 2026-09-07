@@ -90,13 +90,16 @@ def _pack(arguments: list[str]) -> int:
 
 
 def _publish(arguments: list[str]) -> int:
-    from .publisher import PublishError, publish_index, publish_presentation
+    from .publisher import PublishError, publish_index, publish_presentations
 
     parser = argparse.ArgumentParser(
         prog="quarkfoil publish",
         description="Publish a presentation into a collection that shares one runtime and asset pool",
     )
-    parser.add_argument("deck", nargs="?", type=Path, help="Markdown presentation to publish")
+    parser.add_argument(
+        "decks", nargs="*", type=Path, metavar="DECK",
+        help="Markdown presentations to publish; several are staged and listed together",
+    )
     parser.add_argument(
         "--site", required=True, metavar="TARGET",
         help="collection directory, or an rsync destination such as host:talks/",
@@ -122,10 +125,12 @@ def _publish(arguments: list[str]) -> int:
     parser.add_argument("--dry-run", action="store_true", help="Report what would be published, change nothing")
     parser.add_argument("--rsync", default="rsync", help="rsync program to use for a remote site")
     args = parser.parse_args(arguments)
-    if args.index_only and args.deck is not None:
+    if args.index_only and args.decks:
         parser.error("--index-only takes no deck")
-    if not args.index_only and args.deck is None:
+    if not args.index_only and not args.decks:
         parser.error("a deck is required unless --index-only is given")
+    if args.name and len(args.decks) > 1:
+        parser.error("--name applies to a single deck")
     try:
         if args.index_only:
             publish_index(
@@ -133,10 +138,10 @@ def _publish(arguments: list[str]) -> int:
                 dry_run=args.dry_run, rsync=args.rsync,
             )
         else:
-            meta = publish_presentation(
-                args.deck,
+            published = publish_presentations(
+                args.decks,
                 args.site,
-                name=args.name,
+                names=[args.name] if args.name else None,
                 include_notes=args.notes,
                 trim_bibliography=args.trim_bibliography,
                 index=not args.no_index,
@@ -145,7 +150,9 @@ def _publish(arguments: list[str]) -> int:
                 dry_run=args.dry_run,
                 rsync=args.rsync,
             )
-            print(f"Published {meta['title']} as {meta['slug']}/ ({meta['date']})")
+            for meta in published:
+                series = f" in {meta['series']}" if meta.get("series") else ""
+                print(f"Published {meta['title']} as {meta['slug']}/ ({meta['date']}){series}")
     except PublishError as error:
         print(f"quarkfoil publish: {error}", file=sys.stderr)
         return 1
