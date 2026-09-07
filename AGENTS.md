@@ -233,10 +233,11 @@ Run all Python tests:
 uv run python -m unittest discover -s tests -v
 ```
 
-macOS hands out temporary directories under a symlink, so a test that compares
-a returned, resolved path against one built from `tempfile` passes on Linux and
-fails there. Resolve the temporary root in the test, and reproduce that
-platform locally by pointing `TMPDIR` at a symlink:
+A path an API returns is normally resolved, and `tempfile` paths are not:
+macOS serves them under a symlink (`/var` to `/private/var`) and Windows may
+hand back an 8.3 short name (`RUNNER~1`). Comparing the two passes on Linux and
+fails on both other platforms. Resolve the temporary root in the test, and
+reproduce the macOS shape locally by pointing `TMPDIR` at a symlink:
 
 ```console
 mkdir /tmp/real && ln -s real /tmp/link

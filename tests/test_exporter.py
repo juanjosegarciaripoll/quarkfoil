@@ -229,7 +229,9 @@ class ExporterTests(unittest.TestCase):
         stale = output / "figures/stale.svg"
         stale.write_text("<svg/>", encoding="utf-8")
         (output / "index.html").write_text("old", encoding="utf-8")
-        self.assertEqual(export_presentation(self.deck, output), output)
+        # The destination comes back resolved: macOS temporary paths sit under a
+        # symlink and Windows may hand out an 8.3 short name.
+        self.assertEqual(export_presentation(self.deck, output), output.resolve())
         self.assertEqual(marker.read_text(encoding="utf-8"), "keep")
         self.assertEqual(stale.read_text(encoding="utf-8"), "<svg/>")
         self.assertNotEqual((output / "index.html").read_text(encoding="utf-8"), "old")
