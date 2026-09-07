@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import datetime
 import hashlib
 import json
 import os
@@ -800,9 +801,17 @@ def _selected_slides(value: str | None) -> set[int] | None:
     return selected
 
 
+def _json_scalar(value: Any) -> str:
+    """Front matter is YAML, so a field such as `date:` arrives as a date object."""
+    if isinstance(value, (datetime.date, datetime.time)):
+        return value.isoformat()
+    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
+
+
 def _print_json(payload: Any, *, compact: bool = False, stream: Any = None) -> None:
     separators = (",", ":") if compact else None
-    print(json.dumps(payload, ensure_ascii=False, indent=None if compact else 2, separators=separators),
+    print(json.dumps(payload, ensure_ascii=False, indent=None if compact else 2,
+                     separators=separators, default=_json_scalar),
           file=sys.stdout if stream is None else stream, flush=True)
 
 

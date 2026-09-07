@@ -775,3 +775,28 @@ class DeckCliTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FrontMatterDateTests(unittest.TestCase):
+    """A YAML `date:` field is a date object, which JSON cannot hold on its own."""
+
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory()
+        self.deck = Path(self.temporary.name) / "talk.md"
+        self.deck.write_text(
+            "---\ntitle: Dated\ndate: 2026-09-07\n---\n\n"
+            "## Slide {.layout-1}\n\n::: core\nText\n:::\n",
+            encoding="utf-8",
+        )
+
+    def tearDown(self) -> None:
+        self.temporary.cleanup()
+
+    def test_inspect_reports_a_date_as_an_iso_string(self) -> None:
+        output = StringIO()
+        with redirect_stdout(output):
+            code = main(["deck", "inspect", str(self.deck), "--no-source", "--compact"])
+
+        self.assertEqual(code, 0)
+        summary = json.loads(output.getvalue())
+        self.assertEqual(summary["metadata"]["date"], "2026-09-07")
