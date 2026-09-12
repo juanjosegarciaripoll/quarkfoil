@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import contextlib
 import hashlib
 import html
 import http.server
@@ -11,6 +12,7 @@ import shutil
 import subprocess
 import tempfile
 import threading
+from collections.abc import Iterator
 from pathlib import Path
 from urllib.parse import quote, unquote, urlsplit
 
@@ -82,6 +84,20 @@ CDN_FILES = {
 
 PLAYER_MODULE = "player"
 PLAYER_BUNDLE = "quarkfoil/player.js"
+
+# Programs tried, in order, when a headless browser has to render the
+# presentation itself. Chromium keeps its Windows and macOS builds off PATH,
+# so their usual locations are named too.
+CHROMIUM_BROWSERS = (
+    "chromium", "chromium-browser", "google-chrome", "google-chrome-stable", "microsoft-edge", "msedge",
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "/Applications/Chromium.app/Contents/MacOS/Chromium",
+    "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+    r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+    r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+    r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+    r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+)
 
 MODULE_IMPORT_PATTERN = re.compile(
     r'(?m)^import[ \t]*\{(?P<names>[^}]*)\}[ \t]*from[ \t]*"\./(?P<module>[\w.-]+)\.js";[ \t]*$'
@@ -500,7 +516,8 @@ def _index_html(
 """
 
 
-def _executable(candidates: tuple[str, ...], label: str) -> str:
+def find_executable(candidates: tuple[str, ...]) -> str | None:
+    """Return the first candidate that is on PATH or is itself a program."""
     for candidate in candidates:
         found = shutil.which(candidate)
         if found:
@@ -508,7 +525,33 @@ def _executable(candidates: tuple[str, ...], label: str) -> str:
         path = Path(candidate)
         if path.is_file():
             return str(path)
+    return None
+
+
+def _executable(candidates: tuple[str, ...], label: str) -> str:
+    found = find_executable(candidates)
+    if found:
+        return found
     raise RuntimeError(f"{label} is required to create an export preview")
+
+
+@contextlib.contextmanager
+def serve_directory(root: Path) -> Iterator[str]:
+    """Serve a directory on a loopback port and yield its origin.
+
+    A headless browser reads the presentation over HTTP rather than from
+    ``file://`` so the player takes its ordinary network path.
+    """
+    handler = lambda *args, **kwargs: _QuietHandler(*args, directory=str(root), **kwargs)
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{server.server_port}"
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
 
 
 def _preview_command(browser: str, output: Path, url: str) -> list[str]:
@@ -526,43 +569,27 @@ def _preview_command(browser: str, output: Path, url: str) -> list[str]:
 
 
 def _create_preview(export_root: Path, preview_path: str) -> None:
-    browser = _executable(
-        (
-            "chromium", "chromium-browser", "google-chrome", "google-chrome-stable", "microsoft-edge", "msedge",
-            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-            "/Applications/Chromium.app/Contents/MacOS/Chromium",
-            "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
-        ),
-        "Chrome, Chromium, or Edge",
-    )
+    browser = _executable(CHROMIUM_BROWSERS, "Chrome, Chromium, or Edge")
     output = export_root / preview_path
     output.parent.mkdir(parents=True, exist_ok=True)
     if output.exists():
         raise FileExistsError(f"Preview image already exists in the presentation assets: {preview_path}")
 
-    handler = lambda *args, **kwargs: _QuietHandler(*args, directory=str(export_root), **kwargs)
-    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    try:
-        url = f"http://127.0.0.1:{server.server_port}/?preview"
-        subprocess.run(
-            _preview_command(browser, output, url),
-            check=True,
-            capture_output=True,
-            timeout=60,
-        )
-        if not output.is_file() or not output.stat().st_size:
-            raise RuntimeError("The browser did not create the preview image")
-    except subprocess.CalledProcessError as error:
-        detail = error.stderr.decode(errors="replace").strip() if isinstance(error.stderr, bytes) else str(error.stderr or "").strip()
-        raise RuntimeError(detail or "Could not create the export preview") from error
-    except subprocess.TimeoutExpired as error:
-        raise RuntimeError("Timed out while creating the export preview") from error
-    finally:
-        server.shutdown()
-        server.server_close()
-        thread.join(timeout=5)
+    with serve_directory(export_root) as origin:
+        try:
+            subprocess.run(
+                _preview_command(browser, output, f"{origin}/?preview"),
+                check=True,
+                capture_output=True,
+                timeout=60,
+            )
+            if not output.is_file() or not output.stat().st_size:
+                raise RuntimeError("The browser did not create the preview image")
+        except subprocess.CalledProcessError as error:
+            detail = error.stderr.decode(errors="replace").strip() if isinstance(error.stderr, bytes) else str(error.stderr or "").strip()
+            raise RuntimeError(detail or "Could not create the export preview") from error
+        except subprocess.TimeoutExpired as error:
+            raise RuntimeError("Timed out while creating the export preview") from error
 
 
 def export_presentation(
