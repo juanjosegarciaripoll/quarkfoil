@@ -25,6 +25,7 @@ The presentation remains a readable Markdown file accompanied by a `figures/` di
 - Source, Design, and Present modes use the same Markdown source of truth.
 - Local assets and pinned browser libraries require no runtime CDN or Node/npm toolchain.
 - Presentations export as self-contained static websites, with an optional pinned-CDN mode.
+- One command prints a PDF with slide-sized pages, using Chrome, Chromium, Edge, or Firefox.
 - Saves are atomic, conflict-checked, and restricted to the selected presentation directory.
 
 ## Install
@@ -73,6 +74,16 @@ server. Add `--cdn` to reference exact, integrity-checked jsDelivr packages
 instead of copying the browser libraries. See the
 [export guide](docs/EXPORT.md) for details.
 
+## Print a PDF
+
+```powershell
+quarkfoil print path\to\presentation.md
+```
+
+A headless browser renders one page per slide, each page the size of a slide
+rather than a letterboxed sheet of A4. Chrome, Chromium, Edge, and Firefox all
+work. See the [printing guide](docs/PRINT.md).
+
 ## Copy a project you keep editing
 
 ```powershell
@@ -98,6 +109,7 @@ locally or on a web host over rsync. See the
 - [Installation and command-line use](docs/INSTALLATION.md)
 - [Use Quarkfoil with AI assistants](docs/AGENT_CLI.md)
 - [Editor guide](docs/USER_GUIDE.md)
+- [Printing a PDF](docs/PRINT.md)
 - [Markdown format reference](docs/FORMAT.md)
 - [Security and trust model](docs/SECURITY.md)
 - [Development and release guide](docs/DEVELOPMENT.md)

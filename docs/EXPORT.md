@@ -157,11 +157,20 @@ The exported HTML also contains the presentation title, author, description
 
 ## Print or save as PDF
 
+For a PDF whose pages are the size of a slide, without touching a print dialog,
+use [`quarkfoil print`](PRINT.md). The rest of this section describes printing
+by hand from a browser.
+
 Use **Print / PDF** in an exported presentation, or press <kbd>Ctrl</kbd>+<kbd>P</kbd>
 (<kbd>Command</kbd>+<kbd>P</kbd> on macOS). Quarkfoil reloads the presentation in
 Reveal.js's PDF layout and opens the browser print dialog after fonts and images
 are ready. Choose **Save as PDF** to create a multi-page file with one slide per
 page.
+
+The dialog's own paper setting overrides the page size the presentation asks
+for, so set the paper to a custom 13.33 × 7.5 inches, the margins to none, and
+enable background graphics. Otherwise the slides are letterboxed onto the paper
+the browser was last set to.
 
 Reveal.js recommends Chrome or another Chromium-based browser for PDF export;
 other browsers may show the print layout but are not guaranteed to produce the

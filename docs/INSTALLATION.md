@@ -98,6 +98,18 @@ Add `--cdn` for a smaller, network-dependent export. See the
 [static export guide](EXPORT.md) for the generated structure, deployment, and
 security trade-offs.
 
+## Print a presentation as a PDF
+
+To hand a deck out as pages rather than as a website:
+
+```console
+quarkfoil print lecture.md
+```
+
+A headless Chrome, Chromium, Edge, or Firefox renders `lecture.pdf` with one
+page per slide, each page the size of a slide rather than a sheet of A4. See
+the [printing guide](PRINT.md).
+
 ## Copy a presentation project
 
 To move or hand over a presentation you intend to keep editing, copy it with
@@ -125,17 +137,19 @@ See the [publishing guide](PUBLISH.md).
 
 ## Which command produces what
 
-Quarkfoil writes a presentation out in three ways, and they do not overlap:
+Quarkfoil writes a presentation out in four ways, and they do not overlap:
 
 | Command | Produces | Use it to |
 |---|---|---|
 | `quarkfoil export` | one self-contained folder, openable from the file system | hand a deck over, archive it, or deploy it on its own |
 | `quarkfoil pack` | an editable project folder | move a presentation, or split one folder into one project per talk |
 | `quarkfoil publish` | one talk inside a shared collection | build up a site of talks that share a runtime and their figures |
+| `quarkfoil print` | one PDF file, one page per slide | hand out or archive the slides where a browser is not wanted |
 
 `export` and `publish` both produce a website; the difference is whether the
 deck stands alone or joins others. `pack` produces no website at all: its
-output is source you go on editing.
+output is source you go on editing. `print` produces neither: it is the deck
+frozen into pages.
 
 To let a coding assistant make safe, structured slide changes, follow
 [Use Quarkfoil with an AI assistant](AGENT_CLI.md). No additional plugin or

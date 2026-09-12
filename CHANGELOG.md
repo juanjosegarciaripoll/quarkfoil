@@ -7,6 +7,20 @@ All notable changes to Quarkfoil are documented here. The project follows
 
 ### Added
 
+- `quarkfoil print DECK` renders a presentation to PDF with one page per
+  slide. Quarkfoil exports the deck to a temporary website, serves it on a
+  loopback port, and drives a headless Chrome, Chromium, Edge, or Firefox,
+  preferring Chromium and falling back to Firefox; `--browser` names another
+  one. Every page is the size of a slide, 13.33 x 7.5 in, rather than the
+  paper the browser's print dialog was last set to: Chromium takes the size
+  from the presentation, and Firefox is given it through the throwaway profile
+  it prints with. The PDF is written beside its destination and renamed into
+  place, so an existing file is replaced whole or not at all. `--output` names
+  the file, which defaults to the deck's name with a `.pdf` suffix, and
+  `--timeout` covers a very large deck. Speaker notes are left out.
+  Chrome and Edge are now also discovered in their usual Windows locations,
+  which `export --preview` uses too.
+
 - `quarkfoil publish DECK --site TARGET` publishes a talk into a collection
   that shares one player runtime and one content-addressed asset pool, with a
   static listing page grouped by year, newest first. Identical figures are

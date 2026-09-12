@@ -89,6 +89,41 @@ def _pack(arguments: list[str]) -> int:
     return 0
 
 
+def _print(arguments: list[str]) -> int:
+    from .printer import BROWSER_TIMEOUT_SECONDS, SLIDE_HEIGHT_INCHES, SLIDE_WIDTH_INCHES, print_presentation
+
+    parser = argparse.ArgumentParser(
+        prog="quarkfoil print",
+        description="Render a Quarkfoil presentation to PDF with a headless browser",
+    )
+    parser.add_argument("deck", type=Path, help="Markdown presentation to print")
+    parser.add_argument(
+        "--output", "-o", type=Path,
+        help="PDF file to write (default: the presentation name with a .pdf suffix)",
+    )
+    parser.add_argument(
+        "--browser",
+        help="Browser to print with (default: the first Chrome, Chromium, Edge, or Firefox found)",
+    )
+    parser.add_argument(
+        "--timeout", type=float, default=BROWSER_TIMEOUT_SECONDS,
+        help=f"Seconds to wait for the browser (default: {BROWSER_TIMEOUT_SECONDS:.0f})",
+    )
+    args = parser.parse_args(arguments)
+    try:
+        destination, browser = print_presentation(
+            args.deck, args.output, browser=args.browser, timeout=args.timeout
+        )
+    except (FileNotFoundError, IsADirectoryError, ValueError, RuntimeError) as error:
+        print(f"quarkfoil print: {error}", file=sys.stderr)
+        return 1
+    print(f"Printed Quarkfoil presentation to {destination}")
+    print(
+        f"One slide per page, {SLIDE_WIDTH_INCHES:.2f} x {SLIDE_HEIGHT_INCHES:.2f} in, printed with {browser}"
+    )
+    return 0
+
+
 def _publish(arguments: list[str]) -> int:
     from .publisher import PublishError, publish_index, publish_presentations
 
@@ -170,6 +205,8 @@ def main(argv: list[str] | None = None) -> int:
         return _pack(arguments[1:])
     if arguments[:1] == ["publish"]:
         return _publish(arguments[1:])
+    if arguments[:1] == ["print"]:
+        return _print(arguments[1:])
     if arguments[:1] == ["deck"]:
         from .deck_cli import main as deck
 

@@ -45,7 +45,7 @@ app/modules/render.js      Shared slide and Markdown/KaTeX renderer
 app/modules/editor.js      Direct-manipulation editor behavior
 app/modules/app.js         Editor application state and UI orchestration
 app/modules/player.js      Presentation-only static player
-src/scientific_slides/     Python launcher, local server, and exporter
+src/scientific_slides/     Python launcher, local server, exporter, printer
 example/                   Maintained sample presentation and figures
 tests/                     Python tests and the Edge browser CI harness
 docs/                      User, format, security, export, and developer docs
@@ -135,6 +135,26 @@ The distribution and command-line tool are named `quarkfoil`.
   presentation's own directory.
 - Keep `pack` and `export` as separate verbs. Their option sets, output kinds,
   and overwrite rules differ on purpose.
+
+### Printing a PDF
+
+- `quarkfoil print DECK` renders the presentation to PDF with a headless
+  browser: it exports to a temporary website, serves it on a loopback port, and
+  prints the Reveal print view. Quarkfoil has no PDF renderer of its own and
+  must not grow one.
+- Every page is the size of a slide, derived from the 1280x720 canvas in
+  `app/modules/player.js`. Keep the two in step. A page the size of the paper
+  the browser happened to be set to is the bug this command exists to avoid, so
+  never leave the size to the browser's own defaults.
+- Chromium reads the page size from the presentation's own print stylesheet;
+  Firefox does not, and is given the size, silent printing, and zero margins
+  through the throwaway profile it prints with. Never print through the user's
+  real browser profile.
+- Prefer Chromium, fall back to Firefox, and let `--browser` name either. When
+  neither is installed, say so rather than producing a PDF of the wrong shape.
+- The browser writes beside the destination and the finished file is renamed
+  into place, so a failed run leaves an existing PDF untouched.
+- Speaker notes are left out, as when publishing.
 
 ### Publishing a collection
 
