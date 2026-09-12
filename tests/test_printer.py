@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 import tempfile
 import unittest
@@ -60,19 +61,20 @@ class BrowserDiscoveryTests(unittest.TestCase):
 
 class BrowserCommandTests(unittest.TestCase):
     def test_chromium_prints_the_reveal_print_view_without_page_furniture(self) -> None:
-        command = _chromium_command("/usr/bin/chromium", Path("/tmp/out.pdf"), "http://127.0.0.1:9/?print-pdf", Path("/tmp/p"))
+        output, profile = Path("/tmp/out.pdf"), Path("/tmp/p")
+        command = _chromium_command("/usr/bin/chromium", output, "http://127.0.0.1:9/?print-pdf", profile)
         self.assertIn("--headless=new", command)
-        self.assertIn("--print-to-pdf=/tmp/out.pdf", command)
+        self.assertIn(f"--print-to-pdf={output}", command)
         self.assertIn("--no-pdf-header-footer", command)
-        self.assertIn("--user-data-dir=/tmp/p", command)
+        self.assertIn(f"--user-data-dir={profile}", command)
         self.assertEqual(command[-1], "http://127.0.0.1:9/?print-pdf")
 
     def test_firefox_runs_headless_in_its_own_instance_and_profile(self) -> None:
-        command = _firefox_command("/usr/bin/firefox", "http://127.0.0.1:9/?print-pdf&print-dialog", Path("/tmp/p"))
+        profile = Path("/tmp/p")
+        command = _firefox_command("/usr/bin/firefox", "http://127.0.0.1:9/?print-pdf&print-dialog", profile)
         self.assertIn("--headless", command)
         self.assertIn("--no-remote", command)
-        self.assertIn("--profile", command)
-        self.assertIn("/tmp/p", command)
+        self.assertEqual(command[command.index("--profile") + 1], str(profile))
 
     def test_only_firefox_needs_the_page_to_open_the_print_dialog(self) -> None:
         self.assertEqual(print_url("http://127.0.0.1:9", "chromium"), "http://127.0.0.1:9/?print-pdf")
@@ -89,10 +91,14 @@ class FirefoxPreferenceTests(unittest.TestCase):
         self.assertAlmostEqual(SLIDE_WIDTH_INCHES / SLIDE_HEIGHT_INCHES, 16 / 9)
 
     def test_printing_is_silent_edge_to_edge_and_unstamped(self) -> None:
-        preferences = firefox_preferences(Path("/tmp/slides.pdf"))
+        output = Path("/tmp/slides.pdf")
+        preferences = firefox_preferences(output)
         self.assertIn('user_pref("print.always_print_silent", true);', preferences)
         self.assertIn('user_pref("print_printer", "Mozilla Save to PDF");', preferences)
-        self.assertIn('user_pref("print.printer_Mozilla_Save_to_PDF.print_to_filename", "/tmp/slides.pdf");', preferences)
+        self.assertIn(
+            f'user_pref("print.printer_Mozilla_Save_to_PDF.print_to_filename", {json.dumps(str(output))});',
+            preferences,
+        )
         self.assertIn('user_pref("print.printer_Mozilla_Save_to_PDF.print_bgcolor", true);', preferences)
         for margin in ("top", "bottom", "left", "right"):
             self.assertIn(f'user_pref("print.printer_Mozilla_Save_to_PDF.print_margin_{margin}", "0");', preferences)
