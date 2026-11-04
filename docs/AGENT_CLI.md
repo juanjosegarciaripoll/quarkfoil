@@ -6,8 +6,9 @@ editor assistants with access to your presentation folder. An ordinary web
 chat cannot use this feature unless you upload files and edit them manually.
 
 You do not need to teach the assistant Quarkfoil's file format or prepare JSON
-files yourself. Quarkfoil gives it a short built-in guide and applies its slide
-changes safely.
+files yourself. Quarkfoil provides installed, version-matched guidance for its
+workflow, Markdown format, layouts, overlays, assets, citations, and authoring
+conventions, then applies slide changes safely.
 
 ## Before you begin
 
@@ -22,6 +23,29 @@ quarkfoil deck guide
 Then open the folder containing your presentation in your coding assistant.
 Only give an assistant access to folders and files you are comfortable sharing
 with that service.
+
+The bare guide is a compact index. An assistant can load only the knowledge its
+task needs:
+
+```console
+quarkfoil deck guide workflow
+quarkfoil deck guide format
+quarkfoil deck guide layouts
+quarkfoil deck guide overlays
+quarkfoil deck guide assets
+quarkfoil deck guide citations
+quarkfoil deck guide authoring
+quarkfoil deck guide reproduction
+quarkfoil deck guide examples
+```
+
+`quarkfoil deck guide --all` prints the complete installed reference. Because
+the guidance comes from the installed Quarkfoil version, an assistant does not
+need an application-specific skill or an internet copy of the documentation.
+For reconstruction from PowerPoint, PDF, or screenshots, the `reproduction`
+topic explains resolved type sizes, image-only regions, free-canvas choices,
+overlay line breaks, geometry, overflow budgets, and visual verification. See
+also the [authoring and source-reconstruction guide](AUTHORING.md).
 
 ## A prompt you can copy
 
@@ -39,6 +63,23 @@ then make normal requests, for example:
 - “Add a summary slide after the results.”
 - “Move the motivation slide before the model description.”
 - “Review the deck and suggest changes, but do not apply them yet.”
+
+## Create a presentation without starting the editor
+
+An assistant can initialize a presentation and continue working without
+starting a long-running browser server:
+
+```console
+quarkfoil deck create lecture.md \
+  --title "Quantum simulation" \
+  --author "Ada Lovelace" \
+  --theme scientific-dark
+```
+
+The parent directory must already exist. The command accepts `.md` and
+`.markdown`, initializes a missing or whitespace-only file, and refuses to
+replace any nonempty file. It prints the path and initial revision as JSON.
+After creation, the normal inspect-and-apply workflow applies.
 
 Open the presentation in Quarkfoil while you work if you want to review each
 change visually. A clean editor reloads changes made by the assistant. If you
@@ -76,6 +117,11 @@ should use this interface unless they specifically need the compatibility JSON
 protocol. It keeps Markdown and LaTeX literal, carries its own revision guards,
 and makes several edits in one atomic application without generating escaped
 strings.
+
+Before generating unfamiliar Quarkfoil structures, query the relevant guide
+topic rather than guessing directive names or layout regions. The browser's
+JavaScript parser remains canonical; `deck inspect` and `deck apply` validate
+the same document structure through its Python mirror.
 
 ### Edit one slide without JSON
 

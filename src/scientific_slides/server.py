@@ -24,6 +24,7 @@ from pathlib import Path
 
 from .icons import ICON_COLLECTIONS, fetch_icon_svg, import_icon, search_icons
 from .paths import APP_ROOT, inside as _inside
+from .starter import STARTER_DECK
 from .storage import atomic_write, deck_file_lock
 
 
@@ -38,23 +39,6 @@ VIDEO_SUFFIXES = {".mp4", ".webm"}
 PRESENTATION_SUFFIXES = {".md", ".markdown"}
 CONVERTIBLE_VIDEO_SUFFIXES = {".avi", ".mkv"}
 ASSET_SUFFIXES = IMAGE_SUFFIXES | VIDEO_SUFFIXES
-STARTER_DECK = """---
-title: New presentation
-author: Your name
-aspect-ratio: 16:9
-theme: scientific-light
-defaults:
-  footer: Quarkfoil · Reveal.js
----
-
-# New presentation {.layout-front}
-
-::: core
-**Your name**
-
-Presentation subtitle
-:::
-"""
 
 
 class VideoConversionJob:

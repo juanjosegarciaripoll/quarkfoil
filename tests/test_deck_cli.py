@@ -18,6 +18,7 @@ from scientific_slides import main
 from scientific_slides import deck_cli
 from scientific_slides.deck_cli import apply_transaction, revision, without_notes
 from scientific_slides.parser import parse_deck
+from scientific_slides.starter import STARTER_DECK
 from scientific_slides.storage import deck_file_lock
 
 
@@ -82,11 +83,111 @@ class DeckCliTests(unittest.TestCase):
     def test_guide_is_concise_and_complete(self) -> None:
         result, output, errors = self.invoke(["deck", "guide"])
         self.assertEqual((result, errors), (0, ""))
-        self.assertLess(len(output.split()), 150)
+        self.assertLess(len(output.split()), 195)
         self.assertIn("Quarkfoil agent protocol v1", output)
-        self.assertIn('"operation":"replace"', output)
+        self.assertIn("quarkfoil deck guide layouts", output)
+        self.assertIn("quarkfoil deck create DECK", output)
         self.assertIn("Exit 3 means the deck changed", output)
-        self.assertIn("--no-notes hides returned notes", output)
+        self.assertIn("Use --no-notes", output)
+        self.assertIn("front-matter `bibliography` BibTeX file", output)
+        self.assertIn("`[@key]` inline", output)
+        self.assertIn('empty `type="citation"` overlay', output)
+
+    def test_guide_topics_and_complete_reference_are_discoverable(self) -> None:
+        result, output, errors = self.invoke(["deck", "guide", "layouts"])
+        self.assertEqual((result, errors), (0, ""))
+        self.assertIn("`.layout-1-2`", output)
+        self.assertIn('columns="42 58"', output)
+        sample = output.split("```markdown\n", 1)[1].split("```", 1)[0]
+        self.assertFalse([item for item in parse_deck(sample).diagnostics if item.level == "error"])
+
+        result, workflow, errors = self.invoke(["deck", "guide", "workflow"])
+        self.assertEqual((result, errors), (0, ""))
+        for operation in ("insert", "delete", "move", "substitute"):
+            self.assertIn(f"operation: {operation}", workflow)
+
+        result, complete, errors = self.invoke(["deck", "guide", "--all"])
+        self.assertEqual((result, errors), (0, ""))
+        for heading in (
+            "Quarkfoil editing workflow", "Quarkfoil Markdown format", "Quarkfoil layouts",
+            "Quarkfoil positioned overlays", "Quarkfoil project assets",
+            "CITATIONS: BIBLIOGRAPHY SOURCE AND CANONICAL FORMS", "Quarkfoil authoring and review",
+            "REPRODUCTION: FIRST-PASS RULES", "Quarkfoil slide examples",
+        ):
+            self.assertIn(heading, complete)
+
+        result, reproduction, errors = self.invoke(["deck", "guide", "reproduction"])
+        self.assertEqual((result, errors), (0, ""))
+        self.assertIn("grid-cell prose", reproduction)
+        self.assertIn("0.72 -> 23.0 px", reproduction)
+        self.assertIn("overlay Markdown prose", reproduction)
+        self.assertIn("1.00 -> 21.8 px", reproduction)
+        self.assertIn("IMAGE CELLS ARE IMAGE-ONLY", reproduction)
+        self.assertIn("OVERLAY LINE BREAKS", reproduction)
+        self.assertIn("REPRODUCTION: CITATION BOXES", reproduction)
+        self.assertIn('type="citation"', reproduction)
+        self.assertIn("bibliography:", reproduction)
+        self.assertIn("references.bib", reproduction)
+        self.assertIn('x="55" y="82" w="40" h="8"', reproduction)
+        self.assertIn("quarkfoil print deck.md", reproduction)
+
+        result, overlays, errors = self.invoke(["deck", "guide", "overlays"])
+        self.assertEqual((result, errors), (0, ""))
+        self.assertIn("their own box type", overlays)
+        self.assertIn('type="citation"', overlays)
+
+        result, output, errors = self.invoke(["deck", "guide", "layouts", "--all"])
+        self.assertEqual((result, output), (2, ""))
+        self.assertEqual(json.loads(errors)["error"], "usage_error")
+
+    def test_create_initializes_a_deck_without_starting_the_server(self) -> None:
+        destination = Path(self.temporary.name) / "created.md"
+        result, output, errors = self.invoke(["deck", "create", str(destination)])
+        self.assertEqual((result, errors), (0, ""))
+        payload = json.loads(output)
+        self.assertTrue(payload["created"])
+        self.assertEqual(payload["slides"], 1)
+        self.assertEqual(destination.read_text(encoding="utf-8"), STARTER_DECK)
+        self.assertEqual(payload["revision"], revision(STARTER_DECK.encode("utf-8")))
+
+    def test_create_customizes_whitespace_only_decks_and_refuses_nonempty_files(self) -> None:
+        destination = Path(self.temporary.name) / "custom.markdown"
+        destination.write_text(" \n\t", encoding="utf-8")
+        result, output, errors = self.invoke([
+            "deck", "create", str(destination), "--title", "Quantum phases",
+            "--author", "Ada Lovelace", "--theme", "scientific-dark",
+        ])
+        self.assertEqual((result, errors), (0, ""))
+        self.assertFalse(json.loads(output)["created"])
+        parsed = parse_deck(destination.read_text(encoding="utf-8"))
+        self.assertEqual(parsed.metadata["title"], "Quantum phases")
+        self.assertEqual(parsed.metadata["author"], "Ada Lovelace")
+        self.assertEqual(parsed.metadata["theme"], "scientific-dark")
+        self.assertEqual(parsed.metadata["aspect-ratio"], "16:9")
+        self.assertEqual(parsed.slides[0].title, "Quantum phases")
+        self.assertFalse([item for item in parsed.diagnostics if item.level == "error"])
+
+        before = self.deck.read_bytes()
+        result, output, errors = self.invoke(["deck", "create", str(self.deck)])
+        self.assertEqual((result, output), (2, ""))
+        self.assertEqual(json.loads(errors)["error"], "destination_exists")
+        self.assertEqual(self.deck.read_bytes(), before)
+
+    def test_create_validates_destination_and_metadata(self) -> None:
+        invalid = Path(self.temporary.name) / "deck.txt"
+        result, output, errors = self.invoke(["deck", "create", str(invalid)])
+        self.assertEqual((result, output), (2, ""))
+        self.assertEqual(json.loads(errors)["error"], "usage_error")
+
+        missing = Path(self.temporary.name) / "missing" / "deck.md"
+        result, output, errors = self.invoke(["deck", "create", str(missing)])
+        self.assertEqual((result, output), (2, ""))
+        self.assertIn("parent directory", json.loads(errors)["message"])
+
+        destination = Path(self.temporary.name) / "invalid-title.md"
+        result, output, errors = self.invoke(["deck", "create", str(destination), "--title", " \n "])
+        self.assertEqual((result, output), (2, ""))
+        self.assertFalse(destination.exists())
 
     def test_protocol_advertises_machine_readable_contract(self) -> None:
         result, output, errors = self.invoke(["deck", "protocol"])

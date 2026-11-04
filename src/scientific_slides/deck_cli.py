@@ -15,7 +15,9 @@ from typing import Any
 
 import yaml
 
+from .deck_guides import GUIDE, GUIDE_TOPICS, complete_guide
 from .parser import Deck, parse_deck
+from .starter import starter_deck
 from .storage import atomic_write, deck_file_lock
 
 
@@ -25,29 +27,6 @@ PROTOCOL_VERSION = 1
 CAPABILITIES = ("replace", "insert", "delete", "move", "notes_policy", "dry_run", "quiet", "compact",
                 "inspect_projection", "slide_fingerprints", "apply_results", "source_file", "substitute",
                 "edit_documents", "yaml_results", "markdown_projection")
-GUIDE = """Quarkfoil agent protocol v1
-
-Read and edit literal Markdown:
-  quarkfoil deck inspect DECK --slides N --format edit [--no-notes] > slide.md
-  quarkfoil deck apply DECK --edit slide.md
-
-The edit document carries the guarded deck and slide revisions in a YAML
-header. Keep the header. Repeat --edit for one ordered atomic transaction.
-Use --format markdown for readable output without an edit receipt.
-
-JSON remains available:
-  quarkfoil deck inspect DECK --no-source --slides N --compact [--no-notes]
-  quarkfoil deck apply DECK [TRANSACTION.json|-] --quiet --compact
-
-Transaction:
-{"revision":"sha256:...","operations":[...]}
-{"operation":"replace","slide":N,"source":"...","notes":"preserve|replace|remove"}
-
-Operations are sequential and guarded by the inspected revision.
-Exit 3 means the deck changed: inspect again and rebuild the transaction.
---no-notes hides returned notes. Default notes policy preserves existing notes
-in replacements. Run `quarkfoil deck protocol` for the full JSON contract.
-"""
 
 PROTOCOL = {
     "name": "quarkfoil-deck",
@@ -874,6 +853,81 @@ def _write_edit_directory(destination: Path, summary: dict[str, Any], *, include
         raise
 
 
+def _guide(arguments: list[str]) -> int:
+    parser = DeckArgumentParser(
+        prog="quarkfoil deck guide",
+        description="Print installed, version-matched guidance for presentation agents",
+    )
+    parser.add_argument("topic", nargs="?", choices=tuple(GUIDE_TOPICS), help="Focused guidance topic")
+    parser.add_argument("--all", action="store_true", help="Print the complete agent reference")
+    args = parser.parse_args(arguments)
+    if args.all and args.topic:
+        raise DeckCommandError("a guide topic cannot be combined with --all", code="usage_error")
+    if args.all:
+        output = complete_guide()
+    elif args.topic:
+        output = GUIDE_TOPICS[args.topic]
+    else:
+        output = GUIDE
+    print(output, end="" if output.endswith("\n") else "\n", flush=True)
+    return 0
+
+
+def _single_line(value: str, field: str, *, allow_empty: bool = False) -> str:
+    value = value.strip()
+    if (not value and not allow_empty) or "\n" in value or "\r" in value:
+        suffix = "a single line" if allow_empty else "a nonempty single line"
+        raise DeckCommandError(f"--{field} must be {suffix}", code="usage_error")
+    return value
+
+
+def _create(arguments: list[str]) -> int:
+    parser = DeckArgumentParser(
+        prog="quarkfoil deck create",
+        description="Create a starter presentation without launching the editor server",
+    )
+    parser.add_argument("deck", type=Path, help="New .md or .markdown presentation")
+    parser.add_argument("--title", default="New presentation", help="Presentation and opening-slide title")
+    parser.add_argument("--author", default="Your name", help="Presentation author; may be empty")
+    parser.add_argument(
+        "--theme", choices=("scientific-light", "scientific-dark"), default="scientific-light",
+        help="Presentation theme (default: scientific-light)",
+    )
+    args = parser.parse_args(arguments)
+    title = _single_line(args.title, "title")
+    author = _single_line(args.author, "author", allow_empty=True)
+    path = args.deck.resolve()
+    if path.suffix.lower() not in (".md", ".markdown"):
+        raise DeckCommandError("presentation path must end in .md or .markdown", code="usage_error")
+    if not path.parent.is_dir():
+        raise DeckCommandError("presentation parent directory does not exist", path=str(path.parent))
+    source = starter_deck(title=title, author=author, theme=args.theme)
+    encoded = source.encode("utf-8")
+    with deck_file_lock(path):
+        existed = path.exists()
+        if existed and not path.is_file():
+            raise DeckCommandError("presentation path is not a file", path=str(path))
+        if existed:
+            try:
+                current = path.read_bytes()
+            except OSError as error:
+                raise DeckCommandError(str(error), path=str(path)) from error
+            if current.strip():
+                raise DeckCommandError(
+                    "presentation already exists and is nonempty",
+                    code="destination_exists", path=str(path),
+                )
+        atomic_write(path, encoded)
+    _print_json({
+        "quarkfoil_result": 1,
+        "path": str(path),
+        "revision": revision(encoded),
+        "created": not existed,
+        "slides": 1,
+    })
+    return 0
+
+
 def _inspect(arguments: list[str]) -> int:
     parser = DeckArgumentParser(prog="quarkfoil deck inspect", description="Return a presentation snapshot for an editing agent")
     parser.add_argument("deck", type=Path)
@@ -1020,21 +1074,26 @@ def main(arguments: list[str]) -> int:
         and "--format" in arguments
     )
     try:
-        if not arguments or arguments[0] not in ("guide", "protocol", "inspect", "apply"):
-            parser = DeckArgumentParser(prog="quarkfoil deck", description="Inspect or atomically edit a presentation for an LLM agent")
-            parser.add_argument("command", choices=("guide", "protocol", "inspect", "apply"))
+        commands = ("guide", "protocol", "create", "inspect", "apply")
+        if not arguments or arguments[0] not in commands:
+            parser = DeckArgumentParser(
+                prog="quarkfoil deck",
+                description="Create, inspect, or atomically edit a presentation for an LLM agent",
+            )
+            parser.add_argument("command", choices=commands)
             parser.parse_args(arguments)
         if arguments[0] == "guide":
-            if len(arguments) != 1:
-                raise DeckCommandError("guide takes no arguments", code="usage_error")
-            print(GUIDE, end="", flush=True)
-            return 0
+            return _guide(arguments[1:])
         if arguments[0] == "protocol":
             if len(arguments) != 1:
                 raise DeckCommandError("protocol takes no arguments", code="usage_error")
             _print_json(PROTOCOL)
             return 0
-        return _inspect(arguments[1:]) if arguments[0] == "inspect" else _apply(arguments[1:])
+        if arguments[0] == "create":
+            return _create(arguments[1:])
+        if arguments[0] == "inspect":
+            return _inspect(arguments[1:])
+        return _apply(arguments[1:])
     except DeckCommandError as error:
         payload = {"error": error.code, "message": str(error), **error.details}
         if yaml_errors:

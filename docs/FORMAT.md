@@ -8,7 +8,7 @@ The UTF-8 Markdown file is the presentation's source of truth. YAML front matter
 ---
 title: Quantum simulation platforms
 author: Ada Lovelace
-aspect-ratio: 16:9
+aspect-ratio: "16:9"
 theme: scientific-light
 assets:
   figures: artwork
@@ -98,6 +98,11 @@ Each slide begins with a Markdown heading and layout attributes:
 
 `columns` and `rows` are relative proportions and are normalized by the parser.
 
+Use `.layout-0` for positioned content that still needs the ordinary title and
+footer. Use `.layout-free` only when the entire slide should be free of that
+chrome; Free suppresses the complete slide frame, including its title and
+footer. Overlay geometry remains relative to the full slide in both layouts.
+
 ### Title Markdown and spacing
 
 The Design title editor exposes the real heading Markdown but hides the
@@ -141,7 +146,10 @@ Markdown for the left region.
 Valid region names are `core`, `left`, `right`, `top-left`, `bottom-left`, `top-right`, and `bottom-right`, according to the selected layout.
 The optional `font-size` attribute sets a region's text size in `em`; the
 Design properties expose values from `0.25em` through `3em`. Removing the
-attribute restores the default `0.72em` region size.
+attribute restores the default `0.72em` region size. Source accepts any
+positive decimal value, optionally followed by `em`; the Design controls clamp
+editing to the displayed range. Effective size depends on context, especially
+for overlay prose and equations; see [Resolved typography](AUTHORING.md#resolved-typography).
 Within a grid region, one empty line has its usual Markdown meaning and
 separates blocks such as paragraphs or lists. Each additional consecutive
 empty line adds one line of visible vertical space. Empty lines inside fenced
@@ -231,6 +239,13 @@ rules, alternating rows, and colors:
 ![](figures/example.svg){fit=contain focus="50 50" opacity="0.65"}
 ```
 
+A grid region is recognized as an image region only when its complete trimmed
+body is one image. Do not mix a caption or prose with that image in the same
+region: the region then becomes ordinary Markdown, and Quarkfoil-specific image
+attributes such as `{fit=contain}` may render as literal text. Put captions in
+a separate region or positioned overlay. See [Keep images alone in grid
+regions](AUTHORING.md#keep-images-alone-in-grid-regions).
+
 Supported `fit` values:
 
 - `contain`: show the complete image.
@@ -310,6 +325,12 @@ Attributes:
 - `color`: an optional six- or eight-digit hexadecimal text color, such as
   `#c92a2a` or the 50%-opaque `#c92a2a80`.
 - `align`: `left`, `center`, or `right`.
+
+Markdown overlays and shape labels render source newlines as hard line breaks,
+unlike grid regions. Keep each overlay paragraph on one source line unless the
+break is intentional. Overlay boxes, grid regions, and shape labels may also
+clip content without producing a parser diagnostic; use the rendered-page
+verification workflow in the [authoring guide](AUTHORING.md#visual-verification).
 
 ### Videos
 
@@ -430,13 +451,21 @@ Several works may be grouped [@einstein1905; @smith2024].
 ```
 
 Escaped citations and citations inside inline or fenced code remain literal.
-A citation overlay provides a positioned figure attribution:
+A citation overlay provides an automatically formatted paper reference at an
+arbitrary position. Figure attribution is one common use. The web interface's
+**Bibliography** → **Add attribution** action inserts this initial form:
 
 ```markdown
-::: overlay {#figure-source type="citation" keys="smith2024 jones2022" display="brief" x="55" y="82" w="40" h="8" font-size="0.7em"}
+::: overlay {#citation-smith2024 type="citation" x="55" y="82" w="40" h="8" key="smith2024" display="brief" align="left" font-size="0.7em"}
 
 :::
 ```
+
+This is a dedicated box/object type. Use `type="citation"` for any positioned
+paper reference, including source credits and figure attributions; do not
+reproduce one as a Markdown overlay containing manually formatted reference
+text. Inline `[@key]` citations remain ordinary Markdown and are a separate
+feature.
 
 `display="number"` shows a citation's shared number. `display="brief"` is an
 attribution: it shows generated abbreviated references without citation

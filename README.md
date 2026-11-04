@@ -63,6 +63,21 @@ uv run quarkfoil example\deck.md
 
 The [`example/`](example/) directory is also a template for new presentation projects.
 
+## Use with coding assistants
+
+Quarkfoil teaches terminal-capable assistants its current format and guarded
+editing workflow directly:
+
+```powershell
+quarkfoil deck guide
+```
+
+Focused guides cover the Markdown format, layouts, overlays, assets, citations,
+presentation authoring, and reconstruction from PowerPoint or PDF references.
+`quarkfoil deck create presentation.md` initializes a deck without starting the
+browser server, while `deck inspect` and `deck apply` make revision-checked,
+atomic slide edits. See the [AI assistant guide](docs/AGENT_CLI.md).
+
 ## Export a static website
 
 ```powershell

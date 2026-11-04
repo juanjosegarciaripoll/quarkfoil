@@ -84,6 +84,18 @@ To start a new presentation directly:
 quarkfoil my-new-lecture.md
 ```
 
+For a script or coding assistant that should initialize the presentation and
+exit instead of starting the editor server:
+
+```console
+quarkfoil deck create my-new-lecture.md \
+  --title "My new lecture" \
+  --author "Ada Lovelace"
+```
+
+Run `quarkfoil deck guide` to discover the version-matched agent workflow and
+its focused Markdown, layout, asset, citation, and authoring references.
+
 Binding to a non-loopback address exposes the editor to the corresponding network. Do so only on a trusted network and after reviewing the security implications.
 
 ## Export a presentation website

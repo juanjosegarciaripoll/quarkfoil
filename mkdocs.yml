@@ -44,6 +44,7 @@ nav:
   - User guide:
       - Installation and command line: INSTALLATION.md
       - Use with AI assistants: AGENT_CLI.md
+      - Authoring and source reconstruction: AUTHORING.md
       - Editor: USER_GUIDE.md
       - Export a static website: EXPORT.md
       - Print a PDF: PRINT.md

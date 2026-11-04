@@ -10,7 +10,7 @@ import { keepListItemVisible } from "./sidebar.js";
 const STARTER = `---
 title: Quarkfoil
 author: Your name
-aspect-ratio: 16:9
+aspect-ratio: "16:9"
 theme: scientific-light
 defaults:
   footer: Editable Markdown · Reveal.js

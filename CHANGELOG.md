@@ -7,6 +7,19 @@ All notable changes to Quarkfoil are documented here. The project follows
 
 ### Added
 
+- Expand `quarkfoil deck guide` into a self-teaching, version-matched reference
+  with focused topics for the guarded workflow, Markdown format, layouts,
+  overlays, assets, citations, authoring, source reconstruction, and canonical
+  examples. The reconstruction guide resolves effective pixel sizes, documents
+  image-only cells and overlay line breaks, distinguishes the two gridless
+  layouts, derives overlay geometry, and makes rendered-page inspection part
+  of whole-deck authoring. `--all`
+  prints the complete reference when context size is not a concern. Add
+  `quarkfoil deck create DECK` to initialize a missing or whitespace-only
+  presentation without starting the browser server; optional title, author,
+  and theme fields customize the starter, while nonempty files are never
+  replaced.
+
 - `quarkfoil print DECK` renders a presentation to PDF with one page per
   slide. Quarkfoil exports the deck to a temporary website, serves it on a
   loopback port, and drives a headless Chrome, Chromium, Edge, or Firefox,
@@ -46,6 +59,10 @@ All notable changes to Quarkfoil are documented here. The project follows
   a conflict rather than overwritten unless `--force` is given.
 
 ### Fixed
+
+- Quote `aspect-ratio: "16:9"` in generated starter presentations and format
+  examples so Python-side deck inspection retains the ratio as a string instead
+  of interpreting YAML 1.1 sexagesimal notation as the integer `969`.
 
 - Open exported presentations directly from the file system. The exported
   player is now one classic script rather than ES modules, and `index.html`
