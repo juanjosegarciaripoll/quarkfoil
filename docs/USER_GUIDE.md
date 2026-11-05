@@ -287,10 +287,10 @@ different entry would use an existing citation key, Quarkfoil adds a conventiona
 alphabetic suffix such as `smith2024a` before showing the preview.
 After confirmation, DOI imports are formatted and the complete draft is sorted
 alphabetically by citation key. **Reformat** applies the same canonical multiline
-format and sorting to entries edited or pasted by hand. Because rewriting cannot
-safely preserve every BibTeX extension, Reformat refuses `%` comments and
-`@comment`, `@preamble`, or `@string` directives instead of silently discarding
-them. **Close**, `Escape`, **Insert [n]**, and **Add attribution** save the
+format and sorting to entries edited or pasted by hand. It removes ordinary
+lines beginning with `%`. Because rewriting cannot safely flatten every BibTeX
+extension, Reformat still refuses `@comment`, `@preamble`, and `@string`
+directives. **Close**, `Escape`, **Insert [n]**, and **Add attribution** save the
 current valid bibliography automatically. A parse error or external-file
 conflict leaves the dialog open so the draft can be repaired or reconciled.
 Pressing `Enter` in the DOI field performs the same Add DOI action and keeps the

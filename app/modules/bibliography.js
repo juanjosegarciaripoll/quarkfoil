@@ -53,12 +53,12 @@ export function parseBibliography(source) {
 }
 
 export function formatBibliography(source) {
-  if (!source.trim()) return "";
-  if (/^\s*%/m.test(source)) throw new Error("Remove or convert % comments before reformatting the bibliography");
-  if (/@(?:comment|preamble|string)\s*\{/i.test(source)) {
+  const cleaned = String(source).replace(/^[ \t]*%[^\r\n]*(?:\r?\n|$)/gm, "");
+  if (!cleaned.trim()) return "";
+  if (/@(?:comment|preamble|string)\s*\{/i.test(cleaned)) {
     throw new Error("Reformat supports ordinary bibliography entries, not @comment, @preamble, or @string directives");
   }
-  const records = bibliographyRecords(source);
+  const records = bibliographyRecords(cleaned);
   if (records.some(record => !record.citationKey || !record.entryTags)) {
     throw new Error("Reformat supports ordinary bibliography entries, not @comment, @preamble, or @string directives");
   }
@@ -104,6 +104,13 @@ export function renameBibliographyEntry(source, key) {
   return renamed;
 }
 
+function isArxivDoi(value) {
+  const doi = String(value || "").trim()
+    .replace(/^https?:\/\/(?:dx\.)?doi\.org\//i, "")
+    .replace(/^doi:\s*/i, "");
+  return /^10\.48550\/arxiv\./i.test(doi);
+}
+
 export function briefReference(entry) {
   const fields = entry?.fields || {};
   const authors = (fields.author || "Unknown author").split(/\s+and\s+/i);
@@ -112,7 +119,7 @@ export function briefReference(entry) {
   const type = String(entry?.type || "").toLocaleLowerCase();
   const thesis = type === "phdthesis" ? "PhD thesis" : type === "mastersthesis" ? "Master's thesis" : "";
   const venue = fields.journal || fields.booktitle || fields.publisher || fields.school || fields.institution || "";
-  const archive = fields.eprint && !venue && !fields.doi
+  const archive = fields.eprint && (isArxivDoi(fields.doi) || (!venue && !fields.doi))
     ? `${fields.archiveprefix || "arXiv"}:${fields.eprint.replace(/^arxiv:\s*/i, "")}`
     : "";
   const details = thesis

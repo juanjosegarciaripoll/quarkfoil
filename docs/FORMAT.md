@@ -477,4 +477,5 @@ DOI and URL fields become links. In the local editor, an attribution also shows
 a small document link when its bibliography entry has an available `file` or
 `pdf` attachment. Entries with an `eprint` field show their archive and
 identifier, for example `arXiv:2501.12345`, when no publication venue or DOI is
-available. Missing keys are shown as visible errors.
+available. An arXiv DOI (`10.48550/arXiv.…`) identifies the preprint itself, so
+its `eprint` is also shown. Missing keys are shown as visible errors.

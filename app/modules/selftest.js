@@ -369,6 +369,9 @@ function assertCitations() {
     "bibliography reformatting sorts entries alphabetically by citation key");
   assert(formattedBibliography.includes("  author    = {Alpha, Alice},\n  title     = {First},")
     && formattedBibliography.includes("title  = {A {Protected} Title},"), "bibliography reformatting orders and aligns fields while retaining protected braces");
+  const cleanedBibliography = formatBibliography("% Encoding: UTF-8\n  % Imported bibliography\r\n@article{clean2026, author={Clean, C.}, year={2026}}\n");
+  assert(cleanedBibliography.startsWith("@article{clean2026,") && !cleanedBibliography.includes("Encoding")
+    && !cleanedBibliography.includes("Imported"), "bibliography reformatting removes ordinary percent comment lines");
   const thesisReference = briefReference(parseBibliography("@phdthesis{doe2020, author={Doe, Jane}, school={Example University}, year={2020}}")[0]);
   assert(thesisReference === "Doe, PhD thesis, Example University, (2020)", "thesis attributions identify their type and institution");
   const mastersReference = briefReference(parseBibliography("@mastersthesis{roe2021, author={Roe, Richard}, school={Example College}, year={2021}}")[0]);
@@ -380,6 +383,12 @@ function assertCitations() {
     "published attributions omit redundant e-print identifiers");
   const doiEprintReference = briefReference(parseBibliography("@article{mark2025, author={Mark, A.}, year={2025}, eprint={2501.12345}, archivePrefix={arXiv}, doi={10.1000/example}}")[0]);
   assert(doiEprintReference === "Mark, (2025)", "DOI-backed attributions omit redundant e-print identifiers");
+  const arxivDoiReference = briefReference(parseBibliography("@article{mark2025, author={Mark, A.}, year={2025}, eprint={2501.12345}, archivePrefix={arXiv}, doi={10.48550/arXiv.2501.12345}}")[0]);
+  assert(arxivDoiReference === "Mark, arXiv:2501.12345, (2025)",
+    "arXiv DOI attributions retain their e-print identifier");
+  const arxivUrlDoiReference = briefReference(parseBibliography("@article{mark2025, author={Mark, A.}, year={2025}, eprint={arXiv:2501.12345}, doi={https://doi.org/10.48550/ARXIV.2501.12345}}")[0]);
+  assert(arxivUrlDoiReference === "Mark, arXiv:2501.12345, (2025)",
+    "arXiv DOI detection accepts DOI URLs and avoids repeating the archive prefix");
   let bibliographyError = "";
   try { parseBibliography("@article{broken, month=Sept}"); } catch (error) { bibliographyError = error.message; }
   assert(bibliographyError.startsWith("Invalid BibTeX:"), "BibTeX parser failures produce visible error messages");

@@ -63,6 +63,15 @@ All notable changes to Quarkfoil are documented here. The project follows
 
 ### Fixed
 
+- Remove ordinary `%` comment lines while canonically reformatting a bibliography,
+  so importing a DOI succeeds when the existing BibTeX file contains comments.
+  Structural `@comment`, `@preamble`, and `@string` directives remain explicit
+  errors because flattening them could change entry values.
+
+- Keep the arXiv identifier in a brief reference when its BibTeX entry also has
+  the corresponding `10.48550/arXiv.…` DOI. Journal DOI references continue to
+  omit a redundant preprint identifier.
+
 - Quote `aspect-ratio: "16:9"` in generated starter presentations and format
   examples so Python-side deck inspection retains the ratio as a string instead
   of interpreting YAML 1.1 sexagesimal notation as the integer `969`.
