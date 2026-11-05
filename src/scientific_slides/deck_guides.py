@@ -15,6 +15,7 @@ Before editing, read the workflow and the topics relevant to the request:
   quarkfoil deck guide overlays
   quarkfoil deck guide assets
   quarkfoil deck guide citations
+  quarkfoil deck guide publishing
   quarkfoil deck guide authoring
   quarkfoil deck guide reproduction
   quarkfoil deck guide examples
@@ -367,6 +368,61 @@ source is missing. The box has a transparent background and no border or shadow.
 """
 
 
+PUBLISHING = """Quarkfoil collection publishing
+
+`quarkfoil publish` adds one or more decks to a shared static collection with
+one generated listing, versioned player runtimes, and a content-addressed asset
+pool. It does not use SFTP. A remote target is an rsync destination, normally
+transferred over SSH; Quarkfoil leaves authentication to SSH.
+
+Every published deck needs a valid `date` in front matter. The listing also
+uses `title`, `description` (falling back to `subtitle`), `event`, `series`,
+`part`, `series-description`, and `unlisted` when present:
+
+```yaml
+---
+title: Quantum simulation
+description: An introduction to programmable quantum matter.
+event: Summer school
+date: 2026-09-07
+---
+```
+
+Publish to a local collection or inspect a remote update without changing it:
+
+```console
+quarkfoil publish lecture.md --site ./talks
+quarkfoil publish lecture.md --site homepage:talks/ --dry-run
+```
+
+When the dry run names the intended target and changes, publish by removing
+`--dry-run`:
+
+```console
+quarkfoil publish lecture.md --site homepage:talks/
+```
+
+Here `homepage` is an SSH host name or alias and `talks/` is relative to the
+remote account's home. An explicit target may instead be
+`user@host:/var/www/talks/`. The web server, DNS, and mapping from that remote
+directory to a public URL are external to Quarkfoil. Inspect the user's SSH
+configuration or ask for the target; never derive it from the public URL.
+
+Publish several decks in one staged update so assets transfer once and the
+listing is rebuilt once:
+
+```console
+quarkfoil publish presentations/0*.md --site homepage:talks/
+```
+
+The deck folder defaults to the Markdown filename; `--name` changes it for a
+single deck. `--index-title` and `--index-lede` initialize or update remembered
+listing text. `--index-only` rebuilds the listing. Speaker notes are omitted by
+default because the published Markdown is public; include them only with the
+explicit `--notes` option. Use `quarkfoil publish --help` for all options.
+"""
+
+
 AUTHORING = """Quarkfoil authoring and review
 
 Preserve scientific meaning, equations, units, caveats, citations, and speaker
@@ -624,6 +680,7 @@ GUIDE_TOPICS = {
     "overlays": OVERLAYS,
     "assets": ASSETS,
     "citations": CITATIONS,
+    "publishing": PUBLISHING,
     "authoring": AUTHORING,
     "reproduction": REPRODUCTION,
     "examples": EXAMPLES,

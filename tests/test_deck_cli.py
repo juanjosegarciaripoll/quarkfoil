@@ -86,6 +86,7 @@ class DeckCliTests(unittest.TestCase):
         self.assertLess(len(output.split()), 195)
         self.assertIn("Quarkfoil agent protocol v1", output)
         self.assertIn("quarkfoil deck guide layouts", output)
+        self.assertIn("quarkfoil deck guide publishing", output)
         self.assertIn("quarkfoil deck create DECK", output)
         self.assertIn("Exit 3 means the deck changed", output)
         self.assertIn("Use --no-notes", output)
@@ -112,7 +113,8 @@ class DeckCliTests(unittest.TestCase):
             "Quarkfoil editing workflow", "Quarkfoil Markdown format", "Quarkfoil layouts",
             "Quarkfoil positioned overlays", "Quarkfoil project assets",
             "CITATIONS: BIBLIOGRAPHY SOURCE AND CANONICAL FORMS", "Quarkfoil authoring and review",
-            "REPRODUCTION: FIRST-PASS RULES", "Quarkfoil slide examples",
+            "Quarkfoil collection publishing", "REPRODUCTION: FIRST-PASS RULES",
+            "Quarkfoil slide examples",
         ):
             self.assertIn(heading, complete)
 
@@ -135,6 +137,15 @@ class DeckCliTests(unittest.TestCase):
         self.assertEqual((result, errors), (0, ""))
         self.assertIn("their own box type", overlays)
         self.assertIn('type="citation"', overlays)
+
+        result, publishing, errors = self.invoke(["deck", "guide", "publishing"])
+        self.assertEqual((result, errors), (0, ""))
+        self.assertIn("Every published deck needs a valid `date`", publishing)
+        self.assertIn("rsync destination", publishing)
+        self.assertIn("transferred over SSH", publishing)
+        self.assertIn("--dry-run", publishing)
+        self.assertIn("never derive it from the public URL", publishing)
+        self.assertIn("Speaker notes are omitted", publishing)
 
         result, output, errors = self.invoke(["deck", "guide", "layouts", "--all"])
         self.assertEqual((result, output), (2, ""))

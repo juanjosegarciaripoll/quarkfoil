@@ -7,8 +7,8 @@ chat cannot use this feature unless you upload files and edit them manually.
 
 You do not need to teach the assistant Quarkfoil's file format or prepare JSON
 files yourself. Quarkfoil provides installed, version-matched guidance for its
-workflow, Markdown format, layouts, overlays, assets, citations, and authoring
-conventions, then applies slide changes safely.
+workflow, Markdown format, layouts, overlays, assets, citations, publishing,
+and authoring conventions, then applies slide changes safely.
 
 ## Before you begin
 
@@ -34,6 +34,7 @@ quarkfoil deck guide layouts
 quarkfoil deck guide overlays
 quarkfoil deck guide assets
 quarkfoil deck guide citations
+quarkfoil deck guide publishing
 quarkfoil deck guide authoring
 quarkfoil deck guide reproduction
 quarkfoil deck guide examples
@@ -46,6 +47,10 @@ For reconstruction from PowerPoint, PDF, or screenshots, the `reproduction`
 topic explains resolved type sizes, image-only regions, free-canvas choices,
 overlay line breaks, geometry, overflow budgets, and visual verification. See
 also the [authoring and source-reconstruction guide](AUTHORING.md).
+
+The `publishing` topic explains how an assistant can update a local or remote
+collection, including the required front matter, rsync-over-SSH target syntax,
+safe dry runs, and the boundary between Quarkfoil and web-server configuration.
 
 ## A prompt you can copy
 

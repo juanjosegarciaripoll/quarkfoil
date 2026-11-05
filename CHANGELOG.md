@@ -9,8 +9,11 @@ All notable changes to Quarkfoil are documented here. The project follows
 
 - Expand `quarkfoil deck guide` into a self-teaching, version-matched reference
   with focused topics for the guarded workflow, Markdown format, layouts,
-  overlays, assets, citations, authoring, source reconstruction, and canonical
-  examples. The reconstruction guide resolves effective pixel sizes, documents
+  overlays, assets, citations, collection publishing, authoring, source
+  reconstruction, and canonical examples. The publishing guide documents
+  required metadata, local and rsync-over-SSH targets, dry runs, and the
+  external mapping from a remote directory to its public URL. The reconstruction
+  guide resolves effective pixel sizes, documents
   image-only cells and overlay line breaks, distinguishes the two gridless
   layouts, derives overlay geometry, and makes rendered-page inspection part
   of whole-deck authoring. `--all`
