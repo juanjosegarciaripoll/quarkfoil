@@ -5,51 +5,60 @@ from __future__ import annotations
 
 GUIDE = """Quarkfoil agent protocol v1
 
-Create a presentation without starting the editor server:
-  quarkfoil deck create DECK [--title TITLE] [--author AUTHOR] [--theme THEME]
+DECK is opaque. Never read, parse, or rewrite it with cat, sed, awk, Python,
+regex scripts, or generic patch tools. Use `deck inspect` for every read and
+`deck apply` for every write. Normal editing tools may change only generated
+edit documents.
 
-Before editing, read the workflow and the topics relevant to the request:
-  quarkfoil deck guide workflow
-  quarkfoil deck guide format
-  quarkfoil deck guide layouts
-  quarkfoil deck guide overlays
-  quarkfoil deck guide assets
-  quarkfoil deck guide citations
-  quarkfoil deck guide publishing
-  quarkfoil deck guide authoring
-  quarkfoil deck guide reproduction
-  quarkfoil deck guide examples
+Before editing: `quarkfoil deck guide workflow`.
+Load details only when relevant: `quarkfoil deck guide TOPIC`.
+Topics: operations, format, layouts, overlays, assets, citations, publishing,
+authoring, reproduction, examples. `--all` prints everything.
 
-Use `quarkfoil deck guide --all` for the complete installed reference.
-Use `quarkfoil deck protocol` for the machine-readable editing contract.
-For a whole-deck reconstruction from PowerPoint, PDF, or screenshots, read
-`guide reproduction`, `guide layouts`, and `guide format` before writing.
+Create: `quarkfoil deck create DECK`.
 
-The safe editing loop is:
-  quarkfoil deck inspect DECK --slides N --format edit > slide.md
-  quarkfoil deck apply DECK --edit slide.md
+Edit:
+  quarkfoil deck inspect DECK --slides 4 --format edit --output EDIT_DIR
+  [edit EDIT_DIR/slide-0004.md; keep its YAML header]
+  quarkfoil deck apply DECK --edit EDIT_DIR/slide-0004.md
 
-Citations resolve keys from the front-matter `bibliography` BibTeX file. Use
-`[@key]` inline or an empty `type="citation"` overlay for a positioned reference.
-
-Never edit the deck directly. Keep the generated YAML header and its revision
-guards. Exit 3 means the deck changed: inspect again and rebuild the edit.
-Use --no-notes when notes must remain outside the agent context.
+EDIT_DIR must be new. Exit 3 means DECK changed: inspect again.
+Use --no-notes when notes must remain outside agent context.
 """
 
 
 WORKFLOW = """Quarkfoil editing workflow
 
+ACCESS BOUNDARY
+
+The presentation Markdown is opaque to general-purpose tools. Do not use cat,
+sed, awk, grep, Python, regular-expression scripts, or a generic file editor to
+read, extract, transform, or patch the deck. These bypass slide boundaries,
+notes policy, parser validation, revision guards, and atomic writes.
+
+Use `quarkfoil deck inspect` for every deck read and `quarkfoil deck apply` for
+every deck write. An agent's normal text-editing or patch tool may modify only
+the generated edit documents, not the deck itself.
+
 1. Inspect before changing anything. For narrative or deck-wide consistency,
    inspect the whole deck. For a local change, project only the relevant slides.
-2. Use literal Markdown edit documents:
-     quarkfoil deck inspect DECK --slides 4 --format edit > slide-4.md
+2. Ask Quarkfoil to create literal Markdown edit documents in a new directory:
+     quarkfoil deck inspect DECK --slides 4 --format edit --output deck-edit
 3. Keep the YAML header. Edit only the operation fields and Markdown body that
-   the operation permits.
+   the operation permits, using the agent's ordinary file-editing capability.
 4. Apply one or more documents in a single atomic transaction:
-     quarkfoil deck apply DECK --edit slide-4.md --edit conclusion.md
+     quarkfoil deck apply DECK --edit deck-edit/slide-0004.md
 5. Inspect the affected slides again. Parser validation does not prove that a
    slide is visually balanced; use the browser editor for layout-sensitive work.
+
+Every apply validates all operations and writes once. Exit 3 means the deck
+changed; inspect again. Use `--no-notes` when notes must stay outside agent
+context. Run `quarkfoil deck guide operations` for operation schemas and exact
+edit-document headers.
+"""
+
+
+OPERATIONS = """Quarkfoil edit operations
 
 Edit operations:
   replace     Replace one slide. Existing notes are preserved when notes is
@@ -675,6 +684,7 @@ Free-canvas annotation:
 
 GUIDE_TOPICS = {
     "workflow": WORKFLOW,
+    "operations": OPERATIONS,
     "format": FORMAT,
     "layouts": LAYOUTS,
     "overlays": OVERLAYS,

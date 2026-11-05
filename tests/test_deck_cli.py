@@ -83,16 +83,17 @@ class DeckCliTests(unittest.TestCase):
     def test_guide_is_concise_and_complete(self) -> None:
         result, output, errors = self.invoke(["deck", "guide"])
         self.assertEqual((result, errors), (0, ""))
-        self.assertLess(len(output.split()), 195)
+        self.assertLess(len(output.split()), 170)
         self.assertIn("Quarkfoil agent protocol v1", output)
-        self.assertIn("quarkfoil deck guide layouts", output)
-        self.assertIn("quarkfoil deck guide publishing", output)
+        self.assertIn("operations, format, layouts", output)
+        self.assertIn("publishing", output)
+        self.assertIn("DECK is opaque", output)
+        self.assertIn("cat, sed, awk, Python", output)
+        self.assertIn("--format edit --output EDIT_DIR", output)
+        self.assertIn("Normal editing tools may change only generated", output)
         self.assertIn("quarkfoil deck create DECK", output)
-        self.assertIn("Exit 3 means the deck changed", output)
+        self.assertIn("Exit 3 means DECK changed", output)
         self.assertIn("Use --no-notes", output)
-        self.assertIn("front-matter `bibliography` BibTeX file", output)
-        self.assertIn("`[@key]` inline", output)
-        self.assertIn('empty `type="citation"` overlay', output)
 
     def test_guide_topics_and_complete_reference_are_discoverable(self) -> None:
         result, output, errors = self.invoke(["deck", "guide", "layouts"])
@@ -104,13 +105,21 @@ class DeckCliTests(unittest.TestCase):
 
         result, workflow, errors = self.invoke(["deck", "guide", "workflow"])
         self.assertEqual((result, errors), (0, ""))
+        self.assertIn("ACCESS BOUNDARY", workflow)
+        self.assertIn("Use `quarkfoil deck inspect` for every deck read", workflow)
+        self.assertIn("normal text-editing or patch tool may modify only", workflow)
+        self.assertIn("guide operations", workflow)
+
+        result, operations, errors = self.invoke(["deck", "guide", "operations"])
+        self.assertEqual((result, errors), (0, ""))
         for operation in ("insert", "delete", "move", "substitute"):
-            self.assertIn(f"operation: {operation}", workflow)
+            self.assertIn(f"operation: {operation}", operations)
 
         result, complete, errors = self.invoke(["deck", "guide", "--all"])
         self.assertEqual((result, errors), (0, ""))
         for heading in (
-            "Quarkfoil editing workflow", "Quarkfoil Markdown format", "Quarkfoil layouts",
+            "Quarkfoil editing workflow", "Quarkfoil edit operations",
+            "Quarkfoil Markdown format", "Quarkfoil layouts",
             "Quarkfoil positioned overlays", "Quarkfoil project assets",
             "CITATIONS: BIBLIOGRAPHY SOURCE AND CANONICAL FORMS", "Quarkfoil authoring and review",
             "Quarkfoil collection publishing", "REPRODUCTION: FIRST-PASS RULES",
@@ -137,6 +146,12 @@ class DeckCliTests(unittest.TestCase):
         self.assertEqual((result, errors), (0, ""))
         self.assertIn("their own box type", overlays)
         self.assertIn('type="citation"', overlays)
+
+        result, citations, errors = self.invoke(["deck", "guide", "citations"])
+        self.assertEqual((result, errors), (0, ""))
+        self.assertIn("bibliography: references.bib", citations)
+        self.assertIn("Inline citations", citations)
+        self.assertIn('type="citation"', citations)
 
         result, publishing, errors = self.invoke(["deck", "guide", "publishing"])
         self.assertEqual((result, errors), (0, ""))
@@ -213,6 +228,10 @@ class DeckCliTests(unittest.TestCase):
         self.assertEqual(payload["exit_codes"]["4"], "expectation mismatch")
         self.assertEqual(payload["edit_documents"]["exit_code_4"], "operation precondition mismatch")
         self.assertIn("substitute", payload["capabilities"])
+        self.assertTrue(payload["deck_file_access"]["opaque"])
+        self.assertEqual(payload["deck_file_access"]["read"], "quarkfoil deck inspect")
+        self.assertEqual(payload["deck_file_access"]["write"], "quarkfoil deck apply")
+        self.assertIn("forbidden", payload["deck_file_access"]["direct_file_tools"])
 
     def test_apply_help_describes_quiet_result(self) -> None:
         output = StringIO()

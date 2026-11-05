@@ -86,6 +86,14 @@ All notable changes to Quarkfoil are documented here. The project follows
 
 ### Changed
 
+- Define the presentation Markdown as opaque in the installed agent guide and
+  machine-readable deck protocol. Agents must read through `deck inspect`,
+  write through `deck apply`, and restrict generic text or patch tools to the
+  generated, revision-guarded edit documents. The recommended workflow now
+  uses `inspect --output` instead of shell redirection. Keep the mandatory
+  guide concise by moving detailed operation schemas into an opt-in
+  `deck guide operations` topic.
+
 - Reuse an existing `--output` directory when exporting. Quarkfoil still builds
   the site in a temporary sibling folder and publishes it only after a complete
   export, but it now writes into a directory that already exists instead of

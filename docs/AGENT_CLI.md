@@ -29,6 +29,7 @@ task needs:
 
 ```console
 quarkfoil deck guide workflow
+quarkfoil deck guide operations
 quarkfoil deck guide format
 quarkfoil deck guide layouts
 quarkfoil deck guide overlays
@@ -51,6 +52,34 @@ also the [authoring and source-reconstruction guide](AUTHORING.md).
 The `publishing` topic explains how an assistant can update a local or remote
 collection, including the required front matter, rsync-over-SSH target syntax,
 safe dry runs, and the boundary between Quarkfoil and web-server configuration.
+The `operations` topic contains the exact guarded headers for insertion,
+deletion, movement, and literal substitution; assistants need not load those
+schemas for an ordinary slide replacement.
+
+## Treat the presentation file as opaque
+
+The assistant must use `quarkfoil deck inspect` whenever it needs presentation
+content and `quarkfoil deck apply` for every presentation change. It must not
+read, select, parse, or rewrite the deck with `cat`, `sed`, `awk`, `grep`,
+Python, regular-expression scripts, or a generic patching tool. Those routes
+bypass slide boundaries, private-note filtering, parser validation, revision
+guards, and atomic saving.
+
+Quarkfoil can generate guarded edit documents in a new directory:
+
+```console
+quarkfoil deck inspect lecture.md --slides 12 --format edit --output lecture-edit
+```
+
+The assistant may use its normal text editor or patch capability on
+`lecture-edit/slide-0012.md`, retain the generated YAML header, and apply it:
+
+```console
+quarkfoil deck apply lecture.md --edit lecture-edit/slide-0012.md
+```
+
+This is the only place a generic editing tool belongs in the workflow: it may
+edit a generated transaction document, never `lecture.md` itself.
 
 ## A prompt you can copy
 
@@ -58,8 +87,10 @@ Replace `lecture.md` with the name of your presentation and give the assistant
 this instruction:
 
 > Help me edit `lecture.md` with Quarkfoil. Before making changes, run
-> `quarkfoil deck guide`. Follow its inspect-and-apply workflow instead of
-> editing the Markdown file directly. Ask me before deleting any slide.
+> `quarkfoil deck guide`. Treat `lecture.md` as opaque: do not read or modify it
+> with shell text tools, Python, or a generic patch tool. Access it only through
+> `quarkfoil deck inspect` and `quarkfoil deck apply`; generic editing tools may
+> modify only generated edit documents. Ask me before deleting any slide.
 
 That is enough for the assistant to discover the available commands. You can
 then make normal requests, for example:
@@ -130,10 +161,10 @@ the same document structure through its Python mirror.
 
 ### Edit one slide without JSON
 
-Inspect one slide as a directly editable document:
+Ask Quarkfoil to create one directly editable document in a new directory:
 
 ```console
-quarkfoil deck inspect lecture.md --slides 12 --format edit > slide-12.md
+quarkfoil deck inspect lecture.md --slides 12 --format edit --output lecture-edit
 ```
 
 The output begins with a guarded YAML header and continues as literal Markdown:
@@ -160,7 +191,7 @@ Literal Markdown and $\LaTeX$.
 Edit the Markdown normally, keep the YAML header, and apply it:
 
 ```console
-quarkfoil deck apply lecture.md --edit slide-12.md
+quarkfoil deck apply lecture.md --edit lecture-edit/slide-0012.md
 ```
 
 The result is a concise YAML receipt. Quarkfoil checks both the exact deck
@@ -317,8 +348,8 @@ single atomic write.
 
 The remainder of this page documents the original JSON interface. It remains
 supported for existing integrations, callers that already produce structured
-transactions, and source-file workflows. Agents editing Markdown directly
-should prefer the YAML framework above.
+transactions, and source-file workflows. Agents changing slides should prefer
+the guarded YAML framework above.
 
 ### Inspect a presentation
 

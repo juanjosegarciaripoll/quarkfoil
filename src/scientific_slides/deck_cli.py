@@ -32,6 +32,13 @@ PROTOCOL = {
     "name": "quarkfoil-deck",
     "protocol_version": PROTOCOL_VERSION,
     "capabilities": list(CAPABILITIES),
+    "deck_file_access": {
+        "opaque": True,
+        "read": "quarkfoil deck inspect",
+        "write": "quarkfoil deck apply",
+        "direct_file_tools": "forbidden for the deck itself",
+        "edit_documents": "may be changed with the agent's normal text-editing tool",
+    },
     "workflow": ["inspect the deck", "retain its revision", "apply a transaction using that revision"],
     "transaction": {
         "required": ["revision", "operations"],
@@ -929,7 +936,10 @@ def _create(arguments: list[str]) -> int:
 
 
 def _inspect(arguments: list[str]) -> int:
-    parser = DeckArgumentParser(prog="quarkfoil deck inspect", description="Return a presentation snapshot for an editing agent")
+    parser = DeckArgumentParser(
+        prog="quarkfoil deck inspect",
+        description="Read deck content through Quarkfoil without parsing the file with shell tools",
+    )
     parser.add_argument("deck", type=Path)
     parser.add_argument("--no-notes", action="store_true", help="Omit speaker notes from returned content")
     parser.add_argument("--no-source", action="store_true", help="Omit the whole-deck source from JSON or YAML")
