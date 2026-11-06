@@ -46,6 +46,7 @@ app/modules/editor.js      Direct-manipulation editor behavior
 app/modules/app.js         Editor application state and UI orchestration
 app/modules/player.js      Presentation-only static player
 src/scientific_slides/     Python launcher, local server, exporter, printer
+src/scientific_slides/downloader.py  Published-talk project reconstruction
 example/                   Maintained sample presentation and figures
 tests/                     Python tests and the Edge browser CI harness
 docs/                      User, format, security, export, and developer docs
@@ -136,6 +137,26 @@ The distribution and command-line tool are named `quarkfoil`.
 - Keep `pack` and `export` as separate verbs. Their option sets, output kinds,
   and overwrite rules differ on purpose.
 
+### Downloading a published talk
+
+- `quarkfoil download URL --output DIRECTORY` reconstructs the public talk as
+  an editable project and never changes the published site. Keep removal as a
+  separate future `unpublish` operation.
+- Restore the unchanged published Markdown and reverse the page's asset map so
+  content-addressed and private assets return to their project-relative paths.
+  Do not copy `index.html`, `meta.json`, runtimes, or the hashed pool into the
+  editable project.
+- Keep every restored path inside the output directory and every network asset
+  on the published site's origin. Stage through a temporary sibling and leave
+  no partial project after a missing or unsafe asset.
+- Reuse an existing destination without disturbing unrelated files. Differing
+  files are conflicts unless `--force` is explicit. Prefer the source file name
+  recorded in new publication metadata and fall back to the talk slug for old
+  publications.
+- Do not imply that download can recover unpublished material. Notes omitted by
+  default or bibliography entries removed by `--trim-bibliography` are absent
+  from the public site.
+
 ### Printing a PDF
 
 - `quarkfoil print DECK` renders the presentation to PDF with a headless
@@ -189,9 +210,12 @@ The distribution and command-line tool are named `quarkfoil`.
   on JavaScript: it must be readable by search engines.
 - Remote targets are rsync destinations, read with rsync's own meanings.
   Reaching a network host is a deliberate exception to the local-only rule,
-  explicit per invocation, with no credentials handled by Quarkfoil. Push the
-  pool append-only (`--ignore-existing`), mirror only the deck's own folder
-  (`--delete --delay-updates`), and never run `--delete` at the collection root.
+  explicit per invocation, with no credentials handled by Quarkfoil. Read the
+  collection settings and deck metadata in one operation. Push the pool
+  append-only (`--ignore-existing`), then batch the explicit talk folders,
+  listing, settings, and `series/` into one `--delete --delay-updates`
+  operation. Deletion is scoped to those named directories; never apply it to
+  the collection root.
 
 ## Dependencies and licensing
 

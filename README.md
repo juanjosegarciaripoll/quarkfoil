@@ -122,6 +122,17 @@ each talk canonical Open Graph/Twitter metadata with an opening-slide card.
 See the
 [publishing guide](docs/PUBLISH.md).
 
+## Download a published talk
+
+```powershell
+quarkfoil download https://example.org/talks/quantum-simulation/ `
+  --output quantum-simulation
+```
+
+This reconstructs a non-destructive, editable project from the published
+Markdown and its content-addressed figures. See the
+[download guide](docs/DOWNLOAD.md).
+
 ## Documentation
 
 - [Installation and command-line use](docs/INSTALLATION.md)

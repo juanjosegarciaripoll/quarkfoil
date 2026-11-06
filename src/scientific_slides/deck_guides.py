@@ -455,6 +455,10 @@ listing is rebuilt once:
 quarkfoil publish presentations/0*.md --site homepage:talks/
 ```
 
+An ordinary remote update uses three rsync/SSH sessions: one combined state
+read, one append-only shared-pool upload, and one batched update containing all
+talk folders plus the listing, collection settings, and series pages.
+
 The deck folder defaults to the Markdown filename; `--name` changes it for a
 single deck. `--index-title` and `--index-lede` initialize or update remembered
 listing text. Give the collection's public address once with `--site-url`; it
@@ -482,6 +486,17 @@ need Chrome, Chromium, or Edge; `social.image` does not. `--index-only`
 rebuilds the listing. Speaker notes are omitted by default because the
 published Markdown is public; include them only with the explicit `--notes`
 option. Use `quarkfoil publish --help` for all options.
+
+Recover or fork an already published talk without changing the website:
+
+```console
+quarkfoil download https://example.org/talks/lecture/ --output recovered-lecture
+```
+
+This restores the Markdown and original project-relative asset paths from the
+content-addressed pool. It cannot recover notes omitted during publication or
+bibliography entries removed by `--trim-bibliography`. An existing differing
+file is a conflict unless `--force` is explicitly requested.
 """
 
 

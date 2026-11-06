@@ -149,18 +149,21 @@ See the [publishing guide](PUBLISH.md).
 
 ## Which command produces what
 
-Quarkfoil writes a presentation out in four ways, and they do not overlap:
+Quarkfoil moves presentations between editable and published forms in five
+ways, and they do not overlap:
 
 | Command | Produces | Use it to |
 |---|---|---|
 | `quarkfoil export` | one self-contained folder, openable from the file system | hand a deck over, archive it, or deploy it on its own |
 | `quarkfoil pack` | an editable project folder | move a presentation, or split one folder into one project per talk |
 | `quarkfoil publish` | one talk inside a shared collection | build up a site of talks that share a runtime and their figures |
+| `quarkfoil download` | an editable project reconstructed from a public talk | recover or fork a published presentation |
 | `quarkfoil print` | one PDF file, one page per slide | hand out or archive the slides where a browser is not wanted |
 
 `export` and `publish` both produce a website; the difference is whether the
 deck stands alone or joins others. `pack` produces no website at all: its
-output is source you go on editing. `print` produces neither: it is the deck
+output is source you go on editing. `download` reverses the project paths of a
+published talk without removing it. `print` produces neither: it is the deck
 frozen into pages.
 
 To let a coding assistant make safe, structured slide changes, follow

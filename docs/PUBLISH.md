@@ -203,19 +203,27 @@ Quarkfoil reports which it read before it transfers anything. A target is
 remote when it starts with `rsync://`, contains `::`, or has two or more
 characters before a colon, so a Windows drive letter stays local.
 
-Two transfers run, and they differ deliberately:
+For an existing collection, Quarkfoil uses three remote sessions: one read and
+two writes. The first rsync reads `collection.json` and every talk's
+`meta.json` together. The shared pool and collection-owned pages then need
+different write policies:
 
 ```console
-rsync -rltL --ignore-existing <staged>/assets/  homepage:talks/assets/
-rsync -rltL --delete --delay-updates <staged>/2026-inc-school/  homepage:talks/2026-inc-school/
+rsync ... --include=meta.json --include=collection.json homepage:talks/ <state>/
+rsync -rltpL --ignore-existing <staged>/assets/ homepage:talks/assets/
+rsync -rltpL --delete --delay-updates \
+  <staged>/2026-inc-school <staged>/index.html \
+  <staged>/collection.json <staged>/series homepage:talks/
 ```
 
 The shared half is **append-only**: `--ignore-existing` never deletes, and a
 name that already exists holds the same bytes by construction, so nothing is
-re-sent. The deck's own folder is mirrored, because a re-published talk owns
-it; `--delay-updates` swaps its files in at the end, so a reader loading the
-talk mid-publish does not catch it half-changed. `--delete` is never run at the
-root of the collection: publishing a talk cannot remove another one.
+re-sent. Every talk folder and the generated listing, settings, and series
+pages are named as sources in one batched transfer. A re-published talk owns
+its folder, and `--delay-updates` swaps files in at the end so a reader does not
+catch it half-changed. Although the destination is the collection root,
+`--delete` applies only inside the explicitly named source directories. It
+cannot remove another talk, the asset pool, or an unrelated root file.
 
 Nothing is mirrored locally. Quarkfoil stages the deck in a temporary folder of
 symlinks — a few hundred kilobytes — and rsync sends only the bytes the host is
@@ -236,3 +244,16 @@ deliberate, separate operation, not something a publish does on its own.
 An image written inside prose, rather than as a slide's own image block, is not
 resolved through the asset map. Quarkfoil keeps a private copy of it beside the
 deck so the page is still correct, and says so while publishing.
+
+## Recover an editable project
+
+The published Markdown and its asset map let the command line reconstruct
+the public version as a local project without changing the site:
+
+```console
+quarkfoil download https://example.org/talks/quantum-simulation/ \
+  --output presentations/quantum-simulation
+```
+
+See [Download a published talk](DOWNLOAD.md) for conflict handling and the
+limits imposed by notes omitted during publishing or a trimmed bibliography.

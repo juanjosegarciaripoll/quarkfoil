@@ -89,6 +89,37 @@ def _pack(arguments: list[str]) -> int:
     return 0
 
 
+def _download(arguments: list[str]) -> int:
+    from .downloader import DownloadError, download_published
+
+    parser = argparse.ArgumentParser(
+        prog="quarkfoil download",
+        description="Download a published talk as an editable Quarkfoil project",
+    )
+    parser.add_argument("url", metavar="URL", help="Public URL of the published talk")
+    parser.add_argument("--output", "-o", type=Path, required=True, help="Directory to create or update")
+    parser.add_argument("--name", help="Recovered Markdown file name (default: original name or talk slug)")
+    parser.add_argument(
+        "--force", action="store_true",
+        help="Replace destination files that differ from the downloaded project",
+    )
+    parser.add_argument(
+        "--timeout", type=float, default=30,
+        help="Seconds allowed for each download (default: 30)",
+    )
+    args = parser.parse_args(arguments)
+    try:
+        destination, deck = download_published(
+            args.url, args.output, name=args.name, force=args.force, timeout=args.timeout
+        )
+    except (DownloadError, FileExistsError, ValueError) as error:
+        print(f"quarkfoil download: {error}", file=sys.stderr)
+        return 1
+    print(f"Downloaded editable Quarkfoil project to {destination}")
+    print(f"Keep editing it with: quarkfoil {deck}")
+    return 0
+
+
 def _print(arguments: list[str]) -> int:
     from .printer import BROWSER_TIMEOUT_SECONDS, SLIDE_HEIGHT_INCHES, SLIDE_WIDTH_INCHES, print_presentation
 
@@ -208,6 +239,8 @@ def main(argv: list[str] | None = None) -> int:
         return _export(arguments[1:])
     if arguments[:1] == ["pack"]:
         return _pack(arguments[1:])
+    if arguments[:1] == ["download"]:
+        return _download(arguments[1:])
     if arguments[:1] == ["publish"]:
         return _publish(arguments[1:])
     if arguments[:1] == ["print"]:

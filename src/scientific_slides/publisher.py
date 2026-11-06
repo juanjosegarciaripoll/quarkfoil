@@ -366,6 +366,7 @@ def _stage_deck(
         card_pool, _ = _pool_asset(root, card_asset, card_data)
         pooled.append(f"{POOL_DIR}/{card_pool}")
         card_url = urljoin(collection_url, f"{POOL_DIR}/{quote(card_pool, safe='/')}")
+        asset_map[social_image.replace("\\", "/")] = f"../{POOL_DIR}/{quote(card_pool, safe='/')}"
         card_type = mimetypes.guess_type(card_asset.name)[0] or "application/octet-stream"
         if not card_type.startswith("image/"):
             raise PublishError(f"{resolved.name} social.image is not a recognized image: {social_image}")
@@ -439,6 +440,7 @@ def _stage_deck(
     )
     meta = {
         "slug": slug,
+        "source": resolved.name,
         "title": metadata["title"],
         "description": metadata["description"],
         "author": metadata["author"],
@@ -502,41 +504,63 @@ def _rsync(command: list[str], dry_run: bool, *, tolerate: tuple[int, ...] = (),
     return result.returncode
 
 
-def _ensure_root(target: Target, rsync: str) -> None:
-    """Create the collection folder itself.
-
-    rsync creates the last component of a destination but not the ones above
-    it, so the first publish into a new collection would fail on `.../assets`.
-    Sending an empty directory to the root first works on every rsync version,
-    unlike `--mkpath`, and adds nothing to an existing collection.
-    """
-    empty = Path(tempfile.mkdtemp(prefix=".quarkfoil-root-"))
-    try:
-        _rsync([rsync, *RSYNC_MODES, f"{empty}/", f"{target.raw}/"], False, quiet=True)
-    finally:
-        shutil.rmtree(empty, ignore_errors=True)
-
-
-def _push(staging: Path, target: Target, names: list[str], dry_run: bool, rsync: str) -> None:
-    """Send the staged tree: the shared half append-only, each deck folder mirrored."""
+def _push(
+    staging: Path,
+    target: Target,
+    names: list[str],
+    dry_run: bool,
+    rsync: str,
+    *,
+    root_exists: bool,
+) -> None:
+    """Send the pool once and every collection-owned path in one other transfer."""
     base = [rsync, *RSYNC_MODES, "--human-readable"]
     if dry_run:
         base += ["--dry-run", "--itemize-changes"]
+    assets = staging / ASSETS_DIR
+    owned = [staging / name for name in names if (staging / name).exists()]
+
+    def push_assets() -> None:
+        if assets.is_dir():
+            _rsync(
+                base + ["--ignore-existing", f"{assets}/", f"{target.child(ASSETS_DIR)}/"],
+                dry_run,
+            )
+
+    def push_owned() -> None:
+        if owned:
+            # Passing each named directory without a trailing slash scopes
+            # --delete to those directories. Unnamed talks, assets, and other
+            # root entries are outside the transfer and cannot be deleted.
+            _rsync(
+                base + ["--delete", "--delay-updates", *(str(entry) for entry in owned), f"{target.raw}/"],
+                dry_run,
+            )
+
+    if root_exists:
+        push_assets()
+        push_owned()
     else:
-        _ensure_root(target, rsync)
-    if (staging / ASSETS_DIR).is_dir():
-        _rsync(base + ["--ignore-existing", f"{staging / ASSETS_DIR}/", f"{target.child(ASSETS_DIR)}/"], dry_run)
-    for name in names:
-        entry = staging / name
-        if entry.is_dir():
-            _rsync(base + ["--delete", "--delay-updates", f"{entry}/", f"{target.child(name)}/"], dry_run)
-        elif entry.is_file():
-            _rsync(base + [str(entry), target.child(name)], dry_run)
+        # A named directory/file transfer creates the collection root. On a
+        # real first publish it must precede the nested assets destination.
+        push_owned()
+        if dry_run and assets.is_dir():
+            print(f"  would append shared assets to {target.child(ASSETS_DIR)}/")
+        else:
+            push_assets()
 
 
-def _install(staging: Path, target: Target, names: list[str], dry_run: bool, rsync: str) -> None:
+def _install(
+    staging: Path,
+    target: Target,
+    names: list[str],
+    dry_run: bool,
+    rsync: str,
+    *,
+    root_exists: bool = True,
+) -> None:
     if target.remote:
-        _push(staging, target, names, dry_run, rsync)
+        _push(staging, target, names, dry_run, rsync, root_exists=root_exists)
         return
     root = target.path
     if dry_run:
@@ -578,8 +602,9 @@ def publish_presentations(
     if not decks:
         raise PublishError("No presentation to publish")
     target = Target.parse(site)
+    state = _collection_state(target, rsync)
     settings = _resolved_settings(
-        _settings(target, rsync), title=index_title, lede=index_lede, site_url=site_url
+        state.settings, title=index_title, lede=index_lede, site_url=site_url
     )
     print(f"Publishing to {target.description}")
     staging = Path(tempfile.mkdtemp(prefix=".quarkfoil-publish-"))
@@ -597,19 +622,26 @@ def publish_presentations(
             for warning in staged.warnings:
                 print(f"  warning: {staged.slug}: {warning}")
             published.append(staged.meta)
-        (staging / SETTINGS_NAME).write_text(
-            json.dumps(settings, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
-        )
-        _install(
-            staging, target, [str(meta["slug"]) for meta in published] + [SETTINGS_NAME], dry_run, rsync
-        )
+        entries = _updated_entries(state.entries, published)
+        names = [str(meta["slug"]) for meta in published]
+        rebuild_index = index
+        if index and not _listed_entries(entries) and not state.complete and _has(target, INDEX_NAME, rsync):
+            print("  warning: the collection could not be read; its listing is left unchanged")
+            rebuild_index = False
+            state.exists = True
+        if rebuild_index:
+            count = _stage_index(staging, entries, settings)
+            names += [INDEX_NAME, SETTINGS_NAME, SERIES_DIR]
+        else:
+            (staging / SETTINGS_NAME).write_text(
+                json.dumps(settings, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+            )
+            names.append(SETTINGS_NAME)
+        _install(staging, target, names, dry_run, rsync, root_exists=state.exists)
     finally:
         shutil.rmtree(staging, ignore_errors=True)
-    if index:
-        publish_index(
-            site, title=index_title, lede=index_lede, site_url=site_url,
-            dry_run=dry_run, rsync=rsync,
-        )
+    if rebuild_index:
+        print(f"  listed {count} talk{'' if count == 1 else 's'}")
     return published
 
 
@@ -632,68 +664,95 @@ def publish_presentation(
     Speaker notes are left out unless asked for: a published deck's Markdown is
     a public file, and its notes are written for the presenter.
     """
-    target = Target.parse(site)
-    settings = _resolved_settings(
-        _settings(target, rsync), title=index_title, lede=index_lede, site_url=site_url
-    )
-    print(f"Publishing to {target.description}")
-    staging = Path(tempfile.mkdtemp(prefix=".quarkfoil-publish-"))
-    try:
-        staged = _stage_deck(
-            deck,
-            staging,
-            name=name,
-            include_notes=include_notes,
-            trim_bibliography=trim_bibliography,
-            collection_url=settings["url"],
-        )
-        for warning in staged.warnings:
-            print(f"  warning: {warning}")
-        (staging / SETTINGS_NAME).write_text(
-            json.dumps(settings, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
-        )
-        _install(staging, target, [staged.slug, SETTINGS_NAME], dry_run, rsync)
-    finally:
-        shutil.rmtree(staging, ignore_errors=True)
-    if index:
-        publish_index(
-            site, title=index_title, lede=index_lede, site_url=site_url,
-            dry_run=dry_run, rsync=rsync,
-        )
-    return staged.meta
+    return publish_presentations(
+        [deck],
+        site,
+        names=[name] if name else None,
+        include_notes=include_notes,
+        trim_bibliography=trim_bibliography,
+        index=index,
+        index_title=index_title,
+        index_lede=index_lede,
+        site_url=site_url,
+        dry_run=dry_run,
+        rsync=rsync,
+    )[0]
 
 
 # --------------------------------------------------------------------- index
 
 
-def _gather(target: Target, rsync: str) -> tuple[list[dict[str, object]], bool]:
-    """Read every published deck's own metadata; the collection needs no manifest.
+@dataclass
+class CollectionState:
+    settings: dict[str, object]
+    entries: list[dict[str, object]]
+    complete: bool
+    exists: bool
 
-    Returns the entries and whether the collection could be read at all: a
-    target that does not exist yet reads as empty, which is not the same as a
-    collection whose listing must not be replaced by an empty one.
-    """
-    entries: list[dict[str, object]] = []
-    complete = True
-    if target.remote:
-        temporary = Path(tempfile.mkdtemp(prefix=".quarkfoil-index-"))
-        try:
-            code = _rsync(
-                [rsync, "-rm", "--include=*/", f"--include={META_NAME}", "--exclude=*",
-                 f"{target.raw}/", f"{temporary}/"],
-                False,
-                tolerate=(RSYNC_PARTIAL,),
-                quiet=True,
-            )
-            complete = code == 0
-            files = sorted(temporary.rglob(META_NAME))
-            entries = [json.loads(path.read_text(encoding="utf-8")) for path in files]
-        finally:
-            shutil.rmtree(temporary, ignore_errors=True)
-    elif target.path.is_dir():
-        for path in sorted(target.path.glob(f"*/{META_NAME}")):
-            entries.append(json.loads(path.read_text(encoding="utf-8")))
-    return [entry for entry in entries if not entry.get("unlisted")], complete
+
+def _read_settings(path: Path) -> dict[str, object]:
+    if not path.is_file():
+        return {}
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def _collection_state(target: Target, rsync: str) -> CollectionState:
+    """Read collection settings and every deck metadata file in one operation."""
+    if not target.remote:
+        entries = []
+        if target.path.is_dir():
+            entries = [
+                json.loads(path.read_text(encoding="utf-8"))
+                for path in sorted(target.path.glob(f"*/{META_NAME}"))
+            ]
+        return CollectionState(
+            _read_settings(target.path / SETTINGS_NAME), entries, True, target.path.is_dir()
+        )
+
+    temporary = Path(tempfile.mkdtemp(prefix=".quarkfoil-state-"))
+    try:
+        code = _rsync(
+            [
+                rsync,
+                "-rm",
+                "--include=*/",
+                f"--include={META_NAME}",
+                f"--include={SETTINGS_NAME}",
+                "--exclude=*",
+                f"{target.raw}/",
+                f"{temporary}/",
+            ],
+            False,
+            tolerate=(RSYNC_PARTIAL,),
+            quiet=True,
+        )
+        entries = [
+            json.loads(path.read_text(encoding="utf-8"))
+            for path in sorted(temporary.rglob(META_NAME))
+        ]
+        complete = code == 0
+        return CollectionState(
+            _read_settings(temporary / SETTINGS_NAME), entries, complete, complete
+        )
+    finally:
+        shutil.rmtree(temporary, ignore_errors=True)
+
+
+def _updated_entries(
+    existing: list[dict[str, object]], updates: list[dict[str, object]]
+) -> list[dict[str, object]]:
+    by_slug = {str(entry.get("slug", "")): entry for entry in existing if entry.get("slug")}
+    for entry in updates:
+        by_slug[str(entry["slug"])] = entry
+    return list(by_slug.values())
+
+
+def _listed_entries(entries: list[dict[str, object]]) -> list[dict[str, object]]:
+    return [entry for entry in entries if not entry.get("unlisted")]
 
 
 def _has(target: Target, name: str, rsync: str) -> bool:
@@ -973,36 +1032,22 @@ def index_pages(
             pages[f"{SERIES_DIR}/{card['slug']}/{INDEX_NAME}"] = series_page(card, title, url)
     return pages
 
-
-
-def _settings(target: Target, rsync: str) -> dict[str, object]:
-    """The collection's own heading and standfirst, kept beside its listing."""
-    if not target.remote:
-        path = target.path / SETTINGS_NAME
-        if path.is_file():
-            try:
-                value = json.loads(path.read_text(encoding="utf-8"))
-                return value if isinstance(value, dict) else {}
-            except json.JSONDecodeError:
-                return {}
-        return {}
-    temporary = Path(tempfile.mkdtemp(prefix=".quarkfoil-settings-"))
-    try:
-        _rsync(
-            [rsync, "-q", "--ignore-missing-args", f"{target.raw}/{SETTINGS_NAME}", f"{temporary}/"],
-            False,
-            tolerate=(RSYNC_PARTIAL,),
-            quiet=True,
-        )
-        path = temporary / SETTINGS_NAME
-        if not path.is_file():
-            return {}
-        value = json.loads(path.read_text(encoding="utf-8"))
-        return value if isinstance(value, dict) else {}
-    except (PublishError, json.JSONDecodeError):
-        return {}
-    finally:
-        shutil.rmtree(temporary, ignore_errors=True)
+def _stage_index(
+    staging: Path, entries: list[dict[str, object]], settings: dict[str, str]
+) -> int:
+    listed = _listed_entries(entries)
+    pages = index_pages(listed, settings["title"], settings["lede"], settings["url"])
+    for relative, page in pages.items():
+        destination = staging / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(page, encoding="utf-8")
+    # Always present, even with no series left, so mirroring removes the pages
+    # of a series whose talks are gone.
+    (staging / SERIES_DIR).mkdir(exist_ok=True)
+    (staging / SETTINGS_NAME).write_text(
+        json.dumps(settings, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+    return len(listed)
 
 
 def publish_index(
@@ -1016,31 +1061,28 @@ def publish_index(
 ) -> int:
     """Rebuild the collection's listing from the metadata each deck carries."""
     target = Target.parse(site)
-    settings = _settings(target, rsync)
+    state = _collection_state(target, rsync)
     # Given once, kept from then on: a later publish must not reset the heading.
-    resolved = _resolved_settings(settings, title=title, lede=lede, site_url=site_url)
-    entries, complete = _gather(target, rsync)
-    if not entries and not complete and _has(target, INDEX_NAME, rsync):
+    resolved = _resolved_settings(state.settings, title=title, lede=lede, site_url=site_url)
+    entries = _listed_entries(state.entries)
+    if not entries and not state.complete and _has(target, INDEX_NAME, rsync):
         print("  warning: the collection could not be read; its listing is left unchanged")
         return 0
-    pages = index_pages(entries, resolved["title"], resolved["lede"], resolved["url"])
     staging = Path(tempfile.mkdtemp(prefix=".quarkfoil-index-"))
     try:
-        for relative, page in pages.items():
-            destination = staging / relative
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            destination.write_text(page, encoding="utf-8")
-        # Always present, even with no series left, so mirroring removes the
-        # pages of a series whose talks are gone.
-        (staging / SERIES_DIR).mkdir(exist_ok=True)
-        (staging / SETTINGS_NAME).write_text(
-            json.dumps(resolved, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        count = _stage_index(staging, state.entries, resolved)
+        _install(
+            staging,
+            target,
+            [INDEX_NAME, SETTINGS_NAME, SERIES_DIR],
+            dry_run,
+            rsync,
+            root_exists=state.exists,
         )
-        _install(staging, target, [INDEX_NAME, SETTINGS_NAME, SERIES_DIR], dry_run, rsync)
     finally:
         shutil.rmtree(staging, ignore_errors=True)
-    print(f"  listed {len(entries)} talk{'' if len(entries) == 1 else 's'}")
-    return len(entries)
+    print(f"  listed {count} talk{'' if count == 1 else 's'}")
+    return count
 
 
 __all__ = [

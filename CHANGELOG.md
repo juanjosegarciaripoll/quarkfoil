@@ -7,6 +7,14 @@ All notable changes to Quarkfoil are documented here. The project follows
 
 ### Added
 
+- Add `quarkfoil download URL --output DIRECTORY` to reconstruct a published
+  talk as an editable project without changing the website. It restores pooled
+  and private assets to the paths written in the Markdown, remembers the
+  original source file name for new publications, falls back to the talk slug
+  for older ones, stages atomically, rejects unsafe paths and off-origin asset
+  redirects, and protects differing destination files unless `--force` is
+  given.
+
 - Publish canonical URLs and Open Graph/Twitter cards for talk collections.
   `--site-url` stores the collection's public URL in `collection.json`; every
   published talk then gets absolute canonical and image metadata. By default
@@ -101,6 +109,12 @@ All notable changes to Quarkfoil are documented here. The project follows
   copy when there is no server to ask.
 
 ### Changed
+
+- Reduce an ordinary remote publication to three rsync/SSH sessions: one
+  combined collection-state read, one append-only shared-assets upload, and
+  one batched update for the talk folders, listing, collection settings, and
+  series pages. The batched delete remains scoped to explicitly named
+  directories and cannot remove unrelated talks or root files.
 
 - Define the presentation Markdown as opaque in the installed agent guide and
   machine-readable deck protocol. Agents must read through `deck inspect`,

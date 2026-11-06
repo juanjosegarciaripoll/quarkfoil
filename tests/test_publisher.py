@@ -304,24 +304,26 @@ class RemotePublishTests(unittest.TestCase):
 
         with mock.patch("scientific_slides.publisher.shutil.which", return_value="/usr/bin/rsync"), \
              mock.patch("scientific_slides.publisher.subprocess.run", side_effect=fake_run):
-            publish_presentation(self.deck, "homepage:talks/", index=False)
+            publish_presentation(self.deck, "homepage:talks/")
 
-        self.assertEqual(len(calls), 5)
-        settings_read, root, assets, deck, settings_write = calls
-        self.assertIn("--ignore-missing-args", settings_read)
-        self.assertTrue(root[-1].endswith("homepage:talks/"))
-        self.assertNotIn("--delete", root)
+        self.assertEqual(len(calls), 3)
+        state_read, assets, owned = calls
+        self.assertIn("--include=meta.json", state_read)
+        self.assertIn("--include=collection.json", state_read)
         self.assertIn("--ignore-existing", assets)
         self.assertNotIn("--delete", assets)
         self.assertTrue(assets[-1].endswith("homepage:talks/assets/"))
-        self.assertIn("--delete", deck)
-        self.assertIn("--delay-updates", deck)
-        self.assertTrue(deck[-1].endswith("homepage:talks/lecture/"))
-        self.assertIn("-rltpL", deck)
+        self.assertIn("--delete", owned)
+        self.assertIn("--delay-updates", owned)
+        self.assertTrue(owned[-1].endswith("homepage:talks/"))
+        self.assertTrue(any(str(item).endswith("/lecture") for item in owned))
+        self.assertTrue(any(str(item).endswith("/series") for item in owned))
+        self.assertTrue(any(str(item).endswith("/index.html") for item in owned))
+        self.assertEqual(sum(str(item).endswith("/collection.json") for item in owned), 1)
+        self.assertIn("-rltpL", owned)
         # a web server has to be able to read what was published
-        for command in calls[1:]:
+        for command in (assets, owned):
             self.assertIn("--chmod=D755,F644", command)
-        self.assertTrue(settings_write[-1].endswith("homepage:talks/collection.json"))
 
     def test_a_missing_rsync_is_reported_clearly(self) -> None:
         with mock.patch("scientific_slides.publisher.shutil.which", return_value=None):

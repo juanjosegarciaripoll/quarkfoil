@@ -50,6 +50,7 @@ nav:
       - Print a PDF: PRINT.md
       - Pack a project folder: PACK.md
       - Publish a collection: PUBLISH.md
+      - Download a published talk: DOWNLOAD.md
       - Presentation format: FORMAT.md
   - Reference:
       - Security: SECURITY.md

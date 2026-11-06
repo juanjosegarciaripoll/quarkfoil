@@ -15,6 +15,10 @@ Quarkfoil is a local editing tool, not a hardened multi-user web service.
 - Local-server deck saves require a matching revision and are serialized so two
   API writers cannot both save against the same base revision.
 - Asset uploads are size-limited and restricted to supported image and video extensions.
+- `quarkfoil download` reaches the explicit HTTP(S) talk URL only when invoked.
+  Recovered paths stay inside the chosen output directory, and asset URLs and
+  redirects must remain on the published page's origin. Downloaded Markdown
+  and assets are stored as project data; Quarkfoil does not execute them.
 - The online icon picker contacts Iconify only after an explicit search. Results
   are restricted to an allowlist, downloaded by the local server, checked for
   active or externally loaded SVG content, and then used through `<img>` like
