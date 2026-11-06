@@ -104,11 +104,45 @@ export function renameBibliographyEntry(source, key) {
   return renamed;
 }
 
-function isArxivDoi(value) {
-  const doi = String(value || "").trim()
+function normalizedDoi(value) {
+  return String(value || "").trim()
     .replace(/^https?:\/\/(?:dx\.)?doi\.org\//i, "")
     .replace(/^doi:\s*/i, "");
-  return /^10\.48550\/arxiv\./i.test(doi);
+}
+
+function isArxivDoi(value) {
+  return /^10\.48550\/arxiv\./i.test(normalizedDoi(value));
+}
+
+function eprintIdentifier(value) {
+  return String(value || "").trim().replace(/^arxiv:\s*/i, "");
+}
+
+function arxivIdentifier(fields) {
+  const eprint = String(fields.eprint || "").trim();
+  const archive = String(fields.archiveprefix || "").trim();
+  if (eprint && (isArxivDoi(fields.doi) || !archive || /^arxiv$/i.test(archive) || /^arxiv:/i.test(eprint))) {
+    return eprintIdentifier(eprint);
+  }
+  const match = normalizedDoi(fields.doi).match(/^10\.48550\/arxiv\.(.+)$/i);
+  return match?.[1] || "";
+}
+
+function arxivUrl(fields) {
+  const identifier = arxivIdentifier(fields);
+  if (!identifier) return "";
+  const path = identifier.split("/").map(part => encodeURIComponent(part)).join("/");
+  return `https://arxiv.org/abs/${path}`;
+}
+
+function referenceUrl(fields) {
+  const doi = normalizedDoi(fields.doi);
+  if (doi) {
+    const directArxiv = isArxivDoi(doi) ? arxivUrl(fields) : "";
+    return directArxiv || `https://doi.org/${encodeURI(doi)}`;
+  }
+  if (fields.url) return fields.url;
+  return arxivUrl(fields);
 }
 
 export function briefReference(entry) {
@@ -120,7 +154,7 @@ export function briefReference(entry) {
   const thesis = type === "phdthesis" ? "PhD thesis" : type === "mastersthesis" ? "Master's thesis" : "";
   const venue = fields.journal || fields.booktitle || fields.publisher || fields.school || fields.institution || "";
   const archive = fields.eprint && (isArxivDoi(fields.doi) || (!venue && !fields.doi))
-    ? `${fields.archiveprefix || "arXiv"}:${fields.eprint.replace(/^arxiv:\s*/i, "")}`
+    ? `${fields.archiveprefix || "arXiv"}:${eprintIdentifier(fields.eprint)}`
     : "";
   const details = thesis
     ? [thesis, venue].filter(Boolean).join(", ")
@@ -161,8 +195,7 @@ export function renderCitation(key, bibliography, { brief = false } = {}) {
   const number = bibliography?.numbers.get(key);
   const entry = bibliography?.byKey.get(key);
   if (!entry || (!brief && !number)) return `<span class="citation-missing">[? ${key}]</span>`;
-  const doi = entry.fields.doi;
-  const url = doi ? `https://doi.org/${encodeURI(doi)}` : entry.fields.url;
+  const url = referenceUrl(entry.fields);
   const marker = `<span class="citation-number">[${number}]</span>`;
   const content = brief ? escapeHtml(briefReference(entry)) : marker;
   const citation = url ? `<a class="citation" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${content}</a>` : `<span class="citation">${content}</span>`;

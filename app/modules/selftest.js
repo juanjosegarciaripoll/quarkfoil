@@ -32,7 +32,7 @@ import {
 } from "./parser.js";
 import { renderDeck, renderMarkdownPreview, syncVideoPlayback } from "./render.js";
 import { applyMarkdownStyle, arrowGeometry, bindRangeControl, boundarySlideShortcut, buildShapePalette, buildShapeSelect, canvasLinkTarget, canvasStartsMarquee, clipboardImageFile, deleteKey, DesignEditor, dialogDragPosition, handleMarkdownShortcut, initialImageGeometry, moveGeometryGroup, overlayPasteOffset, pageSlideIndex, projectAssetPage, rectanglesIntersect, refreshConvertedVideoAssets, renameClipboardImage, repeatedActivation, resolveImportDestination, storeOverlayClipboard, storedOverlayClipboard, videoConflictDestination, videoFile, videoPathAttributes } from "./editor.js";
-import { briefReference, formatBibliography, parseBibliography, prepareBibliography, renameBibliographyEntry, uniqueCitationKey } from "./bibliography.js";
+import { briefReference, formatBibliography, parseBibliography, prepareBibliography, renderCitation, renameBibliographyEntry, uniqueCitationKey } from "./bibliography.js";
 import { compileExpression, createPlotSvg } from "./plot.js";
 import { externalDeckAction, externalMergePlan, renderExternalMerge } from "./external.js";
 import { initialShapeGeometry, makeShapeSvg, shapeLabelInsets, SHAPES } from "./shapes.js";
@@ -389,6 +389,26 @@ function assertCitations() {
   const arxivUrlDoiReference = briefReference(parseBibliography("@article{mark2025, author={Mark, A.}, year={2025}, eprint={arXiv:2501.12345}, doi={https://doi.org/10.48550/ARXIV.2501.12345}}")[0]);
   assert(arxivUrlDoiReference === "Mark, arXiv:2501.12345, (2025)",
     "arXiv DOI detection accepts DOI URLs and avoids repeating the archive prefix");
+  const eprintOnlyEntry = parseBibliography("@article{seemps2026, author={Mark, A.}, year={2026}, eprint={2601.16734}}")[0];
+  const eprintOnlyCitation = renderCitation("seemps2026", { byKey: new Map([[eprintOnlyEntry.key, eprintOnlyEntry]]), numbers: new Map() }, { brief: true });
+  assert(eprintOnlyCitation.includes('href="https://arxiv.org/abs/2601.16734"'),
+    "eprint-only arXiv attributions link directly to the abstract page");
+  const prefixedEprintEntry = parseBibliography("@article{new2026, author={New, A.}, year={2026}, eprint={arXiv:2611.06552}}")[0];
+  const prefixedEprintCitation = renderCitation("new2026", { byKey: new Map([[prefixedEprintEntry.key, prefixedEprintEntry]]), numbers: new Map() }, { brief: true });
+  assert(prefixedEprintCitation.includes('href="https://arxiv.org/abs/2611.06552"'),
+    "arXiv link generation removes a repeated archive prefix");
+  const arxivDoiEntry = parseBibliography("@article{doi2025, author={Doi, A.}, year={2025}, doi={10.48550/arXiv.2501.12345}}")[0];
+  const arxivDoiCitation = renderCitation("doi2025", { byKey: new Map([[arxivDoiEntry.key, arxivDoiEntry]]), numbers: new Map() }, { brief: true });
+  assert(arxivDoiCitation.includes('href="https://arxiv.org/abs/2501.12345"'),
+    "arXiv DOI links resolve directly to the abstract page without an eprint field");
+  const oldEprintEntry = parseBibliography("@article{old2002, author={Old, A.}, year={2002}, eprint={quant-ph/0208112}}")[0];
+  const oldEprintCitation = renderCitation("old2002", { byKey: new Map([[oldEprintEntry.key, oldEprintEntry]]), numbers: new Map() }, { brief: true });
+  assert(oldEprintCitation.includes('href="https://arxiv.org/abs/quant-ph/0208112"'),
+    "old-style arXiv identifiers retain their archive path separator");
+  const journalEntry = parseBibliography("@article{journal2025, author={Journal, A.}, year={2025}, eprint={2501.12345}, doi={10.1103/example}}")[0];
+  const journalCitation = renderCitation("journal2025", { byKey: new Map([[journalEntry.key, journalEntry]]), numbers: new Map() }, { brief: true });
+  assert(journalCitation.includes('href="https://doi.org/10.1103/example"'),
+    "ordinary journal DOI links remain authoritative when an eprint is also present");
   let bibliographyError = "";
   try { parseBibliography("@article{broken, month=Sept}"); } catch (error) { bibliographyError = error.message; }
   assert(bibliographyError.startsWith("Invalid BibTeX:"), "BibTeX parser failures produce visible error messages");

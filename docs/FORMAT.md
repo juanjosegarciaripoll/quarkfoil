@@ -476,7 +476,9 @@ numbers and does not affect numbering. Its `key` attribute selects one paper;
 `keys` selects multiple space-separated papers. Both are editable from the
 attribution's Design properties. Attributions have a transparent background,
 without a border or shadow, so they can be placed over other slide content.
-DOI and URL fields become links. In the local editor, an attribution also shows
+DOI and URL fields become links. An arXiv eprint without either one links to
+its `https://arxiv.org/abs/…` abstract page; arXiv DOIs link there directly as
+well. In the local editor, an attribution also shows
 a small document link when its bibliography entry has an available `file` or
 `pdf` attachment. Entries with an `eprint` field show their archive and
 identifier, for example `arXiv:2501.12345`, when no publication venue or DOI is

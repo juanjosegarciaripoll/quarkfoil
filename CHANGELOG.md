@@ -87,6 +87,11 @@ All notable changes to Quarkfoil are documented here. The project follows
 
 ### Fixed
 
+- Link eprint-only arXiv citations to their abstract pages, including
+  `arxiv:`-prefixed and old-style archive identifiers. ArXiv DOIs now resolve
+  directly to the same pages, while ordinary journal DOI links remain
+  authoritative.
+
 - Remove ordinary `%` comment lines while canonically reformatting a bibliography,
   so importing a DOI succeeds when the existing BibTeX file contains comments.
   Structural `@comment`, `@preamble`, and `@string` directives remain explicit
