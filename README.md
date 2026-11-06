@@ -72,8 +72,8 @@ editing workflow directly:
 quarkfoil deck guide
 ```
 
-Focused guides cover the Markdown format, layouts, overlays, assets, citations,
-presentation authoring, and reconstruction from PowerPoint or PDF references.
+Focused guides cover metadata, the Markdown format, layouts, overlays, assets,
+citations, presentation authoring, and reconstruction from PowerPoint or PDF references.
 `quarkfoil deck create presentation.md` initializes a deck without starting the
 browser server, while `deck inspect` and `deck apply` make revision-checked,
 atomic slide edits. See the [AI assistant guide](docs/AGENT_CLI.md).
@@ -112,11 +112,14 @@ project folder that opens in the editor like any other. See the
 ## Publish a collection of talks
 
 ```powershell
-quarkfoil publish path\to\presentation.md --site homepage:talks/
+quarkfoil publish path\to\presentation.md --site homepage:talks/ `
+  --site-url https://example.org/talks/
 ```
 
 Many talks share one player and one pool of figures behind a generated listing,
-locally or on a web host over rsync. See the
+locally or on a web host over rsync. The public URL is remembered and gives
+each talk canonical Open Graph/Twitter metadata with an opening-slide card.
+See the
 [publishing guide](docs/PUBLISH.md).
 
 ## Documentation

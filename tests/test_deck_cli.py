@@ -85,7 +85,7 @@ class DeckCliTests(unittest.TestCase):
         self.assertEqual((result, errors), (0, ""))
         self.assertLess(len(output.split()), 170)
         self.assertIn("Quarkfoil agent protocol v1", output)
-        self.assertIn("operations, format, layouts", output)
+        self.assertIn("operations, metadata, format, layouts", output)
         self.assertIn("publishing", output)
         self.assertIn("DECK is opaque", output)
         self.assertIn("cat, sed, awk, Python", output)
@@ -114,11 +114,17 @@ class DeckCliTests(unittest.TestCase):
         self.assertEqual((result, errors), (0, ""))
         for operation in ("insert", "delete", "move", "substitute"):
             self.assertIn(f"operation: {operation}", operations)
+        self.assertIn("metadata", operations)
+
+        result, metadata, errors = self.invoke(["deck", "guide", "metadata"])
+        self.assertEqual((result, errors), (0, ""))
+        self.assertIn("--format metadata --output metadata.yml", metadata)
+        self.assertIn("leaves every slide byte-for-byte unchanged", metadata)
 
         result, complete, errors = self.invoke(["deck", "guide", "--all"])
         self.assertEqual((result, errors), (0, ""))
         for heading in (
-            "Quarkfoil editing workflow", "Quarkfoil edit operations",
+            "Quarkfoil editing workflow", "Quarkfoil edit operations", "Quarkfoil metadata editing",
             "Quarkfoil Markdown format", "Quarkfoil layouts",
             "Quarkfoil positioned overlays", "Quarkfoil project assets",
             "CITATIONS: BIBLIOGRAPHY SOURCE AND CANONICAL FORMS", "Quarkfoil authoring and review",
@@ -228,6 +234,9 @@ class DeckCliTests(unittest.TestCase):
         self.assertEqual(payload["exit_codes"]["4"], "expectation mismatch")
         self.assertEqual(payload["edit_documents"]["exit_code_4"], "operation precondition mismatch")
         self.assertIn("substitute", payload["capabilities"])
+        self.assertIn("metadata", payload["capabilities"])
+        self.assertEqual(payload["edit_documents"]["operations"]["metadata"]["body"],
+                         "complete YAML front-matter mapping")
         self.assertTrue(payload["deck_file_access"]["opaque"])
         self.assertEqual(payload["deck_file_access"]["read"], "quarkfoil deck inspect")
         self.assertEqual(payload["deck_file_access"]["write"], "quarkfoil deck apply")
@@ -774,6 +783,66 @@ class DeckCliTests(unittest.TestCase):
         stored = self.deck.read_text(encoding="utf-8")
         self.assertIn(r"Equation $\sum_i n_i$.", stored)
         self.assertIn("Private first note", stored)
+
+    def test_metadata_edit_round_trips_front_matter_and_preserves_slide_bytes(self) -> None:
+        source = """---
+title: Agent test
+# Keep this comment
+custom-field:
+  nested: true
+---
+
+## First {.layout-1}
+
+Body.
+"""
+        self.deck.write_text(source, encoding="utf-8")
+        before = parse_deck(source)
+        slide_bytes = source[before.front_matter_range.end:]
+        edit = Path(self.temporary.name) / "metadata.yml"
+
+        result, output, errors = self.invoke([
+            "deck", "inspect", str(self.deck), "--format", "metadata", "--output", str(edit),
+        ])
+
+        self.assertEqual((result, errors), (0, ""))
+        self.assertTrue(yaml.safe_load(output)["metadata"])
+        document = edit.read_text(encoding="utf-8")
+        self.assertIn("operation: metadata", document)
+        self.assertIn("# Keep this comment", document)
+        edit.write_text(document.replace("title: Agent test", "title: Revised\ndate: 2026-11-06"), encoding="utf-8")
+
+        result, output, errors = self.invoke(["deck", "apply", str(self.deck), "--edit", str(edit)])
+
+        self.assertEqual((result, errors), (0, ""))
+        receipt = yaml.safe_load(output)
+        self.assertTrue(receipt["operations"][0]["metadata_changed"])
+        self.assertIsNone(receipt["operations"][0]["result_slide"])
+        stored = self.deck.read_text(encoding="utf-8")
+        parsed = parse_deck(stored)
+        self.assertEqual(parsed.metadata["title"], "Revised")
+        self.assertEqual(parsed.metadata["date"].isoformat(), "2026-11-06")
+        self.assertTrue(parsed.metadata["custom-field"]["nested"])
+        self.assertIn("# Keep this comment", stored[:parsed.front_matter_range.end])
+        self.assertEqual(stored[parsed.front_matter_range.end:], slide_bytes)
+
+    def test_metadata_edits_validate_mapping_and_can_create_front_matter(self) -> None:
+        updated = apply_transaction("## Only {.layout-1}\n", [{"operation": "metadata", "source": "title: Added"}])
+        self.assertEqual(parse_deck(updated).metadata["title"], "Added")
+        self.assertIn("\n\n## Only", updated)
+
+        result, document, errors = self.invoke(["deck", "inspect", str(self.deck), "--format", "metadata"])
+        self.assertEqual((result, errors), (0, ""))
+        edit = Path(self.temporary.name) / "invalid-metadata.yml"
+        header, _ = deck_cli._split_edit_document(document)
+        edit.write_text(deck_cli._edit_text(header, "- not\n- a mapping"), encoding="utf-8")
+        before = self.deck.read_bytes()
+
+        result, output, errors = self.invoke(["deck", "apply", str(self.deck), "--edit", str(edit)])
+
+        self.assertEqual((result, output), (2, ""))
+        self.assertIn("YAML mapping", yaml.safe_load(errors)["message"])
+        self.assertEqual(self.deck.read_bytes(), before)
 
     def test_substitute_edit_uses_literal_yaml_blocks(self) -> None:
         deck = parse_deck(SOURCE)

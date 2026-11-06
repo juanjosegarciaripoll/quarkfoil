@@ -443,6 +443,10 @@ def _index_html(
     *,
     runtime: str = "quarkfoil",
     asset_map: str | None = None,
+    canonical_url: str | None = None,
+    preview_alt: str | None = None,
+    preview_type: str | None = None,
+    preview_size: tuple[int, int] | None = None,
 ) -> str:
     styles, scripts, external = _resource_tags(assets, runtime)
     # Reveal's notes plugin writes this pinned inline speaker-controller script
@@ -457,26 +461,45 @@ def _index_html(
     title = html.escape(metadata["title"], quote=True)
     author = html.escape(metadata["author"], quote=True)
     description = html.escape(metadata["description"], quote=True)
+    twitter_card = "summary_large_image" if preview_path else "summary"
     meta = [f'  <meta name="author" content="{author}">'] if author else []
     if description:
         meta.append(f'  <meta name="description" content="{description}">')
     meta.extend((
         '  <meta property="og:type" content="website">',
         f'  <meta property="og:title" content="{title}">',
-        '  <meta name="twitter:card" content="summary_large_image">',
+        f'  <meta name="twitter:card" content="{twitter_card}">',
         f'  <meta name="twitter:title" content="{title}">',
     ))
+    canonical_tag = ""
+    if canonical_url:
+        escaped_url = html.escape(quote(canonical_url, safe="/:%"), quote=True)
+        meta.append(f'  <meta property="og:url" content="{escaped_url}">')
+        canonical_tag = f'  <link rel="canonical" href="{escaped_url}">\n'
     if description:
         meta.extend((
             f'  <meta property="og:description" content="{description}">',
             f'  <meta name="twitter:description" content="{description}">',
         ))
     if preview_path:
-        preview_url = html.escape(quote(preview_path, safe="/"), quote=True)
+        preview_url = html.escape(quote(preview_path, safe="/:%"), quote=True)
         meta.extend((
             f'  <meta property="og:image" content="{preview_url}">',
             f'  <meta name="twitter:image" content="{preview_url}">',
         ))
+        if preview_type:
+            meta.append(f'  <meta property="og:image:type" content="{html.escape(preview_type, quote=True)}">')
+        if preview_size:
+            meta.extend((
+                f'  <meta property="og:image:width" content="{preview_size[0]}">',
+                f'  <meta property="og:image:height" content="{preview_size[1]}">',
+            ))
+        if preview_alt:
+            escaped_alt = html.escape(preview_alt, quote=True)
+            meta.extend((
+                f'  <meta property="og:image:alt" content="{escaped_alt}">',
+                f'  <meta name="twitter:image:alt" content="{escaped_alt}">',
+            ))
     metadata_tags = "\n".join(meta)
     # A JSON data block, not a script: it needs no CSP hash because browsers
     # never execute it, and it lets the player start without fetching.
@@ -497,7 +520,7 @@ def _index_html(
   <meta http-equiv="Content-Security-Policy" content="{html.escape(policy, quote=True)}">
   <title>{title}</title>
 {metadata_tags}
-  <link rel="icon" href="{runtime}/quarkfoil-mark.svg" type="image/svg+xml">
+{canonical_tag}  <link rel="icon" href="{runtime}/quarkfoil-mark.svg" type="image/svg+xml">
 {styles}
   <link rel="stylesheet" href="{runtime}/layout.css">
   <link rel="stylesheet" href="{runtime}/themes.css">
@@ -554,21 +577,28 @@ def serve_directory(root: Path) -> Iterator[str]:
         thread.join(timeout=5)
 
 
-def _preview_command(browser: str, output: Path, url: str) -> list[str]:
+def _preview_command(
+    browser: str, output: Path, url: str, size: tuple[int, int] = (1280, 720)
+) -> list[str]:
     return [
         browser,
         "--headless=new",
         "--disable-gpu",
         "--hide-scrollbars",
         "--force-device-scale-factor=1",
-        "--window-size=1280,720",
+        f"--window-size={size[0]},{size[1]}",
         "--virtual-time-budget=30000",
         f"--screenshot={output}",
         url,
     ]
 
 
-def _create_preview(export_root: Path, preview_path: str) -> None:
+def _create_preview(
+    export_root: Path,
+    preview_path: str,
+    page: str = "/?preview",
+    size: tuple[int, int] = (1280, 720),
+) -> None:
     browser = _executable(CHROMIUM_BROWSERS, "Chrome, Chromium, or Edge")
     output = export_root / preview_path
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -578,7 +608,7 @@ def _create_preview(export_root: Path, preview_path: str) -> None:
     with serve_directory(export_root) as origin:
         try:
             subprocess.run(
-                _preview_command(browser, output, f"{origin}/?preview"),
+                _preview_command(browser, output, f"{origin}{page}", size),
                 check=True,
                 capture_output=True,
                 timeout=60,
@@ -642,7 +672,16 @@ def export_presentation(
         )
         embedded = _embedded_source(source, _exported_bibliography(temporary, source))
         (temporary / "index.html").write_text(
-            _index_html(assets, metadata, preview_path, embedded), encoding="utf-8"
+            _index_html(
+                assets,
+                metadata,
+                preview_path,
+                embedded,
+                preview_alt=metadata["title"] if preview_path else None,
+                preview_type="image/png" if preview_path else None,
+                preview_size=(1280, 720) if preview_path else None,
+            ),
+            encoding="utf-8",
         )
         if preview_path:
             _create_preview(temporary, preview_path)

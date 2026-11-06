@@ -34,6 +34,9 @@ The supported preface fields are:
 | `series` | Course or school this talk belongs to; groups it in a published listing | Empty |
 | `part` | Position within the series, used to order it | Empty |
 | `series-description` | Sentence describing the series, read from any member | Empty |
+| `social.image` | Project-relative figure used as the published link-sharing card | Empty |
+| `social.slide` | Stable slide ID or one-based page number rendered as the card | Front page slide, then first visible slide |
+| `social.alt` | Alternative text for the social-card image | Presentation title |
 | `aspect-ratio` | Intended slide aspect ratio | `16:9` |
 | `theme` | Default presentation theme (`scientific-light` or `scientific-dark`) | `scientific-light` |
 | `defaults.footer` | Markdown footer inherited by slides | Empty |

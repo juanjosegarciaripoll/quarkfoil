@@ -157,6 +157,10 @@ def _publish(arguments: list[str]) -> int:
     parser.add_argument("--no-index", action="store_true", help="Publish the deck without rebuilding the listing")
     parser.add_argument("--index-title", help="Heading of the listing; remembered by the collection (default: Talks)")
     parser.add_argument("--index-lede", help="Sentence under the listing heading; remembered by the collection")
+    parser.add_argument(
+        "--site-url", metavar="URL",
+        help="Public collection URL; remembered and used for canonical links and social cards",
+    )
     parser.add_argument("--dry-run", action="store_true", help="Report what would be published, change nothing")
     parser.add_argument("--rsync", default="rsync", help="rsync program to use for a remote site")
     args = parser.parse_args(arguments)
@@ -169,7 +173,7 @@ def _publish(arguments: list[str]) -> int:
     try:
         if args.index_only:
             publish_index(
-                args.site, title=args.index_title, lede=args.index_lede,
+                args.site, title=args.index_title, lede=args.index_lede, site_url=args.site_url,
                 dry_run=args.dry_run, rsync=args.rsync,
             )
         else:
@@ -182,6 +186,7 @@ def _publish(arguments: list[str]) -> int:
                 index=not args.no_index,
                 index_title=args.index_title,
                 index_lede=args.index_lede,
+                site_url=args.site_url,
                 dry_run=args.dry_run,
                 rsync=args.rsync,
             )

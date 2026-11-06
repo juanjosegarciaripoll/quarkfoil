@@ -26,7 +26,7 @@ UNRELIABLE_BOUNDARY_CODES = frozenset(("unreliable_slide_boundaries", "untermina
 PROTOCOL_VERSION = 1
 CAPABILITIES = ("replace", "insert", "delete", "move", "notes_policy", "dry_run", "quiet", "compact",
                 "inspect_projection", "slide_fingerprints", "apply_results", "source_file", "substitute",
-                "edit_documents", "yaml_results", "markdown_projection")
+                "metadata", "edit_documents", "yaml_results", "markdown_projection")
 
 PROTOCOL = {
     "name": "quarkfoil-deck",
@@ -52,6 +52,7 @@ PROTOCOL = {
             "delete": {"required": ["slide"]},
             "move": {"required": ["slide", "after"], "after_zero": "beginning"},
             "substitute": {"required": ["slide", "expect", "replacement"], "optional": {"count": 1}},
+            "metadata": {"required": ["source"], "source": "complete YAML front-matter mapping"},
         },
     },
     "edit_documents": {
@@ -66,6 +67,7 @@ PROTOCOL = {
             "move": {"header": ["deck_revision", "slide", "slide_revision", "after"]},
             "substitute": {"header": ["deck_revision", "slide", "slide_revision", "expect", "replacement"],
                            "optional": {"count": 1}},
+            "metadata": {"header": ["deck_revision"], "body": "complete YAML front-matter mapping"},
         },
         "operations_are_sequential": True,
         "io": {"success": "YAML receipt on stdout", "error": "YAML on stderr"},
@@ -132,11 +134,12 @@ PROTOCOL = {
             "type": "object", "required": ["operation", "type", "result_slide"],
             "properties": {
                 "operation": {"type": "integer", "minimum": 0},
-                "type": {"enum": ["replace", "insert", "delete", "move", "substitute"]},
+                "type": {"enum": ["replace", "insert", "delete", "move", "substitute", "metadata"]},
                 "result_slide": {"type": ["integer", "null"], "minimum": 1},
                 "deleted_slide": {"type": "integer", "minimum": 1},
                 "from_slide": {"type": "integer", "minimum": 1},
                 "after": {"type": "integer", "minimum": 0}, "no_op": {"type": "boolean"},
+                "metadata_changed": {"type": "boolean"},
             },
             "additionalProperties": False,
         },
@@ -393,6 +396,28 @@ def _newline(source: str) -> str:
     return "\r\n" if "\r\n" in source else "\n"
 
 
+def _metadata_source(value: Any) -> str:
+    if not isinstance(value, str):
+        raise DeckCommandError("metadata source must be a YAML string")
+    metadata = _load_strict_yaml(value)
+    if metadata is None:
+        metadata = {}
+    if not isinstance(metadata, dict):
+        raise DeckCommandError("metadata source must contain a YAML mapping")
+    if any(not isinstance(key, str) for key in metadata):
+        raise DeckCommandError("metadata field names must be strings")
+    return value.strip("\r\n") if value.strip() else "{}"
+
+
+def _replace_metadata(source: str, deck: Deck, metadata_source: str) -> str:
+    newline = _newline(source)
+    body = metadata_source.replace("\r\n", "\n").replace("\r", "\n").replace("\n", newline)
+    block = f"---{newline}{body}{newline}---{newline}"
+    if deck.front_matter_range.end:
+        return block + source[deck.front_matter_range.end:]
+    return block + newline + source
+
+
 def _separator_after(source: str) -> str:
     newline = _newline(source)
     leading = newline if source.endswith(("\n", "\r")) else newline * 2
@@ -473,6 +498,9 @@ def _apply_operation(source: str, operation: Any) -> str:
             newline = _newline(source)
             replacement = f"{replacement}{newline}{newline}{note}"
         return _replace_slide(source, deck, number, replacement)
+    elif name == "metadata":
+        _check_fields(operation, {"source"})
+        return _replace_metadata(source, deck, _metadata_source(operation.get("source")))
     elif name == "insert":
         _check_fields(operation, {"after", "source"})
         after = _integer(operation, "after", minimum=0)
@@ -560,6 +588,8 @@ def _apply_transaction_details(source: str, operations: Any) -> tuple[str, list[
                 tokens.insert(after - 1 if number < after else after, token)
                 touched.add(token)
             result.update({"from_slide": number, "after": after, "no_op": no_op, "_token": token})
+        elif name == "metadata":
+            result.update({"metadata_changed": updated != source, "result_slide": None})
         results.append(result)
         source = updated
     deck = parse_deck(source)
@@ -620,6 +650,7 @@ _EDIT_OPERATION_FIELDS = {
     "delete": {"slide", "slide_revision"},
     "move": {"slide", "slide_revision", "after"},
     "substitute": {"slide", "slide_revision", "expect", "replacement", "count"},
+    "metadata": set(),
 }
 
 
@@ -670,6 +701,8 @@ def _parse_edit_document(text: str, label: str) -> tuple[str, dict[str, Any]]:
             operation["source"] = _slide_source(body)
             if name == "replace" and header["notes"] not in ("preserve", "replace", "remove"):
                 raise DeckCommandError("edit field 'notes' must be preserve, replace, or remove")
+        elif name == "metadata":
+            operation["source"] = _metadata_source(body)
         elif body.strip():
             raise DeckCommandError(f"{name} edit document must not contain a Markdown body")
         return deck_revision, operation
@@ -828,6 +861,36 @@ def _slide_edit_document(slide: dict[str, Any], deck_revision: str, *, include_n
     return _edit_text(header, slide["source"])
 
 
+def _metadata_edit_document(source: str, deck_revision: str) -> str:
+    deck = parse_deck(source)
+    if deck.front_matter_range.end:
+        lines = source[:deck.front_matter_range.end].splitlines()
+        while lines and not lines[-1].strip():
+            lines.pop()
+        body = "\n".join(lines[1:-1])
+    else:
+        body = "{}"
+    return _edit_text({
+        "quarkfoil_edit": 1,
+        "operation": "metadata",
+        "deck_revision": deck_revision,
+    }, body)
+
+
+def _write_new_edit_file(destination: Path, document: str) -> Path:
+    destination = destination.resolve()
+    if not destination.parent.is_dir():
+        raise DeckCommandError("edit output parent directory does not exist", path=str(destination.parent))
+    try:
+        with destination.open("x", encoding="utf-8", newline="") as stream:
+            stream.write(document)
+    except FileExistsError as error:
+        raise DeckCommandError("edit output destination already exists", path=str(destination)) from error
+    except OSError as error:
+        raise DeckCommandError(f"cannot write edit output: {error}", path=str(destination)) from error
+    return destination
+
+
 def _write_edit_directory(destination: Path, summary: dict[str, Any], *, include_notes: bool) -> None:
     destination = destination.resolve()
     if destination.exists():
@@ -945,19 +1008,31 @@ def _inspect(arguments: list[str]) -> int:
     parser.add_argument("--no-source", action="store_true", help="Omit the whole-deck source from JSON or YAML")
     parser.add_argument("--slides", help="Return only these comma-separated slide numbers")
     parser.add_argument("--compact", action="store_true", help="Emit compact JSON")
-    parser.add_argument("--format", choices=("json", "yaml", "edit", "markdown"), default="json",
-                        help="Output format; edit is guarded YAML followed by literal Markdown")
-    parser.add_argument("--output", type=Path, help="New directory for one or more editable slide documents")
+    parser.add_argument("--format", choices=("json", "yaml", "edit", "metadata", "markdown"), default="json",
+                        help="Output format; edit and metadata produce guarded editable documents")
+    parser.add_argument("--output", type=Path, help="New edit directory, or new metadata edit file")
     args = parser.parse_args(arguments)
     selected = _selected_slides(args.slides)
     if args.format in ("edit", "markdown") and selected is None:
         raise DeckCommandError(f"--format {args.format} requires --slides", code="usage_error")
-    if args.output is not None and args.format != "edit":
-        raise DeckCommandError("--output requires --format edit", code="usage_error")
+    if args.format == "metadata" and selected is not None:
+        raise DeckCommandError("--format metadata cannot be combined with --slides", code="usage_error")
+    if args.output is not None and args.format not in ("edit", "metadata"):
+        raise DeckCommandError("--output requires --format edit or metadata", code="usage_error")
     if args.compact and args.format != "json":
         raise DeckCommandError("--compact is only available with --format json", code="usage_error")
     data, current = _read_deck(args.deck)
-    summary = _summary(data.decode("utf-8"), current, include_notes=not args.no_notes,
+    source = data.decode("utf-8")
+    if args.format == "metadata":
+        document = _metadata_edit_document(source, current)
+        if args.output is not None:
+            destination = _write_new_edit_file(args.output, document)
+            _print_yaml({"quarkfoil_result": 1, "revision": current, "output": str(destination),
+                         "metadata": True})
+        else:
+            print(document, end="" if document.endswith("\n") else "\n", flush=True)
+        return 0
+    summary = _summary(source, current, include_notes=not args.no_notes,
                        include_source=args.format in ("edit", "markdown") or not args.no_source,
                        selected_slides=selected)
     if args.format == "json":
@@ -1080,7 +1155,7 @@ def main(arguments: list[str]) -> int:
         bool(arguments) and arguments[0] == "apply" and "--edit" in arguments
     ) or (
         bool(arguments) and arguments[0] == "inspect"
-        and any(value in arguments for value in ("yaml", "edit", "markdown"))
+        and any(value in arguments for value in ("yaml", "edit", "metadata", "markdown"))
         and "--format" in arguments
     )
     try:

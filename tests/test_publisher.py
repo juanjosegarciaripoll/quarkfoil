@@ -177,6 +177,101 @@ class PublisherTests(unittest.TestCase):
         mapping = json.loads(re.search(r'id="quarkfoil-assets">(.*?)</script>', page, re.S).group(1))
         self.assertNotIn("figures/diagram.svg", mapping)
 
+    def test_site_url_is_remembered_and_the_first_slide_is_the_default_card(self) -> None:
+        calls = []
+
+        def preview(root: Path, relative: str, page: str, size: tuple[int, int]) -> None:
+            calls.append(page)
+            self.assertEqual(size, (1200, 630))
+            output = root / relative
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_bytes(b"generated png")
+
+        with mock.patch("scientific_slides.publisher._create_preview", side_effect=preview):
+            meta = publish_presentation(
+                self.deck, str(self.site), site_url="https://example.test/talks"
+            )
+
+        self.assertEqual(calls, ["/lecture/?preview&preview-slide=slide-1"])
+        self.assertEqual(meta["url"], "https://example.test/talks/lecture/")
+        self.assertRegex(str(meta["social_image"]), r"^https://example\.test/talks/assets/f/")
+        settings = json.loads((self.site / "collection.json").read_text(encoding="utf-8"))
+        self.assertEqual(settings["url"], "https://example.test/talks/")
+        page = (self.published() / "index.html").read_text(encoding="utf-8")
+        self.assertIn('rel="canonical" href="https://example.test/talks/lecture/"', page)
+        self.assertIn('property="og:image:width" content="1200"', page)
+        self.assertIn('property="og:image:height" content="630"', page)
+        self.assertIn('name="twitter:card" content="summary_large_image"', page)
+        self.assertIn('property="og:image:alt" content="Superconducting circuits"', page)
+
+    def test_a_social_figure_is_pooled_without_rendering_a_slide(self) -> None:
+        (self.project / "figures" / "card.png").write_bytes(b"chosen card")
+        self.deck.write_text(
+            self.deck.read_text(encoding="utf-8").replace(
+                "date: 2026-09-07", "date: 2026-09-07\nsocial:\n  image: figures/card.png\n  alt: Diagram of a circuit"
+            ),
+            encoding="utf-8",
+        )
+
+        with mock.patch("scientific_slides.publisher._create_preview") as preview:
+            meta = publish_presentation(
+                self.deck, str(self.site), site_url="https://example.test/talks/"
+            )
+
+        preview.assert_not_called()
+        image = str(meta["social_image"])
+        self.assertRegex(image, r"/assets/f/[0-9a-f]{2}/[0-9a-f]{16}-card\.png$")
+        pooled = list((self.site / "assets" / "f").rglob("*card.png"))
+        self.assertEqual([path.read_bytes() for path in pooled], [b"chosen card"])
+        page = (self.published() / "index.html").read_text(encoding="utf-8")
+        self.assertIn('property="og:image:type" content="image/png"', page)
+        self.assertIn('name="twitter:image:alt" content="Diagram of a circuit"', page)
+
+    def test_a_social_slide_uses_its_stable_id(self) -> None:
+        self.deck.write_text(
+            self.deck.read_text(encoding="utf-8")
+            .replace("date: 2026-09-07", "date: 2026-09-07\nsocial:\n  slide: result")
+            .replace("## Diagram {.layout-1}", "## Diagram {#result .layout-1}"),
+            encoding="utf-8",
+        )
+
+        def preview(root: Path, relative: str, page: str, size: tuple[int, int]) -> None:
+            self.assertEqual(page, "/lecture/?preview&preview-slide=result")
+            self.assertEqual(size, (1200, 630))
+            output = root / relative
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_bytes(b"result slide")
+
+        with mock.patch("scientific_slides.publisher._create_preview", side_effect=preview):
+            publish_presentation(self.deck, str(self.site), site_url="https://example.test/talks/")
+
+    def test_the_front_page_layout_is_preferred_for_the_default_card(self) -> None:
+        self.deck.write_text(
+            self.deck.read_text(encoding="utf-8")
+            + "\n---\n\n## Opening {#opening .layout-front}\n\n::: core\nFront page.\n:::\n",
+            encoding="utf-8",
+        )
+
+        def preview(root: Path, relative: str, page: str, size: tuple[int, int]) -> None:
+            self.assertEqual(page, "/lecture/?preview&preview-slide=opening")
+            output = root / relative
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_bytes(b"front page")
+
+        with mock.patch("scientific_slides.publisher._create_preview", side_effect=preview):
+            publish_presentation(self.deck, str(self.site), site_url="https://example.test/talks/")
+
+    def test_an_explicit_social_card_requires_a_public_collection_url(self) -> None:
+        self.deck.write_text(
+            self.deck.read_text(encoding="utf-8").replace(
+                "date: 2026-09-07", "date: 2026-09-07\nsocial:\n  slide: slide-1"
+            ),
+            encoding="utf-8",
+        )
+        with self.assertRaises(PublishError) as error:
+            publish_presentation(self.deck, str(self.site))
+        self.assertIn("--site-url", str(error.exception))
+
 
 class TargetTests(unittest.TestCase):
     def test_local_and_remote_targets_are_told_apart(self) -> None:
@@ -211,8 +306,9 @@ class RemotePublishTests(unittest.TestCase):
              mock.patch("scientific_slides.publisher.subprocess.run", side_effect=fake_run):
             publish_presentation(self.deck, "homepage:talks/", index=False)
 
-        self.assertEqual(len(calls), 3)
-        root, assets, deck = calls
+        self.assertEqual(len(calls), 5)
+        settings_read, root, assets, deck, settings_write = calls
+        self.assertIn("--ignore-missing-args", settings_read)
         self.assertTrue(root[-1].endswith("homepage:talks/"))
         self.assertNotIn("--delete", root)
         self.assertIn("--ignore-existing", assets)
@@ -223,8 +319,9 @@ class RemotePublishTests(unittest.TestCase):
         self.assertTrue(deck[-1].endswith("homepage:talks/lecture/"))
         self.assertIn("-rltpL", deck)
         # a web server has to be able to read what was published
-        for command in calls:
+        for command in calls[1:]:
             self.assertIn("--chmod=D755,F644", command)
+        self.assertTrue(settings_write[-1].endswith("homepage:talks/collection.json"))
 
     def test_a_missing_rsync_is_reported_clearly(self) -> None:
         with mock.patch("scientific_slides.publisher.shutil.which", return_value=None):
@@ -256,6 +353,17 @@ class PublishCommandTests(unittest.TestCase):
     def test_missing_date_exits_with_a_message(self) -> None:
         self.deck.write_text("---\ntitle: x\n---\n\n## S {.layout-1}\n\n::: core\ny\n:::\n", encoding="utf-8")
         self.assertEqual(main(["publish", str(self.deck), "--site", str(self.root / "talks")]), 1)
+
+    def test_index_only_can_initialize_the_public_url(self) -> None:
+        site = self.root / "talks"
+        self.assertEqual(main([
+            "publish", "--site", str(site), "--index-only",
+            "--site-url", "https://example.test/talks",
+        ]), 0)
+        settings = json.loads((site / "collection.json").read_text(encoding="utf-8"))
+        self.assertEqual(settings["url"], "https://example.test/talks/")
+        page = (site / "index.html").read_text(encoding="utf-8")
+        self.assertIn('rel="canonical" href="https://example.test/talks/"', page)
 
 
 if __name__ == "__main__":

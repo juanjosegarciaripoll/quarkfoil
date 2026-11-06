@@ -30,6 +30,7 @@ task needs:
 ```console
 quarkfoil deck guide workflow
 quarkfoil deck guide operations
+quarkfoil deck guide metadata
 quarkfoil deck guide format
 quarkfoil deck guide layouts
 quarkfoil deck guide overlays
@@ -56,6 +57,14 @@ The `operations` topic contains the exact guarded headers for insertion,
 deletion, movement, and literal substitution; assistants need not load those
 schemas for an ordinary slide replacement.
 
+The `metadata` topic covers guarded front-matter changes. It is the supported
+way to change titles, authors, dates, themes, publication fields, asset paths,
+defaults, and custom metadata without opening the deck file directly. For
+link-sharing cards, use `social.image` with a project-relative figure or
+`social.slide` with a stable slide ID, plus optional `social.alt`. Omitting
+both selectors uses the Front page slide. Run `quarkfoil deck guide publishing`
+for the public collection URL and complete publishing workflow.
+
 ## Treat the presentation file as opaque
 
 The assistant must use `quarkfoil deck inspect` whenever it needs presentation
@@ -80,6 +89,27 @@ quarkfoil deck apply lecture.md --edit lecture-edit/slide-0012.md
 
 This is the only place a generic editing tool belongs in the workflow: it may
 edit a generated transaction document, never `lecture.md` itself.
+
+### Edit presentation metadata
+
+Generate a guarded document containing the current front-matter mapping:
+
+```console
+quarkfoil deck inspect lecture.md --format metadata --output metadata.yml
+```
+
+Edit the YAML mapping after the generated header, keeping fields you do not
+intend to change. Unknown fields and comments remain present. Removing a field
+from the mapping removes it from front matter. Apply the document through the
+same guarded interface used for slides:
+
+```console
+quarkfoil deck apply lecture.md --edit metadata.yml
+```
+
+Quarkfoil validates the YAML and revision, changes only front matter, and keeps
+the slide source byte-for-byte unchanged. Nested `assets`, `defaults`, `social`,
+and other mappings require no special flags.
 
 ## A prompt you can copy
 

@@ -153,6 +153,14 @@ def main() -> int:
                 f"Screenshot: {screenshot}"
             )
         base = f"http://127.0.0.1:{server.server_port}"
+        driver.get(f"{base}/print.html?preview&preview-slide=slide-2")
+        WebDriverWait(driver, 30).until(
+            lambda active_driver: active_driver.find_element(By.TAG_NAME, "html").get_attribute("data-preview-ready")
+            == "true"
+        )
+        selected_preview = driver.find_element(By.CSS_SELECTOR, "#slides section.present").get_attribute("data-slide-id")
+        if selected_preview != "slide-2":
+            raise RuntimeError(f"Preview requested slide-2 but selected {selected_preview!r}")
         driver.get(base)
         WebDriverWait(driver, 30).until(
             lambda active_driver: active_driver.find_element(By.ID, "save-state").text == "Saved"

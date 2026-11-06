@@ -12,8 +12,8 @@ edit documents.
 
 Before editing: `quarkfoil deck guide workflow`.
 Load details only when relevant: `quarkfoil deck guide TOPIC`.
-Topics: operations, format, layouts, overlays, assets, citations, publishing,
-authoring, reproduction, examples. `--all` prints everything.
+Topics: operations, metadata, format, layouts, overlays, assets, citations,
+publishing, authoring, reproduction, examples. `--all` prints everything.
 
 Create: `quarkfoil deck create DECK`.
 
@@ -54,7 +54,36 @@ the generated edit documents, not the deck itself.
 Every apply validates all operations and writes once. Exit 3 means the deck
 changed; inspect again. Use `--no-notes` when notes must stay outside agent
 context. Run `quarkfoil deck guide operations` for operation schemas and exact
-edit-document headers.
+edit-document headers, or `guide metadata` for front-matter changes.
+"""
+
+
+METADATA = """Quarkfoil metadata editing
+
+Front matter is part of the opaque deck file. Read and change it through a
+guarded metadata document, never by opening or patching DECK directly:
+
+```console
+quarkfoil deck inspect DECK --format metadata --output metadata.yml
+```
+
+Edit only the YAML mapping after the generated edit header. Existing unknown
+fields and comments are retained in the document. Change scalar or nested
+values normally; deleting a field from the mapping deletes it from front
+matter. Keep `quarkfoil_edit`, `operation`, and `deck_revision` in the header.
+
+```console
+quarkfoil deck apply DECK --edit metadata.yml
+```
+
+Apply validates the mapping and deck revision, replaces only front matter, and
+leaves every slide byte-for-byte unchanged. A stale revision changes nothing.
+Common fields are documented by `quarkfoil deck guide format`; nested fields
+such as `assets`, `defaults`, and `social` use ordinary YAML mappings and
+lists. Publishing uses `social.image` for a project-relative card image or
+`social.slide` for a stable slide ID (a page number is also accepted), with an
+optional `social.alt`. Omit both selectors to use the Front page slide, falling
+back to the first visible slide.
 """
 
 
@@ -71,6 +100,8 @@ Edit operations:
               the beginning.
   substitute  Replace an exact literal fragment. `expect` must occur exactly
               `count` times (one by default).
+  metadata    Replace front matter from a guarded YAML mapping. Generate this
+              document with `deck inspect --format metadata`.
 
 Repeat --edit to apply ordered operations with one write. All documents must
 carry the same deck revision. Operations use sequential slide numbering.
@@ -426,9 +457,31 @@ quarkfoil publish presentations/0*.md --site homepage:talks/
 
 The deck folder defaults to the Markdown filename; `--name` changes it for a
 single deck. `--index-title` and `--index-lede` initialize or update remembered
-listing text. `--index-only` rebuilds the listing. Speaker notes are omitted by
-default because the published Markdown is public; include them only with the
-explicit `--notes` option. Use `quarkfoil publish --help` for all options.
+listing text. Give the collection's public address once with `--site-url`; it
+is remembered in `collection.json` and supplies canonical URLs and absolute
+Open Graph/Twitter card URLs:
+
+```console
+quarkfoil publish lecture.md --site homepage:talks/ \\
+  --site-url https://example.org/talks/
+```
+
+The Front page slide is rendered without cropping on a 1200x630 social-card
+canvas by default when a public URL is configured. Override it in guarded front
+matter with either a pooled raster figure or a stable slide ID; do not set both:
+
+```yaml
+social:
+  image: figures/card.png
+  alt: Quantum simulation platforms
+# or: {slide: results, alt: Main result of the talk}
+```
+
+A slide heading supplies the stable ID as `{#results .layout-1}`. Slide cards
+need Chrome, Chromium, or Edge; `social.image` does not. `--index-only`
+rebuilds the listing. Speaker notes are omitted by default because the
+published Markdown is public; include them only with the explicit `--notes`
+option. Use `quarkfoil publish --help` for all options.
 """
 
 
@@ -685,6 +738,7 @@ Free-canvas annotation:
 GUIDE_TOPICS = {
     "workflow": WORKFLOW,
     "operations": OPERATIONS,
+    "metadata": METADATA,
     "format": FORMAT,
     "layouts": LAYOUTS,
     "overlays": OVERLAYS,

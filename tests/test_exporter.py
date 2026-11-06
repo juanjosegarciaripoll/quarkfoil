@@ -172,6 +172,9 @@ class ExporterTests(unittest.TestCase):
         self.assertTrue((output / "artwork/lecture-preview.png").is_file())
         self.assertIn('property="og:image" content="artwork/lecture-preview.png"', index)
         self.assertIn('name="twitter:image" content="artwork/lecture-preview.png"', index)
+        self.assertIn('property="og:image:width" content="1280"', index)
+        self.assertIn('property="og:image:height" content="720"', index)
+        self.assertIn('property="og:image:alt" content="Preview"', index)
 
     def test_preview_browser_command_captures_a_1280_by_720_viewport(self) -> None:
         output = self.root / "preview.png"

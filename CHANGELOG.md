@@ -7,6 +7,22 @@ All notable changes to Quarkfoil are documented here. The project follows
 
 ### Added
 
+- Publish canonical URLs and Open Graph/Twitter cards for talk collections.
+  `--site-url` stores the collection's public URL in `collection.json`; every
+  published talk then gets absolute canonical and image metadata. By default
+  Quarkfoil captures the Front page slide without cropping on a
+  content-addressed 1200x630 PNG canvas.
+  Deck metadata may instead select a stable slide ID or a project-relative
+  figure through `social.slide` or `social.image`, with `social.alt` supplying
+  accessible image text. The `quarkfoil deck` metadata and publishing guides
+  document the guarded syntax.
+
+- Add guarded front-matter editing to the agent interface. `quarkfoil deck
+  inspect DECK --format metadata --output FILE` creates an editable metadata
+  document that `deck apply --edit FILE` validates and applies atomically.
+  Unknown fields and comments remain editable, invalid YAML or stale revisions
+  change nothing, and slide source is preserved byte-for-byte.
+
 - Expand `quarkfoil deck guide` into a self-teaching, version-matched reference
   with focused topics for the guarded workflow, Markdown format, layouts,
   overlays, assets, citations, collection publishing, authoring, source

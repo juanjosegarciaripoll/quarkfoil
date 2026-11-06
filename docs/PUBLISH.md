@@ -19,7 +19,7 @@ else is identical.
 ```text
 talks/
 ├── index.html                    the listing, plain HTML
-├── collection.json               its heading and standfirst
+├── collection.json               heading, standfirst, and public URL
 ├── 2026-inc-school/
 │   ├── index.html                the deck page
 │   ├── presentation.md           published unchanged
@@ -74,8 +74,64 @@ listing without running any JavaScript.
 Both are remembered in `collection.json`, so a later publish does not reset
 them, and editing that file changes the page on the next publish.
 
+Set the public address once as well:
+
+```console
+quarkfoil publish lecture.md --site homepage:talks/ \
+  --site-url https://example.org/talks/
+```
+
+The normalized URL is remembered as `url` in `collection.json`, just like the
+heading and standfirst. Every later publish to that destination reads it before
+staging the talk and writes the resolved settings back. Quarkfoil cannot infer
+this address from an rsync destination: `homepage:talks/` says where files go,
+not which DNS name and web-server path exposes them. `--index-only --site-url`
+can initialize or change the setting without publishing a deck. If the public
+URL itself changes, republish existing decks so their static canonical and card
+tags acquire the new address.
+
 Use `--index-only` to rebuild the listing without publishing a deck, and
 `--no-index` to publish a deck without touching it.
+
+## Link-sharing cards
+
+Once the collection has a public URL, every published talk includes canonical,
+Open Graph, and Twitter/X metadata with absolute URLs. Quarkfoil renders the
+first visible Front page slide onto a 1200x630 card; if there is no such slide,
+it uses the first visible slide. The 16:9 slide is centered
+without cropping, leaving narrow side margins on the approximately 1.91:1
+social canvas. Chrome, Chromium, or Edge is required for this capture, as with
+`export --preview`.
+
+Front matter can select a different slide by stable heading ID:
+
+```yaml
+social:
+  slide: main-result
+  alt: Main experimental result of the talk
+```
+
+```markdown
+## Main result {#main-result .layout-1}
+```
+
+A one-based page number is accepted for convenience, but a stable ID survives
+insertions and reordering. Alternatively, use a prepared figure without
+launching a browser:
+
+```yaml
+social:
+  image: figures/social-card.png
+  alt: Quantum processor and its control stack
+```
+
+`social.image` stays inside the presentation directory and is copied into the
+same content-addressed pool as other figures. Reusing identical bytes reuses
+the uploaded object; changing the card creates a new hashed URL, which also
+avoids stale social-crawler caches. For custom cards, 1200x630 PNG, JPEG, or
+WebP is a good target; social platforms do not consistently accept SVG cards.
+Do not set both `social.image` and `social.slide`. When neither is set, the
+opening-slide default applies. `social.alt` defaults to the presentation title.
 
 ## A course is one entry, not nine
 

@@ -102,6 +102,12 @@ async function initialize() {
     plugins: window.RevealNotes ? [window.RevealNotes] : [],
   });
   await reveal.initialize();
+  const previewSlide = search.get("preview-slide");
+  if (previewView && previewSlide) {
+    const index = reveal.getSlides().findIndex(slide => slide.dataset.slideId === previewSlide);
+    if (index < 0) throw new Error(`Preview slide '${previewSlide}' was not found`);
+    reveal.slide(index);
+  }
   reveal.on("slidechanged", event => syncVideoPlayback(event.currentSlide));
   syncVideoPlayback(reveal.getCurrentSlide());
   if (previewView) {

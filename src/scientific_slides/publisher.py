@@ -6,6 +6,7 @@ import datetime as _datetime
 import hashlib
 import html
 import json
+import mimetypes
 import os
 import re
 import shutil
@@ -14,7 +15,7 @@ import unicodedata
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
-from urllib.parse import quote, unquote
+from urllib.parse import quote, unquote, urljoin, urlsplit
 
 from .exporter import (
     ASSET_PATTERN,
@@ -22,6 +23,7 @@ from .exporter import (
     EXPORT_FILES,
     LOCAL_FILES,
     _configured_assets,
+    _create_preview,
     _folder_files,
     _front_matter,
     _index_html,
@@ -31,6 +33,7 @@ from .exporter import (
     _without_speaker_notes,
 )
 from .bibliography import citation_keys, trim_bibliography as _trim_bibliography
+from .parser import parse_deck
 from .paths import APP_ROOT, inside as _inside
 
 ASSETS_DIR = "assets"
@@ -180,6 +183,48 @@ def _pool_name(asset: Path, data: bytes) -> str:
     return f"{digest[:2]}/{digest[:16]}-{safe}"
 
 
+def _public_url(value: object) -> str:
+    """Validate and normalize the public URL stored with a collection."""
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    parsed = urlsplit(text)
+    if (
+        parsed.scheme not in {"http", "https"}
+        or not parsed.netloc
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise PublishError("--site-url must be an absolute http(s) URL without a query or fragment")
+    return text.rstrip("/") + "/"
+
+
+def _resolved_settings(
+    existing: dict[str, object],
+    *,
+    title: str | None = None,
+    lede: str | None = None,
+    site_url: str | None = None,
+) -> dict[str, str]:
+    return {
+        "title": title or str(existing.get("title") or "Talks"),
+        "lede": lede if lede is not None else str(existing.get("lede") or ""),
+        "url": _public_url(site_url if site_url is not None else existing.get("url")),
+    }
+
+
+def _pool_asset(root: Path, asset: Path, data: bytes) -> tuple[str, Path]:
+    pool_name = _pool_name(asset, data)
+    target = root / POOL_DIR / pool_name
+    if not target.exists():
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if asset.is_file() and data == asset.read_bytes():
+            _link(asset, target)
+        else:
+            target.write_bytes(data)
+    return pool_name, target
+
+
 def _link(source: Path, destination: Path) -> None:
     """Stage a file without copying its bytes; rsync -L and copy2 both follow it."""
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -227,6 +272,7 @@ def _stage_deck(
     name: str | None,
     include_notes: bool,
     trim_bibliography: bool,
+    collection_url: str = "",
 ) -> Staged:
     resolved = deck.resolve()
     if not resolved.is_file():
@@ -268,14 +314,8 @@ def _stage_deck(
             trimmed = _trim_bibliography(data.decode("utf-8"), citation_keys(source))
             data = trimmed.encode("utf-8")
         pool_name = _pool_name(asset, data)
-        target = root / POOL_DIR / pool_name
         if reference in resolvable:
-            if not target.exists():
-                target.parent.mkdir(parents=True, exist_ok=True)
-                if data == asset.read_bytes():
-                    _link(asset, target)
-                else:
-                    target.write_bytes(data)
+            _pool_asset(root, asset, data)
             asset_map[reference.replace("\\", "/")] = f"../{POOL_DIR}/{quote(pool_name, safe='/')}"
             pooled.append(f"{POOL_DIR}/{pool_name}")
         else:
@@ -296,6 +336,89 @@ def _stage_deck(
         "description": _metadata_text(front.get("description")) or _metadata_text(front.get("subtitle")),
     }
     date = _date(front.get("date"), resolved)
+    social = front.get("social")
+    if social is None:
+        social = {}
+    if not isinstance(social, dict):
+        raise PublishError(f"{resolved.name} has invalid `social` metadata: expected a mapping")
+    has_social_image = "image" in social
+    has_social_slide = "slide" in social
+    social_image = social.get("image")
+    social_slide = social.get("slide")
+    if has_social_image and has_social_slide:
+        raise PublishError(f"{resolved.name} sets both `social.image` and `social.slide`; choose one")
+    if (has_social_image or has_social_slide) and not collection_url:
+        raise PublishError(
+            f"{resolved.name} selects a social card but the collection has no public URL; "
+            "publish once with --site-url"
+        )
+    talk_url = urljoin(collection_url, f"{quote(slug, safe='')}/") if collection_url else ""
+    card_url = ""
+    card_alt = _metadata_text(social.get("alt")) or metadata["title"]
+    card_type = ""
+    card_size: tuple[int, int] | None = None
+
+    if collection_url and has_social_image:
+        if not isinstance(social_image, str) or not social_image.strip():
+            raise PublishError(f"{resolved.name} has invalid `social.image`: expected a project-relative path")
+        card_asset = _project_file(project, social_image)
+        card_data = card_asset.read_bytes()
+        card_pool, _ = _pool_asset(root, card_asset, card_data)
+        pooled.append(f"{POOL_DIR}/{card_pool}")
+        card_url = urljoin(collection_url, f"{POOL_DIR}/{quote(card_pool, safe='/')}")
+        card_type = mimetypes.guess_type(card_asset.name)[0] or "application/octet-stream"
+        if not card_type.startswith("image/"):
+            raise PublishError(f"{resolved.name} social.image is not a recognized image: {social_image}")
+
+    asset_json = (
+        json.dumps(asset_map, ensure_ascii=False)
+        .replace("<", "\\u003c")
+        .replace(">", "\\u003e")
+        .replace("&", "\\u0026")
+    )
+    if collection_url and not has_social_image:
+        parsed = parse_deck(source)
+        visible = [slide for slide in parsed.slides if not slide.trashed]
+        if not visible:
+            raise PublishError(f"{resolved.name} has no visible slide to use as its social card")
+        if not has_social_slide:
+            selected = next((slide for slide in visible if slide.layout == "front"), visible[0])
+        elif isinstance(social_slide, int) and not isinstance(social_slide, bool):
+            if social_slide < 1 or social_slide > len(parsed.slides):
+                raise PublishError(f"{resolved.name} social.slide {social_slide} is outside the deck")
+            selected = parsed.slides[social_slide - 1]
+        elif isinstance(social_slide, str) and social_slide.strip():
+            matches = [slide for slide in parsed.slides if slide.id == social_slide.strip()]
+            if not matches:
+                raise PublishError(f"{resolved.name} has no slide with ID {social_slide!r}")
+            if len(matches) > 1:
+                raise PublishError(f"{resolved.name} has more than one slide with ID {social_slide!r}")
+            selected = matches[0]
+        else:
+            raise PublishError(f"{resolved.name} has invalid `social.slide`: use a stable slide ID or page number")
+        if selected.trashed:
+            raise PublishError(f"{resolved.name} selects trashed slide {selected.id!r} as its social card")
+        # The player must exist before Chromium can capture the selected slide.
+        (folder / INDEX_NAME).write_text(
+            _index_html(
+                "local", metadata, None, None, runtime=f"../{runtime}", asset_map=asset_json,
+                canonical_url=talk_url,
+            ),
+            encoding="utf-8",
+        )
+        preview = root / ".quarkfoil-previews" / f"{slug}-card.png"
+        preview_relative = preview.relative_to(root).as_posix()
+        page = f"/{quote(slug, safe='')}/?preview&preview-slide={quote(selected.id, safe='')}"
+        try:
+            _create_preview(root, preview_relative, page, (1200, 630))
+        except (FileNotFoundError, RuntimeError) as error:
+            raise PublishError(f"Could not render the social card for {resolved.name}: {error}") from error
+        card_pool, _ = _pool_asset(root, Path(f"{slug}-card.png"), preview.read_bytes())
+        pooled.append(f"{POOL_DIR}/{card_pool}")
+        card_url = urljoin(collection_url, f"{POOL_DIR}/{quote(card_pool, safe='/')}")
+        card_type = "image/png"
+        card_size = (1200, 630)
+
     event = _metadata_text(front.get("event"))
     series = _metadata_text(front.get("series"))
     part = front.get("part")
@@ -303,13 +426,14 @@ def _stage_deck(
         _index_html(
             "local",
             metadata,
-            None,
+            card_url or None,
             None,
             runtime=f"../{runtime}",
-            asset_map=json.dumps(asset_map, ensure_ascii=False)
-            .replace("<", "\\u003c")
-            .replace(">", "\\u003e")
-            .replace("&", "\\u0026"),
+            asset_map=asset_json,
+            canonical_url=talk_url or None,
+            preview_alt=card_alt if card_url else None,
+            preview_type=card_type or None,
+            preview_size=card_size,
         ),
         encoding="utf-8",
     )
@@ -327,7 +451,10 @@ def _stage_deck(
         "unlisted": bool(front.get("unlisted")),
         "runtime": version,
         "published": _datetime.datetime.now(_datetime.timezone.utc).date().isoformat(),
-        "assets": sorted(pooled),
+        "assets": sorted(set(pooled)),
+        "url": talk_url,
+        "social_image": card_url,
+        "social_alt": card_alt if card_url else "",
     }
     (folder / META_NAME).write_text(json.dumps(meta, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     return Staged(root=root, slug=slug, meta=meta, warnings=warnings)
@@ -439,6 +566,7 @@ def publish_presentations(
     index: bool = True,
     index_title: str | None = None,
     index_lede: str | None = None,
+    site_url: str | None = None,
     dry_run: bool = False,
     rsync: str = "rsync",
 ) -> list[dict[str, object]]:
@@ -450,6 +578,9 @@ def publish_presentations(
     if not decks:
         raise PublishError("No presentation to publish")
     target = Target.parse(site)
+    settings = _resolved_settings(
+        _settings(target, rsync), title=index_title, lede=index_lede, site_url=site_url
+    )
     print(f"Publishing to {target.description}")
     staging = Path(tempfile.mkdtemp(prefix=".quarkfoil-publish-"))
     published: list[dict[str, object]] = []
@@ -461,15 +592,24 @@ def publish_presentations(
                 name=names[position] if names else None,
                 include_notes=include_notes,
                 trim_bibliography=trim_bibliography,
+                collection_url=settings["url"],
             )
             for warning in staged.warnings:
                 print(f"  warning: {staged.slug}: {warning}")
             published.append(staged.meta)
-        _install(staging, target, [str(meta["slug"]) for meta in published], dry_run, rsync)
+        (staging / SETTINGS_NAME).write_text(
+            json.dumps(settings, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
+        _install(
+            staging, target, [str(meta["slug"]) for meta in published] + [SETTINGS_NAME], dry_run, rsync
+        )
     finally:
         shutil.rmtree(staging, ignore_errors=True)
     if index:
-        publish_index(site, title=index_title, lede=index_lede, dry_run=dry_run, rsync=rsync)
+        publish_index(
+            site, title=index_title, lede=index_lede, site_url=site_url,
+            dry_run=dry_run, rsync=rsync,
+        )
     return published
 
 
@@ -483,6 +623,7 @@ def publish_presentation(
     index: bool = True,
     index_title: str | None = None,
     index_lede: str | None = None,
+    site_url: str | None = None,
     dry_run: bool = False,
     rsync: str = "rsync",
 ) -> dict[str, object]:
@@ -492,6 +633,9 @@ def publish_presentation(
     a public file, and its notes are written for the presenter.
     """
     target = Target.parse(site)
+    settings = _resolved_settings(
+        _settings(target, rsync), title=index_title, lede=index_lede, site_url=site_url
+    )
     print(f"Publishing to {target.description}")
     staging = Path(tempfile.mkdtemp(prefix=".quarkfoil-publish-"))
     try:
@@ -501,14 +645,21 @@ def publish_presentation(
             name=name,
             include_notes=include_notes,
             trim_bibliography=trim_bibliography,
+            collection_url=settings["url"],
         )
         for warning in staged.warnings:
             print(f"  warning: {warning}")
-        _install(staging, target, [staged.slug], dry_run, rsync)
+        (staging / SETTINGS_NAME).write_text(
+            json.dumps(settings, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
+        _install(staging, target, [staged.slug, SETTINGS_NAME], dry_run, rsync)
     finally:
         shutil.rmtree(staging, ignore_errors=True)
     if index:
-        publish_index(site, title=index_title, lede=index_lede, dry_run=dry_run, rsync=rsync)
+        publish_index(
+            site, title=index_title, lede=index_lede, site_url=site_url,
+            dry_run=dry_run, rsync=rsync,
+        )
     return staged.meta
 
 
@@ -730,7 +881,15 @@ def _sections(cards: list[dict[str, object]]) -> str:
     )
 
 
-def _page(heading: str, lede: str, body: str, *, depth: int = 0, back: str = "") -> str:
+def _page(
+    heading: str,
+    lede: str,
+    body: str,
+    *,
+    depth: int = 0,
+    back: str = "",
+    canonical_url: str = "",
+) -> str:
     policy = (
         "default-src 'none'; style-src 'unsafe-inline'; img-src 'self'; "
         "base-uri 'none'; form-action 'none'"
@@ -738,6 +897,12 @@ def _page(heading: str, lede: str, body: str, *, depth: int = 0, back: str = "")
     up = "../" * depth
     title = html.escape(heading)
     description = html.escape(lede) if lede else title
+    canonical = html.escape(quote(canonical_url, safe="/:%"), quote=True) if canonical_url else ""
+    canonical_tags = (
+        f'  <meta property="og:url" content="{canonical}">\n'
+        f'  <link rel="canonical" href="{canonical}">\n'
+        if canonical else ""
+    )
     back_link = f'      <p class="back"><a href="{up}">← {html.escape(back)}</a></p>\n' if back else ""
     return f"""<!doctype html>
 <html lang="en">
@@ -749,7 +914,11 @@ def _page(heading: str, lede: str, body: str, *, depth: int = 0, back: str = "")
   <meta name="description" content="{description}">
   <meta property="og:type" content="website">
   <meta property="og:title" content="{title}">
-  <link rel="icon" href="{up}{MARK_FILE}" type="image/svg+xml">
+  <meta property="og:description" content="{description}">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="{title}">
+  <meta name="twitter:description" content="{description}">
+{canonical_tags}  <link rel="icon" href="{up}{MARK_FILE}" type="image/svg+xml">
   <style>{INDEX_STYLE}</style>
 </head>
 <body>
@@ -767,14 +936,16 @@ def _page(heading: str, lede: str, body: str, *, depth: int = 0, back: str = "")
 """
 
 
-def index_page(entries: list[dict[str, object]], title: str = "Talks", lede: str = "") -> str:
+def index_page(
+    entries: list[dict[str, object]], title: str = "Talks", lede: str = "", url: str = ""
+) -> str:
     """One static page: years descending, a series folded into a single card."""
     cards = _cards(entries)
     body = _sections(cards) if cards else '      <p class="lede">No talks published yet.</p>'
-    return _page(title, lede, body)
+    return _page(title, lede, body, canonical_url=url)
 
 
-def series_page(card: dict[str, object], collection: str = "Talks") -> str:
+def series_page(card: dict[str, object], collection: str = "Talks", url: str = "") -> str:
     """A series reads forwards: its talks in the order they were given."""
     items = "\n".join(_talk_item(talk, prefix="../../") for talk in card["talks"])
     meta = " · ".join(part for part in (
@@ -785,26 +956,33 @@ def series_page(card: dict[str, object], collection: str = "Talks") -> str:
         f'      <section class="year">\n        <h2>{meta}</h2>\n'
         f"        <ul>\n{items}\n        </ul>\n      </section>"
     )
-    return _page(str(card["name"]), str(card.get("description", "")), body, depth=2, back=collection)
+    canonical = urljoin(url, f"{SERIES_DIR}/{quote(str(card['slug']), safe='')}/") if url else ""
+    return _page(
+        str(card["name"]), str(card.get("description", "")), body,
+        depth=2, back=collection, canonical_url=canonical,
+    )
 
 
-def index_pages(entries: list[dict[str, object]], title: str = "Talks", lede: str = "") -> dict[str, str]:
+def index_pages(
+    entries: list[dict[str, object]], title: str = "Talks", lede: str = "", url: str = ""
+) -> dict[str, str]:
     """The listing and one page per series, all of them plain HTML."""
-    pages = {INDEX_NAME: index_page(entries, title, lede)}
+    pages = {INDEX_NAME: index_page(entries, title, lede, url)}
     for card in _cards(entries):
         if card["kind"] == "series":
-            pages[f"{SERIES_DIR}/{card['slug']}/{INDEX_NAME}"] = series_page(card, title)
+            pages[f"{SERIES_DIR}/{card['slug']}/{INDEX_NAME}"] = series_page(card, title, url)
     return pages
 
 
 
-def _settings(target: Target, rsync: str) -> dict[str, str]:
+def _settings(target: Target, rsync: str) -> dict[str, object]:
     """The collection's own heading and standfirst, kept beside its listing."""
     if not target.remote:
         path = target.path / SETTINGS_NAME
         if path.is_file():
             try:
-                return json.loads(path.read_text(encoding="utf-8"))
+                value = json.loads(path.read_text(encoding="utf-8"))
+                return value if isinstance(value, dict) else {}
             except json.JSONDecodeError:
                 return {}
         return {}
@@ -817,7 +995,10 @@ def _settings(target: Target, rsync: str) -> dict[str, str]:
             quiet=True,
         )
         path = temporary / SETTINGS_NAME
-        return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+        if not path.is_file():
+            return {}
+        value = json.loads(path.read_text(encoding="utf-8"))
+        return value if isinstance(value, dict) else {}
     except (PublishError, json.JSONDecodeError):
         return {}
     finally:
@@ -829,6 +1010,7 @@ def publish_index(
     *,
     title: str | None = None,
     lede: str | None = None,
+    site_url: str | None = None,
     dry_run: bool = False,
     rsync: str = "rsync",
 ) -> int:
@@ -836,15 +1018,12 @@ def publish_index(
     target = Target.parse(site)
     settings = _settings(target, rsync)
     # Given once, kept from then on: a later publish must not reset the heading.
-    resolved = {
-        "title": title or str(settings.get("title") or "Talks"),
-        "lede": lede if lede is not None else str(settings.get("lede") or ""),
-    }
+    resolved = _resolved_settings(settings, title=title, lede=lede, site_url=site_url)
     entries, complete = _gather(target, rsync)
     if not entries and not complete and _has(target, INDEX_NAME, rsync):
         print("  warning: the collection could not be read; its listing is left unchanged")
         return 0
-    pages = index_pages(entries, resolved["title"], resolved["lede"])
+    pages = index_pages(entries, resolved["title"], resolved["lede"], resolved["url"])
     staging = Path(tempfile.mkdtemp(prefix=".quarkfoil-index-"))
     try:
         for relative, page in pages.items():
