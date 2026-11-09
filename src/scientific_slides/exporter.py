@@ -263,6 +263,30 @@ def _without_speaker_notes(source: str) -> str:
     return NOTES_BLOCK_PATTERN.sub("", source)
 
 
+def _universal_newlines(text: str) -> str:
+    return text.replace("\r\n", "\n").replace("\r", "\n")
+
+
+def _deck_source(deck: Path, *, include_notes: bool) -> tuple[str, str]:
+    """Return the deck as written, for copying, and with universal newlines, for reading.
+
+    A copy keeps the author's line endings on every platform. ``read_text`` folds
+    CRLF into LF, and ``write_text`` writes CRLF on Windows, so neither may
+    produce the copied file.
+    """
+    original = deck.read_bytes().decode("utf-8")
+    source = _universal_newlines(original)
+    if include_notes:
+        return original, source
+    source = _without_speaker_notes(source)
+    original = _without_speaker_notes(original)
+    if _universal_newlines(original) != source:
+        # Line endings the notes pattern cannot see (a lone CR) must not let a
+        # note into the copy that the checked reading left out.
+        original = source
+    return original, source
+
+
 def _front_matter(source: str) -> dict[str, object]:
     if not source.startswith("---"):
         return {}
@@ -354,8 +378,8 @@ def _copy_project_assets(deck: Path, source: str, destination: Path, *, trim_bib
         _copy_entry(asset, target)
     if trim_bibliography and isinstance(bibliography, str) and bibliography:
         target = destination / bibliography
-        trimmed = _trim_bibliography(target.read_text(encoding="utf-8"), citation_keys(source))
-        target.write_text(trimmed, encoding="utf-8")
+        trimmed = _trim_bibliography(target.read_bytes().decode("utf-8"), citation_keys(source))
+        target.write_bytes(trimmed.encode("utf-8"))
 
 
 def _exported_bibliography(destination: Path, source: str) -> str | None:
@@ -643,9 +667,7 @@ def export_presentation(
     if destination.exists() and not destination.is_dir():
         raise FileExistsError(f"Export destination is not a directory: {destination}")
     destination.parent.mkdir(parents=True, exist_ok=True)
-    source = resolved.read_text(encoding="utf-8")
-    if not include_notes:
-        source = _without_speaker_notes(source)
+    original, source = _deck_source(resolved, include_notes=include_notes)
     metadata = _page_metadata(source, resolved.stem)
     preview_path = None
     if preview:
@@ -657,7 +679,7 @@ def export_presentation(
 
     temporary = Path(tempfile.mkdtemp(prefix=f".{destination.name}-", dir=destination.parent))
     try:
-        (temporary / "presentation.md").write_text(source, encoding="utf-8")
+        (temporary / "presentation.md").write_bytes(original.encode("utf-8"))
         _copy_project_assets(resolved, source, temporary, trim_bibliography=trim_bibliography)
         for source_name, target_name in EXPORT_FILES.items():
             _copy_entry(APP_ROOT / source_name, temporary / target_name)
@@ -713,13 +735,11 @@ def pack_presentation(
     if destination == resolved.parent:
         raise ValueError("Pack destination is the presentation directory; choose another folder")
     destination.parent.mkdir(parents=True, exist_ok=True)
-    source = resolved.read_text(encoding="utf-8")
-    if not include_notes:
-        source = _without_speaker_notes(source)
+    original, source = _deck_source(resolved, include_notes=include_notes)
 
     temporary = Path(tempfile.mkdtemp(prefix=f".{destination.name}-", dir=destination.parent))
     try:
-        (temporary / resolved.name).write_text(source, encoding="utf-8")
+        (temporary / resolved.name).write_bytes(original.encode("utf-8"))
         _copy_project_assets(resolved, source, temporary, trim_bibliography=trim_bibliography)
         if destination.exists() and not force:
             conflicts = _pack_conflicts(temporary, destination)

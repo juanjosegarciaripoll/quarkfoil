@@ -903,8 +903,10 @@ def _write_edit_directory(destination: Path, summary: dict[str, Any], *, include
         entries = []
         for slide in summary["slides"]:
             filename = f"slide-{slide['number']:04d}.md"
-            (temporary / filename).write_text(
-                _slide_edit_document(slide, summary["revision"], include_notes=include_notes), encoding="utf-8",
+            # Bytes, as in _write_new_edit_file: a Windows text-mode write would
+            # turn a CRLF slide's line endings into CR CR LF.
+            (temporary / filename).write_bytes(
+                _slide_edit_document(slide, summary["revision"], include_notes=include_notes).encode("utf-8"),
             )
             entries.append({
                 "slide": slide["number"], "slide_revision": slide["slide_revision"], "file": filename,

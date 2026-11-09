@@ -24,13 +24,13 @@ from .exporter import (
     LOCAL_FILES,
     _configured_assets,
     _create_preview,
+    _deck_source,
     _folder_files,
     _front_matter,
     _index_html,
     _metadata_text,
     _player_bundle,
     _third_party_notice,
-    _without_speaker_notes,
 )
 from .bibliography import citation_keys, trim_bibliography as _trim_bibliography
 from .parser import parse_deck
@@ -280,9 +280,7 @@ def _stage_deck(
     if resolved.suffix.lower() not in {".md", ".markdown"}:
         raise PublishError("Presentation source must be Markdown")
     project = resolved.parent
-    source = resolved.read_text(encoding="utf-8")
-    if not include_notes:
-        source = _without_speaker_notes(source)
+    original, source = _deck_source(resolved, include_notes=include_notes)
 
     front = _front_matter(source)
     slug = _slug(resolved, name)
@@ -329,7 +327,9 @@ def _stage_deck(
                 private.write_bytes(data)
             warnings.append(f"{reference} is not a standalone image block; kept a private copy")
 
-    (folder / "presentation.md").write_text(source, encoding="utf-8")
+    # Published Markdown is the deck's own bytes, never rewritten (nor given
+    # CRLF line endings by a Windows text-mode write).
+    (folder / "presentation.md").write_bytes(original.encode("utf-8"))
     metadata = {
         "title": _metadata_text(front.get("title")) or resolved.stem,
         "author": _metadata_text(front.get("author")),

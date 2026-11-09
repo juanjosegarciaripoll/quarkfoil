@@ -960,6 +960,19 @@ Body.
         self.assertTrue((destination / "manifest.yml").is_file())
         self.assertTrue((destination / "slide-0002.md").is_file())
 
+    def test_edit_directory_keeps_a_crlf_slide_intact(self) -> None:
+        # A Windows text-mode write would turn each CRLF into CR CR LF, which
+        # reads back as a doubled line.
+        self.deck.write_bytes(SOURCE.replace("\n", "\r\n").encode("utf-8"))
+        destination = Path(self.temporary.name) / "inspected"
+        result, _, errors = self.invoke([
+            "deck", "inspect", str(self.deck), "--slides", "2", "--format", "edit", "--output", str(destination),
+        ])
+        self.assertEqual((result, errors), (0, ""))
+        document = (destination / "slide-0002.md").read_bytes()
+        self.assertNotIn(b"\r\r", document)
+        self.assertIn(b"## Second {.layout-1}\r\n\r\nSecond body.", document)
+
     def test_deck_lock_serializes_separate_processes(self) -> None:
         context = multiprocessing.get_context("spawn")
         waiting = context.Event()
@@ -1034,7 +1047,8 @@ class DeckRenderTests(unittest.TestCase):
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name).resolve()
         self.deck = self.root / "deck.md"
-        self.deck.write_text(RENDER_SOURCE, encoding="utf-8")
+        # Bytes, not text: Windows would write CRLF and change the revision.
+        self.deck.write_bytes(RENDER_SOURCE.encode("utf-8"))
         self.output = self.root / "images"
         self.calls: list[dict] = []
         renderer = mock.patch("scientific_slides.renderer.render_slides", side_effect=self._render)

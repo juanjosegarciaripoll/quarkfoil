@@ -353,6 +353,20 @@ class ExporterTests(unittest.TestCase):
         self.assertEqual(main(["export", str(self.deck), "--output", str(output), "--trim-bibliography", "--no-notes"]), 0)
         self.assertEqual((output / "references.bib").read_text(encoding="utf-8").strip(), "")
 
+    def test_exported_deck_and_trimmed_bibliography_keep_their_bytes(self) -> None:
+        # Written as bytes: Path.write_text would write CRLF on Windows.
+        bibliography = self.project / "references.bib"
+        bibliography.write_bytes(b"@misc{used, title={Used}}\n@misc{unused, title={Unused}}\n")
+        source = b"---\nbibliography: references.bib\n---\n\n## Cited\n\n[@used]\n\n::: notes\nSecret.\n:::\n"
+        for name, data in (("lf", source), ("crlf", source.replace(b"\n", b"\r\n"))):
+            with self.subTest(name):
+                self.deck.write_bytes(data)
+                output = export_presentation(self.deck, self.root / f"bytes-{name}", trim_bibliography=True)
+                self.assertEqual((output / "presentation.md").read_bytes(), data)
+                self.assertEqual((output / "references.bib").read_bytes(), b"@misc{used, title={Used}}\n\n")
+                quiet = export_presentation(self.deck, self.root / f"bytes-{name}-no-notes", include_notes=False)
+                self.assertEqual((quiet / "presentation.md").read_bytes(), data[:data.index(b":::")])
+
     def test_trim_without_bibliography(self) -> None:
         output = export_presentation(self.deck, self.root / "no-bibliography", trim_bibliography=True)
         self.assertTrue((output / "index.html").is_file())

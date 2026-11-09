@@ -80,6 +80,18 @@ class PublisherTests(unittest.TestCase):
         # the deck's own Markdown is published untouched
         self.assertIn("![](figures/diagram.svg)", (self.published() / "presentation.md").read_text(encoding="utf-8"))
 
+    def test_the_published_markdown_is_the_decks_own_bytes(self) -> None:
+        # Written as bytes: Path.write_text would write CRLF on Windows, and
+        # read_text folds CRLF into LF on every platform.
+        source = self.deck.read_bytes().replace(b"\r\n", b"\n")
+        for name, data in (("lf", source), ("crlf", source.replace(b"\n", b"\r\n"))):
+            with self.subTest(name):
+                self.deck.write_bytes(data)
+                meta = publish_presentation(self.deck, str(self.site), name=f"bytes-{name}")
+                self.assertEqual((self.published(f"bytes-{name}") / "presentation.md").read_bytes(), data)
+                # a CRLF deck's image block still resolves through the pool
+                self.assertEqual(len(meta["assets"]), 1)
+
     def test_identical_assets_are_stored_once_and_collisions_are_not(self) -> None:
         second = self.root / "other"
         (second / "figures").mkdir(parents=True)

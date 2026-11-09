@@ -44,6 +44,21 @@ class PackerTests(unittest.TestCase):
         self.assertTrue((destination / "figures/diagram.svg").is_file())
         self.assertFalse((destination / "figures/unused.svg").exists())
 
+    def test_pack_copies_the_deck_bytes_whatever_their_line_endings(self) -> None:
+        # Path.write_text would write CRLF on Windows; read_text folds CRLF to LF.
+        source = self.deck.read_bytes().replace(b"\r\n", b"\n")
+        for name, data in (("lf", source), ("crlf", source.replace(b"\n", b"\r\n"))):
+            with self.subTest(name):
+                self.deck.write_bytes(data)
+                destination = pack_presentation(self.deck, self.root / f"packed-{name}")
+                self.assertEqual((destination / "lecture.md").read_bytes(), data)
+        crlf = source.replace(b"\n", b"\r\n")
+        self.deck.write_bytes(crlf)
+        destination = pack_presentation(self.deck, self.root / "packed-no-notes", include_notes=False)
+        packed = (destination / "lecture.md").read_bytes()
+        self.assertNotIn(b"Remember the derivation", packed)
+        self.assertNotIn(b"\n", packed.replace(b"\r\n", b""))
+
     def test_pack_writes_no_website_files(self) -> None:
         destination = pack_presentation(self.deck, self.root / "packed")
 
