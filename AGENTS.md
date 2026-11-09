@@ -378,8 +378,12 @@ The CI workflow covers:
 - a current Python on Linux;
 - the Edge browser self-test on Windows;
 - `tests/print_ci.py`: real `print` and `deck render` runs with the runner
-  image's preinstalled Chromium-family browser and Firefox on Linux, Windows,
-  and macOS. It fails, never skips, when an expected browser is missing, and
+  image's preinstalled browsers on Linux, Windows, and macOS. It tests every
+  distinct installed browser plus the default selection, and fails unless at
+  least one Chromium-family browser and Firefox pass; another browser that
+  cannot start (the runner's Chromium snapshot) is a warning with its
+  diagnostics, including sandboxed and `--no-sandbox` probe launches and a
+  stated conclusion, because hosted runners cannot be inspected by hand. It
   starts with a platform and browser-version report for auditing failures;
   and
 - wheel/source-archive build verification after tests pass.

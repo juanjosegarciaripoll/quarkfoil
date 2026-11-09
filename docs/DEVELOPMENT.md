@@ -61,9 +61,11 @@ The `CI` workflow runs for every push and pull request. It checks:
 - the current Python release on Linux;
 - the browser self-test in Firefox on Linux, Microsoft Edge on Windows, and
   Safari on macOS;
-- `quarkfoil print` and `quarkfoil deck render` end to end, with the Chromium
-  family browser and the Firefox preinstalled on the Linux, Windows, and macOS
-  runner images;
+- `quarkfoil print` and `quarkfoil deck render` end to end, with every browser
+  preinstalled on the Linux, Windows, and macOS runner images and with the
+  default browser selection. At least one Chromium-family browser and Firefox
+  must pass; a browser that cannot start on the runner is reported as a
+  warning with its diagnostics;
 - wheel and source-archive creation after all checks pass.
 
 The print-and-render check is also a local command. It reports the platform
@@ -79,6 +81,15 @@ It deliberately uses the browsers the runner image ships rather than pinned
 ones, so a browser release that breaks printing fails CI. The platform report
 at the top of the job log (runner image version, operating system, and the
 exact browser builds) is the first thing to compare when it does.
+
+Nobody can log in to a hosted runner, so a Chromium-family browser that will
+not start diagnoses itself in the log. The script reports the Linux sandbox
+settings (AppArmor and user namespaces), the browser's sandbox helper,
+AppArmor profiles, and missing libraries. It then launches the browser twice
+to print an empty page, with and without its sandbox, and concludes whether
+the sandbox, Quarkfoil's launch options, or the installation is at fault.
+These probes exist only in the test script; Quarkfoil never disables the
+sandbox.
 
 Distribution archives exist only inside the ephemeral CI runner and are not
 uploaded or retained. Quarkfoil has no automated package-publication workflow.
