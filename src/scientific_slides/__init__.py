@@ -90,33 +90,58 @@ def _pack(arguments: list[str]) -> int:
 
 
 def _download(arguments: list[str]) -> int:
-    from .downloader import DownloadError, download_published
+    from .downloader import DownloadError, download_talk
 
     parser = argparse.ArgumentParser(
         prog="quarkfoil download",
-        description="Download a published talk as an editable Quarkfoil project",
+        description=(
+            "Download a published talk as an editable Quarkfoil project, a ZIP archive of it, "
+            "a PDF, or any combination"
+        ),
     )
     parser.add_argument("url", metavar="URL", help="Public URL of the published talk")
-    parser.add_argument("--output", "-o", type=Path, required=True, help="Directory to create or update")
+    parser.add_argument("--output", "-o", type=Path, help="Directory to create or update with the editable project")
+    parser.add_argument("--zip", type=Path, metavar="FILE.zip", help="Write the editable project as a ZIP archive")
+    parser.add_argument("--pdf", type=Path, metavar="FILE.pdf", help="Print the talk to PDF, one slide per page, with an installed browser")
+    parser.add_argument(
+        "--sha256", action="store_true",
+        help="Write FILE.sha256 beside the ZIP archive and the PDF, for checking later with sha256sum -c",
+    )
     parser.add_argument("--name", help="Recovered Markdown file name (default: original name or talk slug)")
     parser.add_argument(
         "--force", action="store_true",
-        help="Replace destination files that differ from the downloaded project",
+        help="Replace destination files, a ZIP archive, a PDF, or checksum files that differ from the download",
     )
     parser.add_argument(
         "--timeout", type=float, default=30,
         help="Seconds allowed for each download (default: 30)",
     )
+    parser.add_argument(
+        "--browser",
+        help="Browser to print the PDF with (default: the first Chrome, Chromium, Edge, or Firefox that starts)",
+    )
     args = parser.parse_args(arguments)
+    if args.output is None and args.zip is None and args.pdf is None:
+        parser.error("choose at least one of --output, --zip, or --pdf")
     try:
-        destination, deck = download_published(
-            args.url, args.output, name=args.name, force=args.force, timeout=args.timeout
+        result = download_talk(
+            args.url, output=args.output, archive=args.zip, pdf=args.pdf,
+            name=args.name, force=args.force, timeout=args.timeout, browser=args.browser,
+            checksums=args.sha256,
         )
-    except (DownloadError, FileExistsError, ValueError) as error:
+    except (DownloadError, FileExistsError, FileNotFoundError, IsADirectoryError, RuntimeError, ValueError) as error:
         print(f"quarkfoil download: {error}", file=sys.stderr)
         return 1
-    print(f"Downloaded editable Quarkfoil project to {destination}")
-    print(f"Keep editing it with: quarkfoil {deck}")
+    if result.project is not None:
+        print(f"Downloaded editable Quarkfoil project to {result.project}")
+        print(f"Keep editing it with: quarkfoil {result.deck}")
+    if result.archive is not None:
+        state = "is already up to date" if result.archive_unchanged else "written"
+        print(f"ZIP archive of the editable project {state}: {result.archive}")
+    if result.pdf is not None:
+        print(f"Printed the talk to {result.pdf} (one slide per page, printed with {result.browser})")
+    for checksum in result.checksums:
+        print(f"SHA-256 written: {checksum}")
     return 0
 
 

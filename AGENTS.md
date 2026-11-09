@@ -166,6 +166,18 @@ The distribution and command-line tool are named `quarkfoil`.
 - Do not imply that download can recover unpublished material. Notes omitted by
   default or bibliography entries removed by `--trim-bibliography` are absent
   from the public site.
+- `--zip FILE` and `--pdf FILE` are backups of the same recovered project, with
+  or without `--output`. The archive holds exactly that project in one folder
+  named after the talk and is reproducible (sorted entries, fixed timestamps
+  and modes), so an unchanged talk gives identical bytes. Store
+  already-compressed media (`STORED_SUFFIXES`) uncompressed so damage stays
+  local, and verify every archive (file list, sizes, CRCs) before it replaces
+  anything. `--sha256` writes `sha256sum`-format files beside the archive and
+  PDF; a disagreeing one is a conflict. The PDF is printed
+  from the recovered project through `printer.py`, never from the published
+  site, whose older runtime lacks the readiness signal printing waits for.
+  Assemble everything before writing anything; check for a browser before
+  downloading. A differing archive or any existing PDF needs `--force`.
 
 ### Printing a PDF
 
