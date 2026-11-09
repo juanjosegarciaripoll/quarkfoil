@@ -61,7 +61,24 @@ The `CI` workflow runs for every push and pull request. It checks:
 - the current Python release on Linux;
 - the browser self-test in Firefox on Linux, Microsoft Edge on Windows, and
   Safari on macOS;
+- `quarkfoil print` and `quarkfoil deck render` end to end, with the Chromium
+  family browser and the Firefox preinstalled on the Linux, Windows, and macOS
+  runner images;
 - wheel and source-archive creation after all checks pass.
+
+The print-and-render check is also a local command. It reports the platform
+and each browser's version, prints and renders `example/deck.md`, and checks
+for one 960 × 540 pt page per slide and 1280 × 720 images that are not blank:
+
+```console
+uv run python tests/print_ci.py
+uv run python tests/print_ci.py --browser firefox --allow-missing
+```
+
+It deliberately uses the browsers the runner image ships rather than pinned
+ones, so a browser release that breaks printing fails CI. The platform report
+at the top of the job log (runner image version, operating system, and the
+exact browser builds) is the first thing to compare when it does.
 
 Distribution archives exist only inside the ephemeral CI runner and are not
 uploaded or retained. Quarkfoil has no automated package-publication workflow.

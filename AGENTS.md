@@ -311,6 +311,13 @@ uv run python tests/browser_ci.py
 On macOS, enable Apple's bundled WebDriver once with `safaridriver --enable`,
 then run `uv run python tests/browser_ci.py --browser safari`.
 
+Check printing and rendering end to end with the browsers installed locally
+(`--allow-missing` when only one of Chromium or Firefox is present):
+
+```console
+uv run python tests/print_ci.py
+```
+
 The browser self-test must finish with `data-status="passed"`; a successful
 HTTP response alone is not sufficient. When changing layout, selection,
 parsing, rendering, or source-edit behavior, extend `app/modules/selftest.js`
@@ -364,7 +371,12 @@ The CI workflow covers:
 
 - minimum Python on Linux and Windows;
 - a current Python on Linux;
-- the Edge browser self-test on Windows; and
+- the Edge browser self-test on Windows;
+- `tests/print_ci.py`: real `print` and `deck render` runs with the runner
+  image's preinstalled Chromium-family browser and Firefox on Linux, Windows,
+  and macOS. It fails, never skips, when an expected browser is missing, and
+  starts with a platform and browser-version report for auditing failures;
+  and
 - wheel/source-archive build verification after tests pass.
 
 CI build outputs are ephemeral. Do not upload or retain distribution artifacts.
@@ -378,6 +390,8 @@ Before handing off a change, perform the checks proportional to its risk:
 - Python unit tests for server, CLI, or exporter changes.
 - Browser self-test for parser, renderer, editor, or layout changes.
 - Real local and CDN browser loads for static-player/export changes.
+- `tests/print_ci.py` for print, render, browser-driver, or player-readiness
+  changes.
 - `mkdocs build --strict` for documentation or site-style changes.
 - `uv build` plus wheel inspection for packaging changes.
 - YAML validation and action-runtime review for workflow changes.

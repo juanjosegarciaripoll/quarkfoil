@@ -71,9 +71,37 @@ jobs:
       - name: Run browser self-test
         run: uv run --frozen --group browser --python 3.11 python tests/browser_ci.py --browser ${{ matrix.browser }}
 
+  print:
+    name: Print and render · ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux
+            os: ubuntu-latest
+          - name: Windows
+            os: windows-latest
+          - name: macOS
+            os: macos-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: true
+      - name: Install Python
+        run: uv python install 3.11
+      # Uses the runner image's preinstalled browsers on purpose: the job must
+      # fail when a current Chromium or Firefox release breaks printing.
+      - name: Print and render with installed Chromium and Firefox
+        run: uv run --frozen --no-group docs --python 3.11 python tests/print_ci.py
+
   packages:
     name: Verify distribution build
-    needs: [tests, browser]
+    needs: [tests, browser, print]
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
