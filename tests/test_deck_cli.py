@@ -8,6 +8,7 @@ import multiprocessing
 import os
 from pathlib import Path
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -972,6 +973,32 @@ Body.
         document = (destination / "slide-0002.md").read_bytes()
         self.assertNotIn(b"\r\r", document)
         self.assertIn(b"## Second {.layout-1}\r\n\r\nSecond body.", document)
+
+    def test_standard_streams_are_utf8_whatever_the_locale(self) -> None:
+        # Windows reads and writes pipes in the ANSI code page unless told
+        # otherwise; PYTHONIOENCODING=cp1252 reproduces that anywhere.
+        deck = Path(self.temporary.name) / "unicode.md"
+        deck.write_bytes("---\ntitle: Qubit \u03c8 \u2192 \u03c6\n---\n\n## \u03a8 states {.layout-1}\n\nBody.\n".encode("utf-8"))
+        environment = {**os.environ, "PYTHONIOENCODING": "cp1252"}
+        command = [sys.executable, "-c", "import sys; from scientific_slides import main; sys.exit(main())", "deck"]
+        inspected = subprocess.run(
+            [*command, "inspect", str(deck), "--no-source", "--compact"], capture_output=True, env=environment,
+        )
+        self.assertEqual(inspected.returncode, 0, inspected.stderr)
+        payload = json.loads(inspected.stdout.decode("utf-8"))
+        self.assertEqual(payload["slides"][0]["title"], "\u03a8 states")
+        edit = (
+            "---\nquarkfoil_edit: 1\noperation: replace\n"
+            f"deck_revision: {payload['revision']}\nslide: 1\n"
+            f"slide_revision: {payload['slides'][0]['slide_revision']}\nnotes: preserve\n"
+            "---\n\n## \u03a6 states {.layout-1}\n\nBody.\n"
+        )
+        applied = subprocess.run(
+            [*command, "apply", str(deck), "--edit", "-"], input=edit.encode("utf-8"),
+            capture_output=True, env=environment,
+        )
+        self.assertEqual(applied.returncode, 0, applied.stderr)
+        self.assertIn("## \u03a6 states".encode("utf-8"), deck.read_bytes())
 
     def test_deck_lock_serializes_separate_processes(self) -> None:
         context = multiprocessing.get_context("spawn")

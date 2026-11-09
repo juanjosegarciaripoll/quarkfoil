@@ -1246,7 +1246,25 @@ def _render(arguments: list[str]) -> int:
     return 0
 
 
+def _utf8_stdio() -> None:
+    """Speak UTF-8 on the standard streams, as the protocol promises, on every platform.
+
+    Windows otherwise reads and writes pipes in the ANSI code page, which cannot
+    hold most non-ASCII titles, and turns each written LF into CRLF, so a CRLF
+    slide printed in edit format would come out with CR CR LF.
+    """
+    for stream, options in ((sys.stdin, {}), (sys.stdout, {"newline": "\n"}), (sys.stderr, {"newline": "\n"})):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue  # replaced by a caller, for example with StringIO
+        try:
+            reconfigure(encoding="utf-8", **options)
+        except (OSError, ValueError):
+            pass
+
+
 def main(arguments: list[str]) -> int:
+    _utf8_stdio()
     yaml_errors = (
         bool(arguments) and arguments[0] == "apply" and "--edit" in arguments
     ) or (

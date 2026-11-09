@@ -310,10 +310,12 @@ class RemotePublishTests(unittest.TestCase):
     def test_the_pool_is_pushed_append_only_and_the_deck_mirrored(self) -> None:
         calls = []
         directories = []
+        encodings = []
 
-        def fake_run(command, capture_output=False, text=False, cwd=None):
+        def fake_run(command, capture_output=False, text=False, encoding=None, errors=None, cwd=None):
             calls.append(command)
             directories.append(cwd)
+            encodings.append(encoding)
             return mock.Mock(returncode=0, stdout="", stderr="")
 
         with mock.patch("scientific_slides.publisher.shutil.which", return_value="/usr/bin/rsync"), \
@@ -321,6 +323,8 @@ class RemotePublishTests(unittest.TestCase):
             publish_presentation(self.deck, "homepage:talks/")
 
         self.assertEqual(len(calls), 3)
+        # rsync's file names are UTF-8, not the Windows ANSI code page
+        self.assertEqual(encodings, ["utf-8"] * 3)
         state_read, assets, owned = calls
         self.assertIn("--include=meta.json", state_read)
         self.assertIn("--include=collection.json", state_read)
@@ -447,7 +451,7 @@ class FirstPublishTests(unittest.TestCase):
         self.temporary.cleanup()
 
     def _rsync(self, missing: bool):
-        def run(command, capture_output=False, text=False, cwd=None):
+        def run(command, capture_output=False, text=False, encoding=None, errors=None, cwd=None):
             reading = "--list-only" in command or "--include=meta.json" in command or "--ignore-missing-args" in command
             code = 23 if reading and missing else 0
             return mock.Mock(returncode=code, stdout="", stderr="No such file or directory")
@@ -462,7 +466,7 @@ class FirstPublishTests(unittest.TestCase):
     def test_an_unreadable_collection_never_blanks_its_listing(self) -> None:
         calls = []
 
-        def run(command, capture_output=False, text=False, cwd=None):
+        def run(command, capture_output=False, text=False, encoding=None, errors=None, cwd=None):
             calls.append(command)
             reading = "--include=meta.json" in command or "--ignore-missing-args" in command
             listing = "--list-only" in command

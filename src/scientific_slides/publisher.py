@@ -507,7 +507,9 @@ def _rsync(
         )
     if not quiet:
         print(f"  {' '.join(command)}")
-    result = subprocess.run(command, capture_output=True, text=True, cwd=cwd)
+    # rsync prints file names as UTF-8; Windows would decode them in its ANSI
+    # code page, which fails outright on some bytes.
+    result = subprocess.run(command, capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=cwd)
     if result.returncode != 0 and result.returncode not in tolerate:
         raise PublishError(f"rsync failed ({result.returncode}): {result.stderr.strip()}")
     if dry_run and result.stdout.strip():
