@@ -9,7 +9,8 @@ from pathlib import Path
 from unittest import mock
 
 from scientific_slides import main
-from scientific_slides.exporter import _asset_references, _preview_command, export_presentation
+from scientific_slides.exporter import CDN_FILES, _asset_references, _preview_command, export_presentation
+from scientific_slides.paths import APP_ROOT
 
 
 class ExporterTests(unittest.TestCase):
@@ -366,6 +367,13 @@ class ExporterTests(unittest.TestCase):
                 self.assertEqual((output / "references.bib").read_bytes(), b"@misc{used, title={Used}}\n\n")
                 quiet = export_presentation(self.deck, self.root / f"bytes-{name}-no-notes", include_notes=False)
                 self.assertEqual((quiet / "presentation.md").read_bytes(), data[:data.index(b":::")])
+
+    def test_cdn_files_are_vendored_with_the_cdn_line_endings(self) -> None:
+        # Subresource Integrity hashes the vendored bytes; a CRLF checkout
+        # (core.autocrlf on Windows) would break every CDN export.
+        for relative, _ in CDN_FILES.values():
+            with self.subTest(relative):
+                self.assertNotIn(b"\r", (APP_ROOT / relative).read_bytes())
 
     def test_trim_without_bibliography(self) -> None:
         output = export_presentation(self.deck, self.root / "no-bibliography", trim_bibliography=True)

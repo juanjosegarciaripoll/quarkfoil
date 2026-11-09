@@ -1,0 +1,4 @@
+# The CDN serves these files with LF line endings, and the static export
+# hashes the vendored copies for Subresource Integrity. Check them out byte
+# for byte even where core.autocrlf is true, the Git for Windows default.
+app/vendor/** -text
