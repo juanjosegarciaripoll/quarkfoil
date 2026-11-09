@@ -230,7 +230,11 @@ def _link(source: Path, destination: Path) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
     if destination.exists() or destination.is_symlink():
         return
-    destination.symlink_to(source.resolve())
+    try:
+        destination.symlink_to(source.resolve())
+    except OSError:
+        # Windows lets only administrators and Developer Mode create symlinks.
+        shutil.copy2(source, destination)
 
 
 @dataclass

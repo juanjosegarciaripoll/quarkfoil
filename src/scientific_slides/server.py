@@ -287,7 +287,8 @@ def _bibliography_pdfs(source: str, bibliography: Path) -> dict[str, Path]:
             attachment = re.sub(r"(?i):(application/pdf|pdf)\s*$", "", attachment)
             candidates = [attachment]
             if attachment.lower().startswith("file://"):
-                candidates.insert(0, urllib.parse.unquote(urllib.parse.urlsplit(attachment).path))
+                # url2pathname, not unquote: on Windows file:///C:/x.pdf is C:\x.pdf.
+                candidates.insert(0, urllib.request.url2pathname(urllib.parse.urlsplit(attachment).path))
             if ":" in attachment and not re.match(r"^[A-Za-z]:[/\\]", attachment):
                 candidates.append(attachment.split(":", 1)[1])
             for candidate in candidates:

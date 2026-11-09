@@ -92,6 +92,15 @@ class PublisherTests(unittest.TestCase):
                 # a CRLF deck's image block still resolves through the pool
                 self.assertEqual(len(meta["assets"]), 1)
 
+    def test_staging_copies_files_where_symlinks_are_not_allowed(self) -> None:
+        # Windows refuses symlinks to users without Developer Mode.
+        refused = OSError(1314, "A required privilege is not held by the client")
+        with mock.patch("pathlib.Path.symlink_to", side_effect=refused):
+            publish_presentation(self.deck, str(self.site))
+        pooled = sorted((self.site / "assets" / "f").rglob("*.svg"))
+        self.assertEqual([path.read_text(encoding="utf-8") for path in pooled], ["<svg/>"])
+        self.assertTrue((self.published() / "presentation.md").is_file())
+
     def test_identical_assets_are_stored_once_and_collisions_are_not(self) -> None:
         second = self.root / "other"
         (second / "figures").mkdir(parents=True)

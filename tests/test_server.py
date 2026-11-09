@@ -283,6 +283,9 @@ class ServerTests(unittest.TestCase):
         )
         canonical = relative.resolve()
         self.assertEqual(_bibliography_pdfs(source, bibliography), {"relative": canonical, "zotero": canonical})
+        # On Windows the URL is file:///D:/..., whose path is not D:\... after unquoting alone.
+        url = f"@article{{url, file={{{canonical.as_uri()}}}}}\n"
+        self.assertEqual(_bibliography_pdfs(url, bibliography), {"url": canonical})
 
     def test_project_boundary(self) -> None:
         with self.assertRaises(urllib.error.HTTPError) as context:
