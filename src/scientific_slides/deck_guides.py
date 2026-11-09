@@ -24,6 +24,9 @@ Edit:
 
 EDIT_DIR must be new. Exit 3 means DECK changed: inspect again.
 Use --no-notes when notes must remain outside agent context.
+
+Look: `quarkfoil deck render DECK --slides 4` writes PNG images and prints
+their paths as JSON. Structure checks do not show clipping or overlap.
 """
 
 
@@ -520,7 +523,8 @@ For a deck-wide request:
 
 Parser success verifies structure, not appearance. Layout-sensitive changes,
 overlays, long equations, tables, images, and unusual title spacing require a
-browser review. Report clearly when visual validation was not performed.
+visual review: `quarkfoil deck render DECK --slides N` and look at the images.
+Report clearly when visual validation was not performed.
 """
 
 
@@ -673,18 +677,23 @@ reducing the font.
 
 REPRODUCTION: VISUAL VERIFICATION
 
-After applying the deck, print and rasterize it when the required tools exist:
+After applying the deck, render the slides to images:
 
 ```console
-quarkfoil print deck.md --output /tmp/deck.pdf
-pdftoppm -r 96 -png /tmp/deck.pdf /tmp/deck-page
+quarkfoil deck render deck.md --output /tmp/deck-render
+quarkfoil deck render deck.md --slides 4,7 --output /tmp/deck-render
 ```
 
-At 96 dpi, Quarkfoil's 13.33 x 7.5 inch pages rasterize to approximately
-1280x720, so one output pixel is one CSS pixel. Inspect every page for clipped
-text, literal attribute strings, unreadable type, off-slide overlays, long
-equations, and accidental source line breaks. Report when visual verification
-was not possible.
+The command prints JSON listing one `slide-NN.png` per slide, named by deck
+slide number, with every fragment shown. Images are 1280x720 by default, so
+one image pixel is one CSS pixel; `--width 640` halves them when detail
+matters less than size. Trashed slides are not presented and cannot be
+rendered. Rendering needs Chrome, Chromium, Edge, or Firefox; `--browser`
+names one.
+
+Inspect every image for clipped text, literal attribute strings, unreadable
+type, off-slide overlays, long equations, and accidental source line breaks.
+Report when visual verification was not possible.
 """
 
 

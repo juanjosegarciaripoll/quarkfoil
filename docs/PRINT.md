@@ -35,6 +35,13 @@ temporary website, serves it on a loopback address, and asks a browser already
 installed on the computer to print it. The browser runs headlessly in a
 throwaway profile and never touches the one you browse with.
 
+Quarkfoil drives the browser through its own automation interface: the Chrome
+DevTools Protocol for Chrome, Chromium, and Edge, and WebDriver BiDi for
+Firefox. Both listen only on a loopback port the browser chooses. Quarkfoil
+waits until the presentation reports that every slide is laid out and every
+font and image has loaded, then asks for the PDF. It never relies on a guess at
+how long loading takes.
+
 The first of these that is installed is used:
 
 1. Chrome, Chromium, or Edge
@@ -48,9 +55,8 @@ quarkfoil print lecture.md --browser firefox
 quarkfoil print lecture.md --browser "/Applications/Firefox.app/Contents/MacOS/firefox"
 ```
 
-Both browsers produce pages of the same size. Chromium reads the page size from
-the presentation itself; Firefox prints on the paper its settings name, so
-Quarkfoil writes the slide size into the temporary profile it prints with.
+Both browsers produce pages of the same size: Quarkfoil states the slide size,
+zero margins, and background printing in the print request itself.
 
 If neither browser is installed, the command says so and does nothing. Install
 one, or open the presentation and use **Print / PDF** in a browser you have.
@@ -65,9 +71,15 @@ printing. `--timeout` raises the 180-second limit for a very large deck:
 quarkfoil print lecture.md --timeout 600
 ```
 
-The browser writes the PDF beside its destination and Quarkfoil renames it into
-place once it is complete, so an existing PDF is replaced in a single step and
+Quarkfoil writes the PDF beside its destination and renames it into place once
+it is complete, so an existing PDF is replaced in a single step and
 is never left half written. A failed run leaves the previous file untouched.
+
+## Images instead of a PDF
+
+`quarkfoil deck render` uses the same browsers to write one PNG image per slide.
+It is meant for AI assistants checking their own edits, and is described in
+[Use Quarkfoil with an AI assistant](AGENT_CLI.md#let-the-assistant-see-the-slides).
 
 ## Video slides
 

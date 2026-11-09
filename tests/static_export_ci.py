@@ -99,6 +99,12 @@ def main() -> int:
             )
         except TimeoutException as error:
             raise RuntimeError("Static presentation did not create PDF pages") from error
+        try:
+            WebDriverWait(driver, 30).until(
+                lambda active_driver: active_driver.find_element(By.TAG_NAME, "html").get_attribute("data-print-ready") == "true"
+            )
+        except TimeoutException as error:
+            raise RuntimeError("Static presentation did not report its print layout ready") from error
         pdf_pages = driver.find_elements(By.CSS_SELECTOR, ".pdf-page")
         if len(pdf_pages) != printable_slides:
             raise RuntimeError(f"Static presentation created {len(pdf_pages)} PDF pages for {printable_slides} slides")

@@ -26,7 +26,7 @@ UNRELIABLE_BOUNDARY_CODES = frozenset(("unreliable_slide_boundaries", "untermina
 PROTOCOL_VERSION = 1
 CAPABILITIES = ("replace", "insert", "delete", "move", "notes_policy", "dry_run", "quiet", "compact",
                 "inspect_projection", "slide_fingerprints", "apply_results", "source_file", "substitute",
-                "metadata", "edit_documents", "yaml_results", "markdown_projection")
+                "metadata", "edit_documents", "yaml_results", "markdown_projection", "render")
 
 PROTOCOL = {
     "name": "quarkfoil-deck",
@@ -36,6 +36,7 @@ PROTOCOL = {
         "opaque": True,
         "read": "quarkfoil deck inspect",
         "write": "quarkfoil deck apply",
+        "look": "quarkfoil deck render",
         "direct_file_tools": "forbidden for the deck itself",
         "edit_documents": "may be changed with the agent's normal text-editing tool",
     },
@@ -1150,6 +1151,99 @@ def _apply(arguments: list[str]) -> int:
     return 0
 
 
+def _render(arguments: list[str]) -> int:
+    from .browser import BrowserError
+    from .printer import BROWSER_TIMEOUT_SECONDS
+    from .renderer import image_size, render_slides
+
+    parser = DeckArgumentParser(
+        prog="quarkfoil deck render",
+        description="Render slides to PNG images with a headless browser so an agent can look at them",
+    )
+    parser.add_argument("deck", type=Path)
+    parser.add_argument("--slides", help="Render only these comma-separated slide numbers (default: every presented slide)")
+    parser.add_argument("--output", type=Path,
+                        help="Directory for the images, created if missing (default: a new temporary directory)")
+    parser.add_argument("--width", type=int, default=1280, help="Image width in pixels; height follows 16:9 (default: 1280)")
+    parser.add_argument("--browser", help="Browser to render with (default: the first Chrome, Chromium, Edge, or Firefox found)")
+    parser.add_argument("--timeout", type=float, default=BROWSER_TIMEOUT_SECONDS,
+                        help=f"Seconds to wait for the browser (default: {BROWSER_TIMEOUT_SECONDS:g})")
+    parser.add_argument("--compact", action="store_true", help="Emit compact JSON")
+    args = parser.parse_args(arguments)
+    selected = _selected_slides(args.slides)
+    try:
+        width, height = image_size(args.width)
+    except ValueError as error:
+        raise DeckCommandError(str(error), code="usage_error") from error
+    if args.timeout <= 0:
+        raise DeckCommandError("--timeout must be positive", code="usage_error")
+
+    data, current = _read_deck(args.deck)
+    deck = parse_deck(data.decode("utf-8"))
+    errors = [item for item in _diagnostics(deck) if item.get("level") == "error"]
+    if errors:
+        raise DeckCommandError("the presentation has errors and cannot be rendered", code="invalid_deck",
+                               diagnostics=errors)
+    total = len(deck.slides)
+    if selected is not None and max(selected) > total:
+        raise DeckCommandError(f"the presentation has {total} slides", code="slide_not_found",
+                               slides=sorted(number for number in selected if number > total))
+    # The player presents only slides that are not trashed, so a slide's place
+    # in the browser differs from its number in the deck once one is trashed.
+    presented: dict[int, int] = {}
+    for slide in deck.slides:
+        if not slide.trashed:
+            presented[slide.index + 1] = len(presented)
+    numbers = sorted(selected) if selected is not None else list(presented)
+    trashed = [number for number in numbers if number not in presented]
+    if trashed:
+        raise DeckCommandError("trashed slides are not presented and cannot be rendered", code="slide_trashed",
+                               slides=trashed)
+    if not numbers:
+        raise DeckCommandError("the presentation has no presented slides", code="slide_not_found")
+
+    if args.output is None:
+        destination = Path(tempfile.mkdtemp(prefix=f"quarkfoil-render-{args.deck.stem}-"))
+    else:
+        destination = args.output
+        if destination.exists() and not destination.is_dir():
+            raise DeckCommandError(f"render destination is not a directory: {destination}")
+        try:
+            destination.mkdir(parents=True, exist_ok=True)
+        except OSError as error:
+            raise DeckCommandError(str(error)) from error
+    destination = destination.resolve()
+    digits = max(2, len(str(total)))
+    files = {number: destination / f"slide-{number:0{digits}d}.png" for number in numbers}
+    try:
+        browser = render_slides(
+            args.deck,
+            [(presented[number], files[number]) for number in numbers],
+            expected_slides=len(presented),
+            width=width,
+            browser=args.browser,
+            timeout=args.timeout,
+        )
+    except FileNotFoundError as error:
+        raise DeckCommandError(str(error), code="browser_not_found") from error
+    except (BrowserError, RuntimeError, OSError) as error:
+        raise DeckCommandError(str(error), 1, code="render_failed") from error
+    _, after = _read_deck(args.deck)
+    if after != current:
+        raise DeckCommandError("the presentation changed while it was being rendered; render again",
+                               code="revision_changed", revision=current, current_revision=after)
+    titles = {slide.index + 1: slide.title for slide in deck.slides}
+    _print_json({
+        "revision": current,
+        "output": str(destination),
+        "browser": browser,
+        "width": width,
+        "height": height,
+        "images": [{"slide": number, "title": titles[number], "file": str(files[number])} for number in numbers],
+    }, compact=args.compact)
+    return 0
+
+
 def main(arguments: list[str]) -> int:
     yaml_errors = (
         bool(arguments) and arguments[0] == "apply" and "--edit" in arguments
@@ -1159,11 +1253,11 @@ def main(arguments: list[str]) -> int:
         and "--format" in arguments
     )
     try:
-        commands = ("guide", "protocol", "create", "inspect", "apply")
+        commands = ("guide", "protocol", "create", "inspect", "apply", "render")
         if not arguments or arguments[0] not in commands:
             parser = DeckArgumentParser(
                 prog="quarkfoil deck",
-                description="Create, inspect, or atomically edit a presentation for an LLM agent",
+                description="Create, inspect, atomically edit, or render a presentation for an LLM agent",
             )
             parser.add_argument("command", choices=commands)
             parser.parse_args(arguments)
@@ -1178,6 +1272,8 @@ def main(arguments: list[str]) -> int:
             return _create(arguments[1:])
         if arguments[0] == "inspect":
             return _inspect(arguments[1:])
+        if arguments[0] == "render":
+            return _render(arguments[1:])
         return _apply(arguments[1:])
     except DeckCommandError as error:
         payload = {"error": error.code, "message": str(error), **error.details}

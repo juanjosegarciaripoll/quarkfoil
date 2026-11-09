@@ -7,6 +7,7 @@ import json
 import multiprocessing
 import os
 from pathlib import Path
+import shutil
 import sys
 import tempfile
 import unittest
@@ -94,6 +95,7 @@ class DeckCliTests(unittest.TestCase):
         self.assertIn("quarkfoil deck create DECK", output)
         self.assertIn("Exit 3 means DECK changed", output)
         self.assertIn("Use --no-notes", output)
+        self.assertIn("quarkfoil deck render DECK --slides 4", output)
 
     def test_guide_topics_and_complete_reference_are_discoverable(self) -> None:
         result, output, errors = self.invoke(["deck", "guide", "layouts"])
@@ -146,7 +148,7 @@ class DeckCliTests(unittest.TestCase):
         self.assertIn("bibliography:", reproduction)
         self.assertIn("references.bib", reproduction)
         self.assertIn('x="55" y="82" w="40" h="8"', reproduction)
-        self.assertIn("quarkfoil print deck.md", reproduction)
+        self.assertIn("quarkfoil deck render deck.md", reproduction)
 
         result, overlays, errors = self.invoke(["deck", "guide", "overlays"])
         self.assertEqual((result, errors), (0, ""))
@@ -240,6 +242,8 @@ class DeckCliTests(unittest.TestCase):
         self.assertTrue(payload["deck_file_access"]["opaque"])
         self.assertEqual(payload["deck_file_access"]["read"], "quarkfoil deck inspect")
         self.assertEqual(payload["deck_file_access"]["write"], "quarkfoil deck apply")
+        self.assertEqual(payload["deck_file_access"]["look"], "quarkfoil deck render")
+        self.assertIn("render", payload["capabilities"])
         self.assertIn("forbidden", payload["deck_file_access"]["direct_file_tools"])
 
     def test_apply_help_describes_quiet_result(self) -> None:
@@ -1000,3 +1004,125 @@ class FrontMatterDateTests(unittest.TestCase):
         self.assertEqual(code, 0)
         summary = json.loads(output.getvalue())
         self.assertEqual(summary["metadata"]["date"], "2026-09-07")
+
+
+RENDER_SOURCE = """---
+title: Render test
+---
+
+## Opening {.layout-1}
+
+Visible.
+
+---
+
+## Superseded {.layout-1 .trashed}
+
+Hidden.
+
+---
+
+## Closing {.layout-1}
+
+Visible too.
+"""
+
+
+class DeckRenderTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name).resolve()
+        self.deck = self.root / "deck.md"
+        self.deck.write_text(RENDER_SOURCE, encoding="utf-8")
+        self.output = self.root / "images"
+        self.calls: list[dict] = []
+        renderer = mock.patch("scientific_slides.renderer.render_slides", side_effect=self._render)
+        renderer.start()
+        self.addCleanup(renderer.stop)
+
+    def _render(self, deck, targets, **options):
+        self.calls.append({"deck": deck, "targets": targets, **options})
+        for _, path in targets:
+            path.write_bytes(b"\x89PNG")
+        return "/usr/bin/chromium"
+
+    def invoke(self, arguments: list[str]) -> tuple[int, str, str]:
+        output, errors = StringIO(), StringIO()
+        with redirect_stdout(output), redirect_stderr(errors):
+            result = main(["deck", "render", str(self.deck), *arguments])
+        return result, output.getvalue(), errors.getvalue()
+
+    def test_every_presented_slide_is_rendered_and_named_by_its_deck_number(self) -> None:
+        result, output, errors = self.invoke(["--output", str(self.output)])
+        self.assertEqual((result, errors), (0, ""))
+        payload = json.loads(output)
+        self.assertEqual(payload["revision"], revision(RENDER_SOURCE.encode("utf-8")))
+        self.assertEqual((payload["width"], payload["height"]), (1280, 720))
+        self.assertEqual(payload["browser"], "/usr/bin/chromium")
+        self.assertEqual([(image["slide"], image["title"]) for image in payload["images"]],
+                         [(1, "Opening"), (3, "Closing")])
+        self.assertEqual([Path(image["file"]).name for image in payload["images"]], ["slide-01.png", "slide-03.png"])
+        self.assertTrue(all(Path(image["file"]).is_file() for image in payload["images"]))
+        # The trashed slide is not presented, so slide 3 is the player's second slide.
+        call = self.calls[0]
+        self.assertEqual([index for index, _ in call["targets"]], [0, 1])
+        self.assertEqual(call["expected_slides"], 2)
+
+    def test_selected_slides_and_width_are_passed_to_the_browser(self) -> None:
+        result, output, errors = self.invoke(["--output", str(self.output), "--slides", "3", "--width", "640"])
+        self.assertEqual((result, errors), (0, ""))
+        payload = json.loads(output)
+        self.assertEqual((payload["width"], payload["height"]), (640, 360))
+        self.assertEqual([image["slide"] for image in payload["images"]], [3])
+        self.assertEqual(self.calls[0]["width"], 640)
+        self.assertEqual([index for index, _ in self.calls[0]["targets"]], [1])
+
+    def test_without_an_output_directory_the_images_go_to_a_new_temporary_one(self) -> None:
+        result, output, errors = self.invoke(["--slides", "1"])
+        self.assertEqual((result, errors), (0, ""))
+        directory = Path(json.loads(output)["output"])
+        self.addCleanup(shutil.rmtree, directory, True)
+        self.assertTrue(directory.name.startswith("quarkfoil-render-deck-"))
+        self.assertNotEqual(directory.parent, self.root)
+        self.assertTrue((directory / "slide-01.png").is_file())
+
+    def test_unrenderable_selections_are_rejected_before_starting_a_browser(self) -> None:
+        for arguments, code in (
+            (["--slides", "2"], "slide_trashed"),
+            (["--slides", "9"], "slide_not_found"),
+            (["--width", "20"], "usage_error"),
+            (["--slides", "0"], "usage_error"),
+            (["--timeout", "0"], "usage_error"),
+        ):
+            result, output, errors = self.invoke(["--output", str(self.output), *arguments])
+            self.assertEqual((result, output), (2, ""), arguments)
+            self.assertEqual(json.loads(errors)["error"], code)
+        self.assertEqual(self.calls, [])
+
+    def test_a_file_is_not_a_render_destination(self) -> None:
+        self.output.write_text("x", encoding="utf-8")
+        result, _, errors = self.invoke(["--output", str(self.output)])
+        self.assertEqual(result, 2)
+        self.assertIn("not a directory", json.loads(errors)["message"])
+
+    def test_browser_failures_are_reported_as_json(self) -> None:
+        from scientific_slides.browser import BrowserError
+
+        with mock.patch("scientific_slides.renderer.render_slides", side_effect=BrowserError("Timed out")):
+            result, _, errors = self.invoke(["--output", str(self.output)])
+        self.assertEqual(result, 1)
+        self.assertEqual(json.loads(errors), {"error": "render_failed", "message": "Timed out"})
+        with mock.patch("scientific_slides.renderer.render_slides", side_effect=FileNotFoundError("Browser not found: x")):
+            result, _, errors = self.invoke(["--output", str(self.output), "--browser", "x"])
+        self.assertEqual((result, json.loads(errors)["error"]), (2, "browser_not_found"))
+
+    def test_a_deck_changed_during_rendering_is_a_revision_conflict(self) -> None:
+        def change(deck, targets, **options):
+            self.deck.write_text(RENDER_SOURCE + "\n---\n\n## Added\n", encoding="utf-8")
+            return "/usr/bin/chromium"
+
+        with mock.patch("scientific_slides.renderer.render_slides", side_effect=change):
+            result, output, errors = self.invoke(["--output", str(self.output)])
+        self.assertEqual((result, output), (2, ""))
+        self.assertEqual(json.loads(errors)["error"], "revision_changed")

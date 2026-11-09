@@ -152,6 +152,28 @@ change visually. A clean editor reloads changes made by the assistant. If you
 have unsaved browser edits, Quarkfoil asks you to compare the two versions
 instead of silently replacing either one.
 
+## Let the assistant see the slides
+
+Checking the structure of a deck does not show whether text is clipped,
+an equation runs off the slide, or an overlay covers a figure. The assistant can
+look for itself:
+
+```console
+quarkfoil deck render lecture.md --slides 4,7 --output lecture-render
+```
+
+This writes `slide-04.png` and `slide-07.png`, each 1280 × 720 pixels and named
+by the slide's number in the deck, and prints their paths as JSON. Without
+`--slides` every presented slide is rendered; without `--output` the images go
+to a new temporary directory. `--width 640` produces smaller images. The images
+show the slide as presented, with every fragment visible and without speaker
+notes. Trashed slides are not presented and cannot be rendered.
+
+Rendering uses Chrome, Chromium, Edge, or Firefox, whichever is installed
+first, as [printing](PRINT.md#browsers) does; `--browser` names one. If the
+deck changes while it is being rendered the command fails with
+`revision_changed`, so the images always match the revision it reports.
+
 ## Keep speaker notes private
 
 Speaker notes are sent to the assistant by default because they can provide
@@ -336,6 +358,33 @@ quarkfoil deck inspect lecture.md --slides 8,9,10 \
 
 Quarkfoil creates the directory atomically with `manifest.yml` and one edit
 document per slide. The destination must not already exist.
+
+### Render slides to images
+
+```console
+quarkfoil deck render lecture.md [--slides 1,4] [--output DIRECTORY] \
+  [--width 1280] [--browser PROGRAM] [--timeout SECONDS] [--compact]
+```
+
+On success the command prints:
+
+```json
+{
+  "revision": "sha256:...",
+  "output": "/abs/path/lecture-render",
+  "browser": "/usr/bin/chromium",
+  "width": 1280,
+  "height": 720,
+  "images": [{"slide": 4, "title": "Result", "file": "/abs/path/lecture-render/slide-04.png"}]
+}
+```
+
+The output directory is created if missing; files of the same names are
+replaced one at a time and other files are left alone. Errors are JSON on
+stderr: `slide_not_found` and `slide_trashed` (exit 2) before a browser starts,
+`browser_not_found` (exit 2), `render_failed` (exit 1) when the browser fails
+or times out, and `revision_changed` (exit 2) when the deck changed during
+rendering.
 
 ### YAML results and failures
 

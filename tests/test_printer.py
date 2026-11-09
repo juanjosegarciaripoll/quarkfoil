@@ -1,151 +1,95 @@
 from __future__ import annotations
 
-import json
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
 
 from scientific_slides import main
+from scientific_slides.browser import BrowserError
 from scientific_slides.printer import (
+    PRINT_READY,
     SLIDE_HEIGHT_INCHES,
     SLIDE_WIDTH_INCHES,
-    _chromium_command,
-    _firefox_command,
-    browser_kind,
     find_browser,
-    firefox_preferences,
     print_presentation,
     print_url,
-    run_browser,
+    render_pdf,
 )
 
 PDF_BYTES = b"%PDF-1.7\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n"
 
-WRITE_PDF = (
-    "import sys\n"
-    "open(sys.argv[1], 'wb').write(sys.argv[2].encode('latin-1'))\n"
-)
 
+class PageSizeTests(unittest.TestCase):
+    def test_a_page_is_one_slide_of_the_player_canvas(self) -> None:
+        self.assertAlmostEqual(SLIDE_WIDTH_INCHES, 1280 / 96)
+        self.assertAlmostEqual(SLIDE_HEIGHT_INCHES, 720 / 96)
 
-def _fake_browser(script: str, *arguments: str) -> list[str]:
-    return [sys.executable, "-c", script, *arguments]
+    def test_the_browser_opens_the_reveal_print_view(self) -> None:
+        self.assertEqual(print_url("http://127.0.0.1:9"), "http://127.0.0.1:9/?print-pdf")
 
-
-class BrowserDiscoveryTests(unittest.TestCase):
-    def test_chromium_is_preferred_and_firefox_is_the_fallback(self) -> None:
-        with mock.patch("scientific_slides.printer.find_executable", side_effect=["/usr/bin/chromium"]):
-            self.assertEqual(find_browser(), ("chromium", "/usr/bin/chromium"))
-        with mock.patch("scientific_slides.printer.find_executable", side_effect=[None, "/usr/bin/firefox"]):
-            self.assertEqual(find_browser(), ("firefox", "/usr/bin/firefox"))
-
-    def test_missing_browser_names_the_ones_that_would_work(self) -> None:
-        with mock.patch("scientific_slides.printer.find_executable", return_value=None):
+    def test_a_missing_browser_names_printing_and_the_browsers_that_would_work(self) -> None:
+        with mock.patch("scientific_slides.browser.find_executable", return_value=None):
             with self.assertRaises(RuntimeError) as error:
                 find_browser()
-        self.assertIn("Chrome, Chromium, Edge, or Firefox", str(error.exception))
-
-    def test_named_browser_is_used_and_classified_by_its_program_name(self) -> None:
-        with mock.patch("scientific_slides.printer.find_executable", return_value="/opt/firefox-esr/firefox-esr"):
-            self.assertEqual(find_browser("firefox-esr"), ("firefox", "/opt/firefox-esr/firefox-esr"))
-        with mock.patch("scientific_slides.printer.find_executable", return_value=None):
-            with self.assertRaises(FileNotFoundError):
-                find_browser("no-such-browser")
-
-    def test_edge_and_brave_print_the_way_chromium_does(self) -> None:
-        self.assertEqual(browser_kind("/usr/bin/msedge"), "chromium")
-        self.assertEqual(browser_kind(r"C:\Program Files\BraveSoftware\brave.exe"), "chromium")
-        self.assertEqual(browser_kind(r"C:\Program Files\Mozilla Firefox\firefox.exe"), "firefox")
+        self.assertIn("Printing a PDF needs Chrome, Chromium, Edge, or Firefox", str(error.exception))
 
 
-class BrowserCommandTests(unittest.TestCase):
-    def test_chromium_prints_the_reveal_print_view_without_page_furniture(self) -> None:
-        output, profile = Path("/tmp/out.pdf"), Path("/tmp/p")
-        command = _chromium_command("/usr/bin/chromium", output, "http://127.0.0.1:9/?print-pdf", profile)
-        self.assertIn("--headless=new", command)
-        self.assertIn(f"--print-to-pdf={output}", command)
-        self.assertIn("--no-pdf-header-footer", command)
-        self.assertIn(f"--user-data-dir={profile}", command)
-        self.assertEqual(command[-1], "http://127.0.0.1:9/?print-pdf")
+class FakePage:
+    def __init__(self, pdf: bytes = PDF_BYTES) -> None:
+        self.pdf = pdf
+        self.calls: list[tuple] = []
 
-    def test_firefox_runs_headless_in_its_own_instance_and_profile(self) -> None:
-        profile = Path("/tmp/p")
-        command = _firefox_command("/usr/bin/firefox", "http://127.0.0.1:9/?print-pdf&print-dialog", profile)
-        self.assertIn("--headless", command)
-        self.assertIn("--no-remote", command)
-        self.assertEqual(command[command.index("--profile") + 1], str(profile))
+    def navigate(self, url: str) -> None:
+        self.calls.append(("navigate", url))
 
-    def test_only_firefox_needs_the_page_to_open_the_print_dialog(self) -> None:
-        self.assertEqual(print_url("http://127.0.0.1:9", "chromium"), "http://127.0.0.1:9/?print-pdf")
-        self.assertEqual(print_url("http://127.0.0.1:9", "firefox"), "http://127.0.0.1:9/?print-pdf&print-dialog")
+    def evaluate(self, expression: str) -> object:
+        self.calls.append(("evaluate", expression))
+        return True
+
+    def print_pdf(self, width: float, height: float, timeout: float) -> bytes:
+        self.calls.append(("print", width, height))
+        return self.pdf
 
 
-class FirefoxPreferenceTests(unittest.TestCase):
-    def test_paper_is_one_slide_rather_than_the_configured_stationery(self) -> None:
-        preferences = firefox_preferences(Path("/tmp/slides.pdf"))
-        self.assertIn('user_pref("print.printer_Mozilla_Save_to_PDF.print_paper_width", "13.33333");', preferences)
-        self.assertIn('user_pref("print.printer_Mozilla_Save_to_PDF.print_paper_height", "7.50000");', preferences)
-        self.assertIn('user_pref("print.printer_Mozilla_Save_to_PDF.print_paper_size_unit", 0);', preferences)
-        self.assertIn('user_pref("print.printer_Mozilla_Save_to_PDF.print_shrink_to_fit", false);', preferences)
-        self.assertAlmostEqual(SLIDE_WIDTH_INCHES / SLIDE_HEIGHT_INCHES, 16 / 9)
+class RenderPdfTests(unittest.TestCase):
+    def _open(self, page: FakePage):
+        opened: list[dict] = []
 
-    def test_printing_is_silent_edge_to_edge_and_unstamped(self) -> None:
-        output = Path("/tmp/slides.pdf")
-        preferences = firefox_preferences(output)
-        self.assertIn('user_pref("print.always_print_silent", true);', preferences)
-        self.assertIn('user_pref("print_printer", "Mozilla Save to PDF");', preferences)
-        self.assertIn(
-            f'user_pref("print.printer_Mozilla_Save_to_PDF.print_to_filename", {json.dumps(str(output))});',
-            preferences,
-        )
-        self.assertIn('user_pref("print.printer_Mozilla_Save_to_PDF.print_bgcolor", true);', preferences)
-        for margin in ("top", "bottom", "left", "right"):
-            self.assertIn(f'user_pref("print.printer_Mozilla_Save_to_PDF.print_margin_{margin}", "0");', preferences)
-        for edge in ("left", "center", "right"):
-            self.assertIn(f'user_pref("print.printer_Mozilla_Save_to_PDF.print_header{edge}", "");', preferences)
-            self.assertIn(f'user_pref("print.printer_Mozilla_Save_to_PDF.print_footer{edge}", "");', preferences)
+        class Opener:
+            def __init__(self, kind, program, **options):
+                opened.append({"kind": kind, "program": program, **options})
 
-    def test_windows_paths_stay_readable_as_javascript_strings(self) -> None:
-        preferences = firefox_preferences(Path(r"C:\Users\ada\talk.pdf"))
-        self.assertIn(r'"C:\\Users\\ada\\talk.pdf"', preferences)
+            def __enter__(self):
+                return page
 
+            def __exit__(self, *exc):
+                return False
 
-class BrowserRunTests(unittest.TestCase):
-    def setUp(self) -> None:
-        self.temporary = tempfile.TemporaryDirectory()
-        self.root = Path(self.temporary.name).resolve()
-        self.addCleanup(self.temporary.cleanup)
-        self.output = self.root / "out.pdf"
-        self.log = self.root / "browser.log"
+        return Opener, opened
 
-    def test_a_browser_that_writes_a_complete_pdf_finishes(self) -> None:
-        run_browser(_fake_browser(WRITE_PDF, str(self.output), PDF_BYTES.decode("latin-1")), self.output, self.log, 30.0)
-        self.assertEqual(self.output.read_bytes(), PDF_BYTES)
+    def test_the_pdf_is_printed_only_after_the_player_reports_the_layout_ready(self) -> None:
+        page = FakePage()
+        opener, opened = self._open(page)
+        with mock.patch("scientific_slides.printer.open_page", opener):
+            data = render_pdf("firefox", "/usr/bin/firefox", "http://127.0.0.1:9/?print-pdf", 30.0)
+        self.assertEqual(data, PDF_BYTES)
+        self.assertEqual(opened[0]["width"], 1280)
+        self.assertEqual(opened[0]["height"], 720)
+        kinds = [call[0] for call in page.calls]
+        self.assertEqual(kinds, ["navigate", "evaluate", "print"])
+        self.assertEqual(page.calls[1][1], PRINT_READY)
+        self.assertEqual(page.calls[2][1:], (SLIDE_WIDTH_INCHES, SLIDE_HEIGHT_INCHES))
 
-    def test_a_browser_that_stops_without_a_pdf_reports_what_it_said(self) -> None:
-        script = "import sys; print('cannot open display'); sys.exit(1)"
-        with self.assertRaises(RuntimeError) as error:
-            run_browser(_fake_browser(script), self.output, self.log, 30.0)
-        self.assertIn("without writing the PDF", str(error.exception))
-        self.assertIn("cannot open display", str(error.exception))
+    def test_the_readiness_check_reports_player_errors(self) -> None:
+        self.assertIn("player-error", PRINT_READY)
+        self.assertIn("printReady", PRINT_READY)
 
-    def test_a_browser_that_never_finishes_is_timed_out_and_stopped(self) -> None:
-        script = "import time; time.sleep(60)"
-        with self.assertRaises(RuntimeError) as error:
-            run_browser(_fake_browser(script), self.output, self.log, 1.0)
-        self.assertIn("Timed out", str(error.exception))
-
-    def test_a_half_written_pdf_is_not_mistaken_for_a_finished_one(self) -> None:
-        script = (
-            "import sys, time\n"
-            "path = sys.argv[1]\n"
-            "open(path, 'wb').write(b'%PDF-1.7\\n')\n"
-            "time.sleep(60)\n"
-        )
-        with self.assertRaises(RuntimeError) as error:
-            run_browser(_fake_browser(script, str(self.output)), self.output, self.log, 1.5)
-        self.assertIn("Timed out", str(error.exception))
+    def test_anything_but_a_pdf_is_an_error(self) -> None:
+        opener, _ = self._open(FakePage(pdf=b"<html>"))
+        with mock.patch("scientific_slides.printer.open_page", opener):
+            with self.assertRaises(BrowserError):
+                render_pdf("chromium", "/usr/bin/chromium", "http://127.0.0.1:9/?print-pdf", 30.0)
 
 
 class PrintPresentationTests(unittest.TestCase):
@@ -160,17 +104,17 @@ class PrintPresentationTests(unittest.TestCase):
             "---\ntitle: Printable\n---\n\n## Slide {.layout-1}\n\n::: core\nText\n:::\n",
             encoding="utf-8",
         )
-        self.commands: list[list[str]] = []
+        self.urls: list[str] = []
         browser = mock.patch("scientific_slides.printer.find_browser", return_value=("chromium", "/usr/bin/chromium"))
         browser.start()
         self.addCleanup(browser.stop)
-        printer = mock.patch("scientific_slides.printer.run_browser", side_effect=self._render)
+        printer = mock.patch("scientific_slides.printer.render_pdf", side_effect=self._render)
         printer.start()
         self.addCleanup(printer.stop)
 
-    def _render(self, command: list[str], output: Path, log: Path, timeout: float) -> None:
-        self.commands.append(command)
-        output.write_bytes(PDF_BYTES)
+    def _render(self, kind: str, program: str, url: str, timeout: float) -> bytes:
+        self.urls.append(url)
+        return PDF_BYTES
 
     def test_the_pdf_lands_beside_the_deck_unless_another_name_is_given(self) -> None:
         destination, browser = print_presentation(self.deck)
@@ -185,27 +129,23 @@ class PrintPresentationTests(unittest.TestCase):
 
     def test_the_browser_reads_the_presentation_over_http_in_the_print_view(self) -> None:
         print_presentation(self.deck)
-        url = self.commands[0][-1]
-        self.assertTrue(url.startswith("http://127.0.0.1:"))
-        self.assertTrue(url.endswith("/?print-pdf"))
+        self.assertTrue(self.urls[0].startswith("http://127.0.0.1:"))
+        self.assertTrue(self.urls[0].endswith("/?print-pdf"))
 
     def test_nothing_is_left_beside_the_pdf_when_the_browser_fails(self) -> None:
-        with mock.patch("scientific_slides.printer.run_browser", side_effect=RuntimeError("browser exploded")):
+        with mock.patch("scientific_slides.printer.render_pdf", side_effect=BrowserError("browser exploded")):
             with self.assertRaises(RuntimeError):
                 print_presentation(self.deck)
         self.assertEqual(sorted(item.name for item in self.project.iterdir()), ["lecture.md"])
 
-    def test_a_replaced_pdf_is_never_seen_half_written(self) -> None:
+    def test_a_failed_run_leaves_an_existing_pdf_untouched(self) -> None:
         destination = self.project / "lecture.pdf"
         destination.write_bytes(b"%PDF-1.7\nold\n%%EOF\n")
-
-        def check(command: list[str], output: Path, log: Path, timeout: float) -> None:
-            self.assertNotEqual(output, destination)
-            self.assertEqual(destination.read_bytes(), b"%PDF-1.7\nold\n%%EOF\n")
-            output.write_bytes(PDF_BYTES)
-
-        with mock.patch("scientific_slides.printer.run_browser", side_effect=check):
-            print_presentation(self.deck)
+        with mock.patch("scientific_slides.printer.render_pdf", side_effect=BrowserError("timed out")):
+            with self.assertRaises(RuntimeError):
+                print_presentation(self.deck)
+        self.assertEqual(destination.read_bytes(), b"%PDF-1.7\nold\n%%EOF\n")
+        print_presentation(self.deck)
         self.assertEqual(destination.read_bytes(), PDF_BYTES)
 
     def test_only_a_markdown_presentation_that_exists_can_be_printed(self) -> None:

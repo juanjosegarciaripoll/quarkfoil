@@ -82,7 +82,13 @@ async function initialize() {
     } else bibliographySource = await readSource(assetPath(bibliographyPath), embedded?.bibliography ?? null);
   }
   renderDeck(deck, document.querySelector("#slides"), assetPath, prepareBibliography(bibliographySource, deck, bibliographyPdfs), { includeTrashed: false });
-  const reveal = new window.Reveal(document.querySelector(".reveal"), {
+  const revealElement = document.querySelector(".reveal");
+  // Reveal lays out its print view only after the page's load event and
+  // announces it with pdf-ready. Listen before initializing so it is not missed.
+  const printLayout = pdfPrintView()
+    ? new Promise(resolve => revealElement.addEventListener("pdf-ready", resolve, { once: true }))
+    : null;
+  const reveal = new window.Reveal(revealElement, {
     controls: !previewView,
     progress: !previewView,
     hash: !previewView,
@@ -114,13 +120,37 @@ async function initialize() {
     document.querySelector("#print-button")?.remove();
     await waitForRenderAssets();
     document.querySelector("#loading").remove();
-    await waitForRenderAssets();
+    await enablePreviewStepping(reveal);
     document.documentElement.dataset.previewReady = "true";
   } else document.querySelector("#loading").remove();
   if (pdfPrintView()) {
     document.querySelector("#print-button")?.remove();
+    await printLayout;
+    await waitForRenderAssets();
+    // Automated printing (quarkfoil print) waits for this before printing.
+    document.documentElement.dataset.printReady = "true";
     if (search.has("print-dialog")) openPrintDialogWhenReady();
   }
+}
+
+// The preview view has no hash routing of its own. Rendering tools step it
+// through the deck by setting #/N (zero-based, as Reveal writes it) and wait
+// for data-preview-index to report N once the slide's assets have loaded.
+// Every fragment is shown, as in the printed handout.
+async function enablePreviewStepping(reveal) {
+  const root = document.documentElement;
+  const show = async index => {
+    reveal.slide(index, 0, Number.MAX_SAFE_INTEGER);
+    await waitForRenderAssets();
+    root.dataset.previewIndex = String(reveal.getIndices().h);
+  };
+  root.dataset.previewSlides = String(reveal.getTotalSlides());
+  await show(reveal.getIndices().h);
+  let pending = Promise.resolve();
+  window.addEventListener("hashchange", () => {
+    const match = /^#\/(\d+)$/.exec(location.hash);
+    if (match) pending = pending.then(() => show(Number(match[1])));
+  });
 }
 
 document.querySelector("#print-button")?.addEventListener("click", () => window.location.assign(pdfPrintUrl()));
