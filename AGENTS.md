@@ -93,6 +93,15 @@ The distribution and command-line tool are named `quarkfoil`.
   choice and must remain documented as a security decision.
 - Enforce the selected presentation directory as the filesystem boundary.
 - Keep saves UTF-8 validated, size-limited, conflict-checked, and atomic.
+- Quarkfoil writes presentations as UTF-8 without a byte-order mark, with LF
+  line endings and a final newline (`canonical_text` in `parser.py`). It reads
+  a byte-order mark and CRLF or CR line endings by converting text where it
+  enters, with `canonical_source` in Python and `canonicalSource` in
+  `parser.js`; never inside the parsers, whose ranges index the given string.
+  Revisions hash the file's raw bytes. Copies made by export, pack, publish,
+  and download keep the bytes on disk, and Quarkfoil never rewrites support
+  files such as the bibliography or figures. Write exact bytes with
+  `write_bytes`, not `write_text`, which writes CRLF on Windows.
 - Continue escaping raw Markdown HTML. Do not introduce executable Markdown.
 - Keep the editor Content Security Policy restrictive and dependencies local.
 - Treat SVG as an image resource; do not inject untrusted SVG markup into the

@@ -5,10 +5,29 @@ import json
 from pathlib import Path
 import unittest
 
-from scientific_slides.parser import parse_attributes, parse_deck
+from scientific_slides.parser import canonical_source, canonical_text, parse_attributes, parse_deck
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+class CanonicalTextTests(unittest.TestCase):
+    def test_canonical_source_drops_the_byte_order_mark_and_uses_lf(self) -> None:
+        windows = "\ufeff---\r\ntitle: Windows\r\n---\r\n\r\n## One\r\n\r\nA\rB\r\n"
+        canonical = canonical_source(windows)
+        self.assertEqual(canonical, "---\ntitle: Windows\n---\n\n## One\n\nA\nB\n")
+        self.assertEqual(canonical_source(canonical), canonical)
+        self.assertEqual(parse_deck(canonical).metadata["title"], "Windows")
+
+    def test_a_byte_order_mark_hides_front_matter_until_the_text_is_canonical(self) -> None:
+        # Why canonicalization happens where text is read: parse_deck itself
+        # keeps exact offsets and so sees the mark.
+        self.assertEqual(parse_deck("\ufeff---\ntitle: Hidden\n---\n\n## One\n").metadata, {})
+
+    def test_canonical_text_ends_in_exactly_one_newline_unless_empty(self) -> None:
+        self.assertEqual(canonical_text("## One"), "## One\n")
+        self.assertEqual(canonical_text("## One\r\n"), "## One\n")
+        self.assertEqual(canonical_text(""), "")
 
 
 class ParserTests(unittest.TestCase):

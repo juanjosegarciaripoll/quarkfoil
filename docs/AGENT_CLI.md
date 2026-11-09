@@ -588,10 +588,13 @@ Invalid transactions exit with status 2 and also change nothing.
 
 After all operations succeed, Quarkfoil validates the complete result, writes a
 temporary sibling file, flushes it, and atomically replaces the presentation.
-Failures leave the original file byte-for-byte unchanged. Untouched Markdown
-and the deck's newline style are retained. On POSIX systems its permission bits
+Failures leave the original file byte-for-byte unchanged. Untouched Markdown is
+retained, and the result is written as UTF-8 without a byte-order mark and with
+LF line endings, whatever the deck or the edit documents used (see
+[encoding and line endings](FORMAT.md#encoding-and-line-endings)). On POSIX systems its permission bits
 are retained; on Windows Quarkfoil uses the native replacement operation to
 retain file attributes and access-control lists. Revisions are SHA-256 hashes
-of the exact UTF-8 file bytes, without newline normalization.
+of the exact UTF-8 file bytes, without newline normalization: the first write
+to a CRLF deck therefore changes its revision.
 A clean browser editor reloads the external revision; an editor with unsaved
 work uses its normal external-change reconciliation flow.

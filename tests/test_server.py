@@ -224,6 +224,25 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(context.exception.code, 409)
         self.assertEqual(self.deck.read_bytes(), next_source)
 
+    def test_saves_are_canonical_utf8_with_lf_line_endings(self) -> None:
+        digest = hashlib.sha256(self.deck.read_bytes()).hexdigest()
+        status, _, payload = self.request(
+            "/api/deck", method="PUT", body="\ufeff---\r\ntitle: Windows\r\n---\r\n\r\n# Slide".encode("utf-8"),
+            headers={"Content-Type": "text/markdown", "If-Match": f'"{digest}"'},
+        )
+        self.assertEqual(status, 200)
+        stored = self.deck.read_bytes()
+        self.assertEqual(stored, b"---\ntitle: Windows\n---\n\n# Slide\n")
+        # The returned revision is that of the bytes written, so the next save matches.
+        self.assertEqual(json.loads(payload)["hash"], hashlib.sha256(stored).hexdigest())
+
+    def test_a_deck_with_a_byte_order_mark_is_served_as_stored_with_its_revision(self) -> None:
+        stored = "\ufeff---\ntitle: Marked\n---\n\n# Slide\n".encode("utf-8")
+        self.deck.write_bytes(stored)
+        _, headers, payload = self.request("/api/deck")
+        self.assertEqual(payload, stored)
+        self.assertEqual(headers["ETag"].strip('"'), hashlib.sha256(stored).hexdigest())
+
     def test_invalid_external_utf8_is_reported_with_its_revision(self) -> None:
         invalid = b"## Invalid\n\xff\n"
         self.deck.write_bytes(invalid)

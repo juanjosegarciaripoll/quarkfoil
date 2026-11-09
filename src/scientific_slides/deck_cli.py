@@ -16,7 +16,7 @@ from typing import Any
 import yaml
 
 from .deck_guides import GUIDE, GUIDE_TOPICS, complete_guide
-from .parser import Deck, parse_deck
+from .parser import Deck, canonical_source, canonical_text, parse_deck
 from .starter import starter_deck
 from .storage import atomic_write, deck_file_lock
 
@@ -393,10 +393,6 @@ def _slide_position(deck: Deck, number: int) -> int:
     return next(index for index, item in enumerate(deck.items) if item is target)
 
 
-def _newline(source: str) -> str:
-    return "\r\n" if "\r\n" in source else "\n"
-
-
 def _metadata_source(value: Any) -> str:
     if not isinstance(value, str):
         raise DeckCommandError("metadata source must be a YAML string")
@@ -411,18 +407,16 @@ def _metadata_source(value: Any) -> str:
 
 
 def _replace_metadata(source: str, deck: Deck, metadata_source: str) -> str:
-    newline = _newline(source)
-    body = metadata_source.replace("\r\n", "\n").replace("\r", "\n").replace("\n", newline)
-    block = f"---{newline}{body}{newline}---{newline}"
+    body = canonical_source(metadata_source)
+    block = f"---\n{body}\n---\n"
     if deck.front_matter_range.end:
         return block + source[deck.front_matter_range.end:]
-    return block + newline + source
+    return block + "\n" + source
 
 
 def _separator_after(source: str) -> str:
-    newline = _newline(source)
-    leading = newline if source.endswith(("\n", "\r")) else newline * 2
-    return f"{leading}---{newline}{newline}"
+    leading = "\n" if source.endswith(("\n", "\r")) else "\n\n"
+    return f"{leading}---\n\n"
 
 
 def _replace_slide(source: str, deck: Deck, number: int, replacement: str) -> str:
@@ -444,8 +438,7 @@ def _insert_slide(source: str, deck: Deck, after: int, slide_source: str) -> str
     target = deck.slides[after - 1]
     insertion = target.range.end
     slide = slide_source.strip()
-    suffix = _newline(source)
-    return source[:insertion] + _separator_after(source[:insertion]) + slide + suffix + source[insertion:]
+    return source[:insertion] + _separator_after(source[:insertion]) + slide + "\n" + source[insertion:]
 
 
 def _delete_slide(source: str, deck: Deck, number: int) -> str:
@@ -496,8 +489,7 @@ def _apply_operation(source: str, operation: Any) -> str:
             replacement = without_notes(replacement).rstrip()
         if notes == "preserve" and existing.notes_range:
             note = deck.source[existing.notes_range.start:existing.notes_range.end].strip()
-            newline = _newline(source)
-            replacement = f"{replacement}{newline}{newline}{note}"
+            replacement = f"{replacement}\n\n{note}"
         return _replace_slide(source, deck, number, replacement)
     elif name == "metadata":
         _check_fields(operation, {"source"})
@@ -557,6 +549,9 @@ def _apply_operation(source: str, operation: Any) -> str:
 def _apply_transaction_details(source: str, operations: Any) -> tuple[str, list[dict[str, Any]], set[str], list[str]]:
     if not isinstance(operations, list) or not operations:
         raise DeckCommandError("transaction requires a nonempty 'operations' array")
+    # Work on canonical text, and write it: whatever a Windows editor put into
+    # the deck or an edit document, the result is UTF-8 with LF line endings.
+    source = canonical_source(source)
     tokens = [f"original:{index}" for index in range(len(parse_deck(source).slides))]
     touched: set[str] = set()
     results: list[dict[str, Any]] = []
@@ -593,6 +588,7 @@ def _apply_transaction_details(source: str, operations: Any) -> tuple[str, list[
             result.update({"metadata_changed": updated != source, "result_slide": None})
         results.append(result)
         source = updated
+    source = canonical_text(source)
     deck = parse_deck(source)
     errors = [item.message for item in deck.diagnostics if item.level == "error"]
     if errors:
@@ -975,7 +971,7 @@ def _create(arguments: list[str]) -> int:
     if not path.parent.is_dir():
         raise DeckCommandError("presentation parent directory does not exist", path=str(path.parent))
     source = starter_deck(title=title, author=author, theme=args.theme)
-    encoded = source.encode("utf-8")
+    encoded = canonical_text(source).encode("utf-8")
     with deck_file_lock(path):
         existed = path.exists()
         if existed and not path.is_file():
@@ -1025,7 +1021,7 @@ def _inspect(arguments: list[str]) -> int:
     if args.compact and args.format != "json":
         raise DeckCommandError("--compact is only available with --format json", code="usage_error")
     data, current = _read_deck(args.deck)
-    source = data.decode("utf-8")
+    source = canonical_source(data.decode("utf-8"))
     if args.format == "metadata":
         document = _metadata_edit_document(source, current)
         if args.output is not None:
@@ -1181,7 +1177,7 @@ def _render(arguments: list[str]) -> int:
         raise DeckCommandError("--timeout must be positive", code="usage_error")
 
     data, current = _read_deck(args.deck)
-    deck = parse_deck(data.decode("utf-8"))
+    deck = parse_deck(canonical_source(data.decode("utf-8")))
     errors = [item for item in _diagnostics(deck) if item.get("level") == "error"]
     if errors:
         raise DeckCommandError("the presentation has errors and cannot be rendered", code="invalid_deck",

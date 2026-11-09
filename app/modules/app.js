@@ -1,4 +1,4 @@
-import { deleteSection, duplicateSlide, emptyTrash, importSlide, insertOverlay, insertSection, insertSlide, moveSection, moveSlide, normalizeDeck, parseDeck, permanentlyDeleteSlide, restoreSlide, trashSlide, updateSectionTitle, updateSlideNotes } from "./parser.js";
+import { canonicalSource, deleteSection, duplicateSlide, emptyTrash, importSlide, insertOverlay, insertSection, insertSlide, moveSection, moveSlide, normalizeDeck, parseDeck, permanentlyDeleteSlide, restoreSlide, trashSlide, updateSectionTitle, updateSlideNotes } from "./parser.js";
 import { renderDeck, syncVideoPlayback } from "./render.js";
 import { boundarySlideShortcut, DesignEditor, handleMarkdownShortcut, pageSlideIndex, projectAssetPage, refreshConvertedVideoAssets, resolveImportDestination, videoConflictDestination } from "./editor.js";
 import { saveSnapshot } from "./storage.js";
@@ -307,8 +307,9 @@ async function pollForExternalDeck({ force = false } = {}) {
       }
       return false;
     }
-    const source = await response.text();
-    const hash = responseRevision(response) || await hashText(source);
+    const raw = await response.text();
+    const hash = responseRevision(response) || await hashText(raw);
+    const source = canonicalSource(raw);
     const error = deckValidationError(source);
     const action = externalDeckAction({
       knownHash: observedHash,
@@ -343,6 +344,7 @@ function bindExternalDeckChecks() {
 function parseAndRender(source, { preserveSlide = true } = {}) {
   const previous = preserveSlide ? state.currentSlide : 0;
   const previousId = preserveSlide ? state.deck?.slides[state.currentSlide]?.id : null;
+  source = canonicalSource(source);
   const deck = parseDeck(source);
   const fatal = deck.diagnostics.find(item => item.level === "error");
   if (fatal) {
@@ -549,7 +551,7 @@ function renameSection(sectionId) {
 async function chooseSlideToImport(path) {
   const response = await fetch(assetResolver(path), { cache: "no-store" });
   if (!response.ok) throw new Error("Cannot read presentation");
-  const imported = parseDeck(await response.text());
+  const imported = parseDeck(canonicalSource(await response.text()));
   const fatal = imported.diagnostics.find(item => item.level === "error");
   if (fatal) throw new Error(`Cannot import from ${path}: ${fatal.message}`);
   const dialog = document.querySelector("#project-file-dialog");
@@ -883,7 +885,7 @@ async function loadLocalDeck() {
         state.filename = restored.path;
         state.config.deck = restored.path;
         state.serverHash = restored.hash;
-        source = restored.source;
+        source = canonicalSource(restored.source);
       } else {
         try { localStorage.removeItem(lastDeckStorageKey()); } catch { /* Storage may be disabled. */ }
       }
@@ -891,8 +893,12 @@ async function loadLocalDeck() {
     if (source === undefined) {
       const response = await fetchDuringRestart("/api/deck", { cache: "no-store" });
       if (!response.ok) throw new Error("Cannot load deck");
-      source = await response.text();
-      state.serverHash = await hashText(source);
+      const raw = await response.text();
+      // The server's ETag is the hash of the file's bytes. Hashing the decoded
+      // text would disagree for a file with a byte-order mark, which
+      // response.text() drops, and every save would then be refused.
+      state.serverHash = responseRevision(response) || await hashText(raw);
+      source = canonicalSource(raw);
     }
     state.savedSource = source;
     rememberLastDeck(state.config.deck);
@@ -931,7 +937,7 @@ async function openPortable() {
     state.directoryHandle = directory;
     state.fileHandle = handle;
     state.filename = file.name;
-    const source = await file.text();
+    const source = canonicalSource(await file.text());
     await preloadPortableAssets(source);
     state.savedSource = source;
     state.local = false;
@@ -943,7 +949,7 @@ async function openPortable() {
     const file = await handle.getFile();
     state.fileHandle = handle;
     state.filename = file.name;
-    const source = await file.text();
+    const source = canonicalSource(await file.text());
     state.savedSource = source;
     state.local = false;
     state.undo = [];
@@ -1715,7 +1721,7 @@ function bindUi() {
       return;
     }
     state.filename = file.name;
-    const source = await file.text();
+    const source = canonicalSource(await file.text());
     state.savedSource = source;
     state.local = false;
     parseAndRender(source, { preserveSlide: false });

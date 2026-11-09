@@ -21,6 +21,7 @@ import yaml
 from .icons import icon_notices
 from .bibliography import citation_keys, trim_bibliography as _trim_bibliography
 from .paths import APP_ROOT, inside as _inside
+from .parser import canonical_source
 
 
 EXPORT_FILES = {
@@ -263,24 +264,21 @@ def _without_speaker_notes(source: str) -> str:
     return NOTES_BLOCK_PATTERN.sub("", source)
 
 
-def _universal_newlines(text: str) -> str:
-    return text.replace("\r\n", "\n").replace("\r", "\n")
-
-
 def _deck_source(deck: Path, *, include_notes: bool) -> tuple[str, str]:
-    """Return the deck as written, for copying, and with universal newlines, for reading.
+    """Return the deck as written, for copying, and as canonical text, for reading.
 
-    A copy keeps the author's line endings on every platform. ``read_text`` folds
-    CRLF into LF, and ``write_text`` writes CRLF on Windows, so neither may
-    produce the copied file.
+    A copy keeps the file's bytes on every platform: export, pack, and publish
+    never rewrite the deck. ``read_text`` folds CRLF into LF and ``write_text``
+    writes CRLF on Windows, so neither may produce the copied file. The parsers
+    read canonical text (no byte-order mark, LF line endings).
     """
     original = deck.read_bytes().decode("utf-8")
-    source = _universal_newlines(original)
+    source = canonical_source(original)
     if include_notes:
         return original, source
     source = _without_speaker_notes(source)
     original = _without_speaker_notes(original)
-    if _universal_newlines(original) != source:
+    if canonical_source(original) != source:
         # Line endings the notes pattern cannot see (a lone CR) must not let a
         # note into the copy that the checked reading left out.
         original = source

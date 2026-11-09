@@ -142,6 +142,15 @@ class ExporterTests(unittest.TestCase):
         self.assertEqual(result, 0)
         self.assertNotIn("Do not publish", (output / "presentation.md").read_text(encoding="utf-8"))
 
+    def test_a_deck_with_a_byte_order_mark_is_copied_as_is_and_read_canonically(self) -> None:
+        stored = "\ufeff---\r\ntitle: Marked deck\r\n---\r\n\r\n## Slide\r\n".encode("utf-8")
+        self.deck.write_bytes(stored)
+        output = export_presentation(self.deck, self.root / "marked-site")
+        self.assertEqual((output / "presentation.md").read_bytes(), stored)
+        index = (output / "index.html").read_text(encoding="utf-8")
+        self.assertIn("<title>Marked deck</title>", index)
+        self.assertNotIn("\\ufeff", index)
+
     def test_deck_metadata_is_written_into_exported_html(self) -> None:
         self.deck.write_text(
             "---\ntitle: Quantum & light\nauthor:\n  - Ada Lovelace\n  - Emmy Noether\n"

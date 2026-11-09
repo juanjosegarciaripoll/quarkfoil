@@ -1,4 +1,5 @@
 import {
+  canonicalSource,
   deleteOverlay,
   deleteOverlays,
   deleteSection,
@@ -1214,6 +1215,13 @@ Another visible footer
   assert(normalized.includes("# Methods {#methods .section}\n\n---\n\n## Normalize") && normalized.includes("::: overlay {#preserved type=\"markdown\"}\nOverlay first\n\n\nOverlay second\n:::\n\n::: notes"), "sections, slides, and directives use one blank line at their boundaries");
   assert(normalizeDeck(normalized) === normalized, "document normalization is idempotent");
   const normalizedCode = normalizeDeck("## Code {.layout-1}\n\n\n\nBefore.\n\n\n\n```text\nfirst\n\n\nsecond\n```\n");
+  const windowsSource = "\uFEFF---\r\ntitle: Windows deck\r\n---\r\n\r\n## One {.layout-1}\r\n\r\nBody.\rMore.\r\n";
+  const canonical = canonicalSource(windowsSource);
+  assert(canonical === "---\ntitle: Windows deck\n---\n\n## One {.layout-1}\n\nBody.\nMore.\n", "canonical source drops the byte-order mark and uses LF");
+  assert(canonicalSource(canonical) === canonical, "canonical source is idempotent");
+  assert(parseDeck(canonical).metadata.title === "Windows deck", "front matter is read from a deck saved with a byte-order mark");
+  const savedWindows = normalizeDeck(parseDeck(windowsSource.slice(1)));
+  assert(!savedWindows.includes("\r"), "saving a CRLF presentation writes LF line endings");
   assert(normalizedCode.includes("Before.\n\n```text\nfirst\n\n\nsecond\n```"), "document normalization preserves blank lines inside ordinary fenced code");
 
   next = duplicateOverlay(deck, 0, "eq", "eq-copy");

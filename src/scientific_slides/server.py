@@ -24,6 +24,7 @@ from pathlib import Path
 
 from .icons import ICON_COLLECTIONS, fetch_icon_svg, import_icon, search_icons
 from .paths import APP_ROOT, inside as _inside
+from .parser import canonical_text
 from .starter import STARTER_DECK
 from .storage import atomic_write, deck_file_lock
 
@@ -755,7 +756,9 @@ class SlideHandler(SimpleHTTPRequestHandler):
             return
         try:
             body = self._read_body(MAX_WRITE_BYTES)
-            body.decode("utf-8")
+            # Quarkfoil writes presentations as UTF-8 with LF line endings and
+            # no byte-order mark, whatever the browser sent.
+            body = canonical_text(body.decode("utf-8")).encode("utf-8")
         except (ValueError, UnicodeDecodeError) as error:
             self._send_json({"error": str(error)}, HTTPStatus.BAD_REQUEST)
             return

@@ -507,6 +507,21 @@ def _validate_objects(cells: list[Cell], overlays: list[Overlay], index: int, di
         if overlay.color and not _COLOR.fullmatch(overlay.color): diagnostics.append(Diagnostic("warning", f"Overlay '{overlay.id}' has invalid text color '{overlay.color}'", slide=index + 1))
 
 
+def canonical_source(source: str) -> str:
+    """Quarkfoil's canonical presentation text: no byte-order mark, LF line endings.
+
+    Text is converted where it is read, never inside parse_deck, whose ranges
+    must index the string they were given. Mirrors canonicalSource in parser.js.
+    """
+    return source.removeprefix("\ufeff").replace("\r\n", "\n").replace("\r", "\n")
+
+
+def canonical_text(source: str) -> str:
+    """The canonical text Quarkfoil writes: canonical source ending in one LF."""
+    text = canonical_source(source)
+    return text if not text or text.endswith("\n") else text + "\n"
+
+
 def parse_deck(source: str) -> Deck:
     """Parse presentation source without interpreting Markdown content."""
     diagnostics: list[Diagnostic] = []
@@ -556,4 +571,7 @@ def parse_deck(source: str) -> Deck:
     return Deck(source, metadata, SourceRange(0, body_start), slides, sections, items, diagnostics)
 
 
-__all__ = ["Attributes", "Cell", "Deck", "Diagnostic", "Image", "Overlay", "Section", "Slide", "SourceRange", "Video", "parse_attributes", "parse_deck"]
+__all__ = [
+    "Attributes", "Cell", "Deck", "Diagnostic", "Image", "Overlay", "Section", "Slide", "SourceRange", "Video",
+    "canonical_source", "canonical_text", "parse_attributes", "parse_deck",
+]

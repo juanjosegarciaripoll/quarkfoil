@@ -1,4 +1,4 @@
-import { parseDeck } from "./parser.js";
+import { canonicalSource, parseDeck } from "./parser.js";
 import { renderDeck, syncVideoPlayback } from "./render.js";
 import { prepareBibliography } from "./bibliography.js";
 import { openPrintDialogWhenReady, pdfPrintUrl, pdfPrintView, printShortcut, waitForRenderAssets } from "./print.js";
@@ -63,7 +63,7 @@ async function initialize() {
   const deckUrl = localPlayer
     ? `/api/deck${requestedDeck ? `?path=${encodeURIComponent(requestedDeck)}` : ""}`
     : "presentation.md";
-  const deck = parseDeck(await readSource(deckUrl, embedded?.deck ?? null));
+  const deck = parseDeck(canonicalSource(await readSource(deckUrl, embedded?.deck ?? null)));
   const errors = deck.diagnostics.filter(item => item.level === "error");
   if (errors.length) throw new Error(errors.map(item => item.message).join("; "));
 

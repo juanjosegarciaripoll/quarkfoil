@@ -294,14 +294,18 @@ class DeckCliTests(unittest.TestCase):
         self.assertFalse([item for item in deck.diagnostics if item.level == "error"])
 
     def test_replace_preserves_all_source_outside_target_range(self) -> None:
+        # Everything outside the target survives exactly, apart from line endings:
+        # Quarkfoil writes LF, so a CRLF deck comes back canonical.
         source = "---\r\ntitle: Exact\r\n---\r\n\r\n## First\r\n\r\nKeep  trailing spaces.  \r\n\r\n  ---  \r\n\r\n\r\n## Second\r\n\r\nOld.\r\n\r\n---\r\n\r\n## Third\r\n\r\nKeep third.\r\n"
-        target = parse_deck(source).slides[1].range
+        canonical = source.replace("\r\n", "\n")
+        target = parse_deck(canonical).slides[1].range
         updated = apply_transaction(source, [{
             "operation": "replace", "slide": 2, "source": "## Replacement\r\n\r\nNew.\r\n",
         }])
-        self.assertEqual(updated[:target.start], source[:target.start])
-        self.assertEqual(updated[-len(source[target.end:]):], source[target.end:])
-        self.assertNotIn("\n", updated.replace("\r\n", ""))
+        self.assertEqual(updated[:target.start], canonical[:target.start])
+        self.assertEqual(updated[-len(canonical[target.end:]):], canonical[target.end:])
+        self.assertIn("## Replacement\n\nNew.", updated)
+        self.assertNotIn("\r", updated)
 
     def test_insert_preserves_source_on_both_sides_of_insertion(self) -> None:
         deck = parse_deck(SOURCE)
@@ -529,7 +533,7 @@ class DeckCliTests(unittest.TestCase):
         }])
         self.assertNotIn("Ω", parse_deck(updated).slides[0].raw)
         self.assertIn("## Keep", updated)
-        self.assertNotIn("\n", updated.replace("\r\n", ""))
+        self.assertNotIn("\r", updated)
 
     def test_section_membership_and_empty_section_warning_are_returned(self) -> None:
         source = "# Intro {#intro .section}\n\n---\n\n## One\n\n---\n\n# Results {#results .section}\n\n---\n\n## Two\n"
@@ -961,18 +965,42 @@ Body.
         self.assertTrue((destination / "manifest.yml").is_file())
         self.assertTrue((destination / "slide-0002.md").is_file())
 
-    def test_edit_directory_keeps_a_crlf_slide_intact(self) -> None:
-        # A Windows text-mode write would turn each CRLF into CR CR LF, which
-        # reads back as a doubled line.
-        self.deck.write_bytes(SOURCE.replace("\n", "\r\n").encode("utf-8"))
+    def test_a_deck_with_a_byte_order_mark_keeps_its_front_matter(self) -> None:
+        self.deck.write_bytes(("\ufeff" + SOURCE).encode("utf-8"))
+        result, output, errors = self.invoke(["deck", "inspect", str(self.deck), "--no-source"])
+        self.assertEqual((result, errors), (0, ""))
+        self.assertEqual(json.loads(output)["metadata"]["title"], "Agent test")
+
+    def test_apply_writes_canonical_text_whatever_the_deck_and_edit_used(self) -> None:
+        windows = ("\ufeff" + SOURCE.replace("\n", "\r\n")).encode("utf-8")
+        self.deck.write_bytes(windows)
+        transaction = Path(self.temporary.name) / "transaction.json"
+        transaction.write_bytes(json.dumps({
+            "revision": revision(windows),
+            "operations": [{"operation": "replace", "slide": 2, "source": "## Second {.layout-1}\r\n\r\nNew body.\r\n"}],
+        }).encode("utf-8"))
+        result, output, errors = self.invoke(["deck", "apply", str(self.deck), str(transaction)])
+        self.assertEqual((result, errors), (0, ""))
+        stored = self.deck.read_bytes()
+        self.assertFalse(stored.startswith(b"\xef\xbb\xbf"))
+        self.assertNotIn(b"\r", stored)
+        self.assertTrue(stored.endswith(b"\n"))
+        self.assertIn(b"## Second {.layout-1}\n\nNew body.", stored)
+        self.assertIn(b"Private first note.", stored)
+        self.assertEqual(json.loads(output)["revision"], revision(stored))
+
+    def test_edit_directory_from_a_crlf_deck_is_canonical(self) -> None:
+        # Edit documents are canonical text: never CR CR LF (a Windows text-mode
+        # write of CRLF), and never CRLF copied from the deck.
+        self.deck.write_bytes(("\ufeff" + SOURCE.replace("\n", "\r\n")).encode("utf-8"))
         destination = Path(self.temporary.name) / "inspected"
         result, _, errors = self.invoke([
             "deck", "inspect", str(self.deck), "--slides", "2", "--format", "edit", "--output", str(destination),
         ])
         self.assertEqual((result, errors), (0, ""))
         document = (destination / "slide-0002.md").read_bytes()
-        self.assertNotIn(b"\r\r", document)
-        self.assertIn(b"## Second {.layout-1}\r\n\r\nSecond body.", document)
+        self.assertNotIn(b"\r", document)
+        self.assertIn(b"## Second {.layout-1}\n\nSecond body.", document)
 
     def test_standard_streams_are_utf8_whatever_the_locale(self) -> None:
         # Windows reads and writes pipes in the ANSI code page unless told

@@ -455,6 +455,13 @@ function parseSlide(source, range, index, diagnostics) {
   };
 }
 
+// Quarkfoil's canonical presentation text: no byte-order mark and LF line
+// endings. Text is converted where it enters the editor or player, never
+// inside parseDeck, whose ranges must index the string it was given.
+export function canonicalSource(source) {
+  return String(source ?? "").replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n");
+}
+
 export function parseDeck(source) {
   const diagnostics = [];
   const front = splitFrontMatter(source, diagnostics);
@@ -537,10 +544,6 @@ function normalizeSlideSpacing(source) {
   return `${normalized.trimEnd()}\n`;
 }
 
-function sourceNewline(source) {
-  return source.includes("\r\n") ? "\r\n" : "\n";
-}
-
 function normalizeMarkdownSpacing(source, newline) {
   const output = [];
   let pendingBlank = false;
@@ -594,11 +597,14 @@ function normalizeSlide(slide, newline) {
 }
 
 export function normalizeDeck(value) {
-  const deck = typeof value === "string" ? parseDeck(value) : value;
-  if (!deck?.source) throw new Error("Cannot normalize an empty presentation");
+  const given = typeof value === "string" ? value : value?.source;
+  if (!given) throw new Error("Cannot normalize an empty presentation");
+  const source = canonicalSource(given);
+  const deck = typeof value !== "string" && source === value.source ? value : parseDeck(source);
   const fatal = deck.diagnostics.find(item => item.level === "error");
   if (fatal) throw new Error(fatal.message);
-  const newline = sourceNewline(deck.source);
+  // Saved presentations always use LF, whatever the file had before.
+  const newline = "\n";
   const frontMatter = deck.source.slice(0, deck.frontMatterRange.end).trim();
   const items = deck.items.map(item => item.kind === "slide"
     ? normalizeSlide(item, newline)

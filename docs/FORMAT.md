@@ -2,6 +2,27 @@
 
 The UTF-8 Markdown file is the presentation's source of truth. YAML front matter contains deck-wide settings, and a line containing only `---` separates slides.
 
+## Encoding and line endings
+
+Quarkfoil writes presentations in one form: UTF-8 without a byte-order mark,
+with LF (Unix) line endings and a final newline. It reads more than it writes:
+a file with a byte-order mark, or with Windows (CRLF) or old Mac (CR) line
+endings, opens normally, and its first save from the editor or from
+`quarkfoil deck apply` converts it. Text in any other encoding is refused
+rather than guessed.
+
+Only the presentation itself is converted. Quarkfoil never rewrites the
+bibliography, figures, or other files in the project, which other tools such as
+Zotero or JabRef may own; `export`, `pack`, and `publish` copy the deck and its
+assets byte for byte.
+
+To keep a presentation repository in this form on every computer, add a
+`.gitattributes` file beside the deck:
+
+```text
+*.md text eol=lf
+```
+
 ## Front matter
 
 ```yaml
