@@ -488,14 +488,26 @@ RSYNC_PARTIAL = 23
 RSYNC_MODES = ("-rltpL", "--chmod=D755,F644")
 
 
-def _rsync(command: list[str], dry_run: bool, *, tolerate: tuple[int, ...] = (), quiet: bool = False) -> int:
+# Local operands are always relative POSIX paths resolved from `cwd`. rsync
+# reads `HOST:path` as a remote operand, so an absolute Windows path such as
+# D:\staging\talk would name a host called "D"; Windows builds (cwRsync,
+# MSYS2, Cygwin) also disagree on how to spell a drive. A relative path means
+# the same thing to all of them.
+def _rsync(
+    command: list[str],
+    dry_run: bool,
+    *,
+    cwd: Path | None = None,
+    tolerate: tuple[int, ...] = (),
+    quiet: bool = False,
+) -> int:
     if shutil.which(command[0]) is None:
         raise PublishError(
             f"{command[0]} is required to publish to a remote target; install it or use a local --site"
         )
     if not quiet:
         print(f"  {' '.join(command)}")
-    result = subprocess.run(command, capture_output=True, text=True)
+    result = subprocess.run(command, capture_output=True, text=True, cwd=cwd)
     if result.returncode != 0 and result.returncode not in tolerate:
         raise PublishError(f"rsync failed ({result.returncode}): {result.stderr.strip()}")
     if dry_run and result.stdout.strip():
@@ -518,13 +530,14 @@ def _push(
     if dry_run:
         base += ["--dry-run", "--itemize-changes"]
     assets = staging / ASSETS_DIR
-    owned = [staging / name for name in names if (staging / name).exists()]
+    owned = [Path(name).as_posix() for name in names if (staging / name).exists()]
 
     def push_assets() -> None:
         if assets.is_dir():
             _rsync(
-                base + ["--ignore-existing", f"{assets}/", f"{target.child(ASSETS_DIR)}/"],
+                base + ["--ignore-existing", f"{ASSETS_DIR}/", f"{target.child(ASSETS_DIR)}/"],
                 dry_run,
+                cwd=staging,
             )
 
     def push_owned() -> None:
@@ -533,8 +546,9 @@ def _push(
             # --delete to those directories. Unnamed talks, assets, and other
             # root entries are outside the transfer and cannot be deleted.
             _rsync(
-                base + ["--delete", "--delay-updates", *(str(entry) for entry in owned), f"{target.raw}/"],
+                base + ["--delete", "--delay-updates", *owned, f"{target.raw}/"],
                 dry_run,
+                cwd=staging,
             )
 
     if root_exists:
@@ -724,9 +738,10 @@ def _collection_state(target: Target, rsync: str) -> CollectionState:
                 f"--include={SETTINGS_NAME}",
                 "--exclude=*",
                 f"{target.raw}/",
-                f"{temporary}/",
+                "./",
             ],
             False,
+            cwd=temporary,
             tolerate=(RSYNC_PARTIAL,),
             quiet=True,
         )

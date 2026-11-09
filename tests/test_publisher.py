@@ -297,9 +297,11 @@ class RemotePublishTests(unittest.TestCase):
 
     def test_the_pool_is_pushed_append_only_and_the_deck_mirrored(self) -> None:
         calls = []
+        directories = []
 
-        def fake_run(command, capture_output=False, text=False):
+        def fake_run(command, capture_output=False, text=False, cwd=None):
             calls.append(command)
+            directories.append(cwd)
             return mock.Mock(returncode=0, stdout="", stderr="")
 
         with mock.patch("scientific_slides.publisher.shutil.which", return_value="/usr/bin/rsync"), \
@@ -316,10 +318,22 @@ class RemotePublishTests(unittest.TestCase):
         self.assertIn("--delete", owned)
         self.assertIn("--delay-updates", owned)
         self.assertTrue(owned[-1].endswith("homepage:talks/"))
-        self.assertTrue(any(str(item).endswith("/lecture") for item in owned))
-        self.assertTrue(any(str(item).endswith("/series") for item in owned))
-        self.assertTrue(any(str(item).endswith("/index.html") for item in owned))
-        self.assertEqual(sum(str(item).endswith("/collection.json") for item in owned), 1)
+        self.assertIn("lecture", owned)
+        self.assertIn("series", owned)
+        self.assertIn("index.html", owned)
+        self.assertEqual(owned.count("collection.json"), 1)
+        self.assertEqual(assets[-2], "assets/")
+        self.assertEqual(state_read[-1], "./")
+        # Local operands are relative to the working directory rsync runs in:
+        # an absolute Windows path (D:\...) would read as a host named "D".
+        for command, directory in zip(calls, directories):
+            self.assertIsNotNone(directory)
+            self.assertTrue(Path(directory).is_absolute())
+            for operand in command[1:-1]:
+                if not operand.startswith("-"):
+                    self.assertNotIn("\\", operand)
+                    self.assertNotRegex(operand, r"^[A-Za-z]:")
+                    self.assertFalse(operand.startswith("/"), operand)
         self.assertIn("-rltpL", owned)
         # a web server has to be able to read what was published
         for command in (assets, owned):
@@ -421,7 +435,7 @@ class FirstPublishTests(unittest.TestCase):
         self.temporary.cleanup()
 
     def _rsync(self, missing: bool):
-        def run(command, capture_output=False, text=False):
+        def run(command, capture_output=False, text=False, cwd=None):
             reading = "--list-only" in command or "--include=meta.json" in command or "--ignore-missing-args" in command
             code = 23 if reading and missing else 0
             return mock.Mock(returncode=code, stdout="", stderr="No such file or directory")
@@ -436,7 +450,7 @@ class FirstPublishTests(unittest.TestCase):
     def test_an_unreadable_collection_never_blanks_its_listing(self) -> None:
         calls = []
 
-        def run(command, capture_output=False, text=False):
+        def run(command, capture_output=False, text=False, cwd=None):
             calls.append(command)
             reading = "--include=meta.json" in command or "--ignore-missing-args" in command
             listing = "--list-only" in command
