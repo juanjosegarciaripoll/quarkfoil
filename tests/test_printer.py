@@ -11,7 +11,7 @@ from scientific_slides.printer import (
     PRINT_READY,
     SLIDE_HEIGHT_INCHES,
     SLIDE_WIDTH_INCHES,
-    find_browser,
+    browser_candidates,
     print_presentation,
     print_url,
     render_pdf,
@@ -31,7 +31,7 @@ class PageSizeTests(unittest.TestCase):
     def test_a_missing_browser_names_printing_and_the_browsers_that_would_work(self) -> None:
         with mock.patch("scientific_slides.browser.find_executable", return_value=None):
             with self.assertRaises(RuntimeError) as error:
-                find_browser()
+                browser_candidates()
         self.assertIn("Printing a PDF needs Chrome, Chromium, Edge, or Firefox", str(error.exception))
 
 
@@ -52,16 +52,19 @@ class FakePage:
         return self.pdf
 
 
+candidates_used = [("firefox", "/usr/bin/firefox")]
+
+
 class RenderPdfTests(unittest.TestCase):
     def _open(self, page: FakePage):
         opened: list[dict] = []
 
         class Opener:
-            def __init__(self, kind, program, **options):
-                opened.append({"kind": kind, "program": program, **options})
+            def __init__(self, candidates, **options):
+                opened.append({"candidates": candidates, **options})
 
             def __enter__(self):
-                return page
+                return page, candidates_used[0][1]
 
             def __exit__(self, *exc):
                 return False
@@ -71,9 +74,11 @@ class RenderPdfTests(unittest.TestCase):
     def test_the_pdf_is_printed_only_after_the_player_reports_the_layout_ready(self) -> None:
         page = FakePage()
         opener, opened = self._open(page)
-        with mock.patch("scientific_slides.printer.open_page", opener):
-            data = render_pdf("firefox", "/usr/bin/firefox", "http://127.0.0.1:9/?print-pdf", 30.0)
+        with mock.patch("scientific_slides.printer.open_first_page", opener):
+            data, program = render_pdf(candidates_used, "http://127.0.0.1:9/?print-pdf", 30.0)
         self.assertEqual(data, PDF_BYTES)
+        self.assertEqual(program, "/usr/bin/firefox")
+        self.assertEqual(opened[0]["candidates"], candidates_used)
         self.assertEqual(opened[0]["width"], 1280)
         self.assertEqual(opened[0]["height"], 720)
         kinds = [call[0] for call in page.calls]
@@ -87,9 +92,9 @@ class RenderPdfTests(unittest.TestCase):
 
     def test_anything_but_a_pdf_is_an_error(self) -> None:
         opener, _ = self._open(FakePage(pdf=b"<html>"))
-        with mock.patch("scientific_slides.printer.open_page", opener):
+        with mock.patch("scientific_slides.printer.open_first_page", opener):
             with self.assertRaises(BrowserError):
-                render_pdf("chromium", "/usr/bin/chromium", "http://127.0.0.1:9/?print-pdf", 30.0)
+                render_pdf(candidates_used, "http://127.0.0.1:9/?print-pdf", 30.0)
 
 
 class PrintPresentationTests(unittest.TestCase):
@@ -105,16 +110,16 @@ class PrintPresentationTests(unittest.TestCase):
             encoding="utf-8",
         )
         self.urls: list[str] = []
-        browser = mock.patch("scientific_slides.printer.find_browser", return_value=("chromium", "/usr/bin/chromium"))
+        browser = mock.patch("scientific_slides.printer.browser_candidates", return_value=[("chromium", "/usr/bin/chromium")])
         browser.start()
         self.addCleanup(browser.stop)
         printer = mock.patch("scientific_slides.printer.render_pdf", side_effect=self._render)
         printer.start()
         self.addCleanup(printer.stop)
 
-    def _render(self, kind: str, program: str, url: str, timeout: float) -> bytes:
+    def _render(self, candidates: list, url: str, timeout: float) -> tuple[bytes, str]:
         self.urls.append(url)
-        return PDF_BYTES
+        return PDF_BYTES, candidates[0][1]
 
     def test_the_pdf_lands_beside_the_deck_unless_another_name_is_given(self) -> None:
         destination, browser = print_presentation(self.deck)

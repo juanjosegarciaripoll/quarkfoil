@@ -180,8 +180,13 @@ The distribution and command-line tool are named `quarkfoil`.
 - The print request itself states the slide size, zero margins, and
   background printing for both browsers. Never drive the user's real browser
   profile; each run gets a throwaway one.
-- Prefer Chromium, fall back to Firefox, and let `--browser` name either. When
-  neither is installed, say so rather than producing a PDF of the wrong shape.
+- Prefer Chromium, fall back to Firefox, and let `--browser` name either.
+  Without `--browser`, try each distinct installed browser in that order until
+  one starts, and say on stderr which were skipped and why; a named browser is
+  never replaced. Report a startup failure with the browser's `FATAL` lines and
+  console tail, not just its last line. Never pass `--no-sandbox` to work
+  around a Chromium that cannot sandbox. When no browser is installed, say so
+  rather than producing a PDF of the wrong shape.
 - The PDF is written beside the destination and renamed into place, so a
   failed run leaves an existing PDF untouched.
 - Speaker notes are left out, as when publishing.

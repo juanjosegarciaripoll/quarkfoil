@@ -13,7 +13,7 @@ import os
 import tempfile
 from pathlib import Path
 
-from .browser import BrowserError, find_browser, open_page, wait_for
+from .browser import BrowserError, browser_candidates, open_first_page, wait_for
 from .exporter import export_presentation, serve_directory
 from .printer import BROWSER_TIMEOUT_SECONDS, SLIDE_HEIGHT_PIXELS, SLIDE_WIDTH_PIXELS
 
@@ -57,10 +57,11 @@ def render_slides(
     an error rather than a set of mislabelled pictures.
     """
     size = image_size(width)
-    kind, program = find_browser(browser, purpose="Rendering slides")
+    candidates = browser_candidates(browser, purpose="Rendering slides")
     with tempfile.TemporaryDirectory(prefix="quarkfoil-render-") as workspace:
         site = export_presentation(deck.resolve(), Path(workspace) / "site", include_notes=False)
-        with serve_directory(site) as origin, open_page(kind, program, width=size[0], height=size[1]) as page:
+        with serve_directory(site) as origin, \
+                open_first_page(candidates, width=size[0], height=size[1]) as (page, program):
             page.navigate(f"{origin}/?preview")
             presented = wait_for(page, PREVIEW_READY, timeout)
             if presented != expected_slides:

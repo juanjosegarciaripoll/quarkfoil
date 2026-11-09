@@ -16,7 +16,14 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from .browser import FIREFOX_BROWSERS, BrowserError, browser_kind, find_browser as _find_browser, open_page, wait_for
+from .browser import (
+    FIREFOX_BROWSERS,
+    BrowserError,
+    browser_candidates as _browser_candidates,
+    browser_kind,
+    open_first_page,
+    wait_for,
+)
 from .exporter import export_presentation, serve_directory
 
 
@@ -39,9 +46,9 @@ PRINT_READY = """(() => {
 })()"""
 
 
-def find_browser(preferred: str | None = None) -> tuple[str, str]:
-    """Return the kind and path of the browser to print with."""
-    return _find_browser(preferred, purpose="Printing a PDF")
+def browser_candidates(preferred: str | None = None) -> list[tuple[str, str]]:
+    """The browsers to try, in order: the named one, or every one installed."""
+    return _browser_candidates(preferred, purpose="Printing a PDF")
 
 
 def print_url(origin: str) -> str:
@@ -49,15 +56,15 @@ def print_url(origin: str) -> str:
     return f"{origin}/?print-pdf"
 
 
-def render_pdf(kind: str, program: str, url: str, timeout: float) -> bytes:
-    """Open `url` in a headless browser, wait for the print layout, and print it."""
-    with open_page(kind, program, width=SLIDE_WIDTH_PIXELS, height=SLIDE_HEIGHT_PIXELS) as page:
+def render_pdf(candidates: list[tuple[str, str]], url: str, timeout: float) -> tuple[bytes, str]:
+    """Print `url` with the first candidate browser that starts; return the PDF and that browser."""
+    with open_first_page(candidates, width=SLIDE_WIDTH_PIXELS, height=SLIDE_HEIGHT_PIXELS) as (page, program):
         page.navigate(url)
         wait_for(page, PRINT_READY, timeout)
         data = page.print_pdf(SLIDE_WIDTH_INCHES, SLIDE_HEIGHT_INCHES, timeout)
     if not data.startswith(b"%PDF"):
         raise BrowserError("The browser did not return a PDF")
-    return data
+    return data, program
 
 
 def print_presentation(
@@ -79,7 +86,7 @@ def print_presentation(
         raise IsADirectoryError(f"PDF destination is a directory: {destination}")
     if not destination.parent.is_dir():
         raise FileNotFoundError(f"PDF directory not found: {destination.parent}")
-    kind, program = find_browser(browser)
+    candidates = browser_candidates(browser)
 
     # The PDF is written beside the destination so the finished file arrives in
     # one rename. A half-written PDF never carries the name the user asked for.
@@ -89,7 +96,8 @@ def print_presentation(
         with tempfile.TemporaryDirectory(prefix="quarkfoil-print-") as workspace:
             site = export_presentation(resolved, Path(workspace) / "site", include_notes=False)
             with serve_directory(site) as origin:
-                pdf.write_bytes(render_pdf(kind, program, print_url(origin), timeout))
+                data, program = render_pdf(candidates, print_url(origin), timeout)
+                pdf.write_bytes(data)
         os.replace(pdf, destination)
     finally:
         shutil.rmtree(staging, ignore_errors=True)
@@ -101,7 +109,7 @@ __all__ = [
     "SLIDE_HEIGHT_INCHES",
     "SLIDE_WIDTH_INCHES",
     "browser_kind",
-    "find_browser",
+    "browser_candidates",
     "print_presentation",
     "print_url",
     "render_pdf",

@@ -42,10 +42,17 @@ waits until the presentation reports that every slide is laid out and every
 font and image has loaded, then asks for the PDF. It never relies on a guess at
 how long loading takes.
 
-The first of these that is installed is used:
+Quarkfoil tries the installed browsers in this order and uses the first one
+that starts:
 
 1. Chrome, Chromium, or Edge
 2. Firefox
+
+A browser that is installed but cannot run headlessly is skipped with a note
+explaining why, and the next one is tried. The usual case is a Chromium build
+installed without an AppArmor profile on Ubuntu 23.10 or later, where AppArmor
+blocks Chromium's sandbox; Quarkfoil never disables the sandbox to work around
+it.
 
 Name a different one with `--browser`, either as a program on `PATH` or as a
 full path:
@@ -58,7 +65,9 @@ quarkfoil print lecture.md --browser "/Applications/Firefox.app/Contents/MacOS/f
 Both browsers produce pages of the same size: Quarkfoil states the slide size,
 zero margins, and background printing in the print request itself.
 
-If neither browser is installed, the command says so and does nothing. Install
+A browser named with `--browser` is the only one tried. If it, or every
+installed browser, fails to start, the command reports the browser's own
+explanation and does nothing. If no browser is installed, it says so. Install
 one, or open the presentation and use **Print / PDF** in a browser you have.
 
 ## While it runs

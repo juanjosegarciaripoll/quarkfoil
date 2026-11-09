@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import base64
+import contextlib
 import hashlib
+import io
 import json
 import socket
 import struct
@@ -13,7 +15,12 @@ from pathlib import Path
 from unittest import mock
 
 from scientific_slides.browser import (
+    SANDBOX_HINT,
     BrowserError,
+    BrowserStartError,
+    browser_candidates,
+    log_excerpt,
+    open_first_page,
     ChromiumPage,
     FirefoxPage,
     WebSocket,
@@ -47,6 +54,29 @@ class BrowserDiscoveryTests(unittest.TestCase):
         with mock.patch("scientific_slides.browser.find_executable", return_value=None):
             with self.assertRaises(FileNotFoundError):
                 find_browser("no-such-browser")
+
+    def test_every_distinct_installed_browser_is_a_candidate_once_in_preference_order(self) -> None:
+        installed = {
+            "chromium": "/usr/bin/chromium",
+            "chromium-browser": "/usr/bin/chromium-browser",
+            "google-chrome": "/usr/bin/google-chrome",
+            "firefox": "/usr/bin/firefox",
+        }
+        same = {"/usr/bin/chromium-browser": "/opt/chromium/chrome", "/usr/bin/chromium": "/opt/chromium/chrome"}
+        with mock.patch("scientific_slides.browser.find_executable", side_effect=lambda names: installed.get(names[0])), \
+             mock.patch("scientific_slides.browser.os.path.realpath", side_effect=lambda path: same.get(path, path)):
+            self.assertEqual(browser_candidates(), [
+                ("chromium", "/usr/bin/chromium"),
+                ("chromium", "/usr/bin/google-chrome"),
+                ("firefox", "/usr/bin/firefox"),
+            ])
+            self.assertEqual(browser_candidates("firefox"), [("firefox", "/usr/bin/firefox")])
+
+    def test_no_candidates_is_the_usual_missing_browser_error(self) -> None:
+        with mock.patch("scientific_slides.browser.find_executable", return_value=None):
+            with self.assertRaises(RuntimeError) as error:
+                browser_candidates(purpose="Printing a PDF")
+        self.assertIn("Printing a PDF needs", str(error.exception))
 
     def test_edge_and_brave_are_driven_the_way_chromium_is(self) -> None:
         self.assertEqual(browser_kind("/usr/bin/msedge"), "chromium")
@@ -98,11 +128,29 @@ class LaunchTests(unittest.TestCase):
 
     def test_a_browser_that_stops_before_it_listens_reports_what_it_said(self) -> None:
         with self._fake_browser("import sys; print('cannot open display'); sys.exit(1)"):
-            with self.assertRaises(BrowserError) as error:
+            with self.assertRaises(BrowserStartError) as error:
                 with open_page("chromium", "chromium", startup_timeout=30):
                     pass
-        self.assertIn("stopped before it was ready", str(error.exception))
+        self.assertIn("stopped before it was ready (exit 1)", str(error.exception))
         self.assertIn("cannot open display", str(error.exception))
+
+    def test_a_crash_reports_its_fatal_line_rather_than_the_end_of_the_stack_trace(self) -> None:
+        crash = (
+            "import sys\n"
+            "print('[123:123:FATAL:zygote_host_impl_linux.cc(132)] No usable sandbox! You are probably running on Ubuntu')\n"
+            "for frame in range(30): print(f'#{frame} 0x55d4 (/opt/chromium/chrome+0x{frame:04x})')\n"
+            "print('[end of stack trace]')\n"
+            "sys.exit(133)\n"
+        )
+        with self._fake_browser(crash):
+            with self.assertRaises(BrowserStartError) as error:
+                with open_page("chromium", "chromium", startup_timeout=30):
+                    pass
+        message = str(error.exception)
+        self.assertIn("No usable sandbox!", message)
+        self.assertIn("[end of stack trace]", message)
+        self.assertIn(SANDBOX_HINT, message)
+        self.assertNotIn("0x55d4", message, "stack frames are left out of the excerpt")
 
     def test_a_browser_that_never_listens_is_timed_out_and_stopped(self) -> None:
         with self._fake_browser("import time; time.sleep(60)"):
@@ -110,6 +158,65 @@ class LaunchTests(unittest.TestCase):
                 with open_page("firefox", "firefox", startup_timeout=1):
                     pass
         self.assertIn("Timed out waiting for the browser to start", str(error.exception))
+
+
+class LogExcerptTests(unittest.TestCase):
+    def test_an_ordinary_failure_gives_the_tail_without_a_sandbox_hint(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            log = Path(directory) / "browser.log"
+            self.assertEqual(log_excerpt(log), "")
+            log.write_text("\n".join(f"line {number}" for number in range(10)) + "\n\n", encoding="utf-8")
+            excerpt = log_excerpt(log)
+        self.assertEqual(excerpt.split("\n  "), [f"line {number}" for number in range(4, 10)])
+        self.assertNotIn(SANDBOX_HINT, excerpt)
+
+
+class FallbackTests(unittest.TestCase):
+    def test_a_browser_that_cannot_start_hands_over_to_the_next_candidate(self) -> None:
+        opened = []
+
+        @contextlib.contextmanager
+        def fake_open(kind, program, **options):
+            opened.append(program)
+            if program == "/usr/bin/chromium":
+                raise BrowserStartError("No usable sandbox!")
+            yield f"page of {program}"
+
+        stderr = io.StringIO()
+        with mock.patch("scientific_slides.browser.open_page", fake_open), contextlib.redirect_stderr(stderr):
+            with open_first_page([("chromium", "/usr/bin/chromium"), ("firefox", "/usr/bin/firefox")]) as (page, program):
+                self.assertEqual((page, program), ("page of /usr/bin/firefox", "/usr/bin/firefox"))
+        self.assertEqual(opened, ["/usr/bin/chromium", "/usr/bin/firefox"])
+        self.assertIn("/usr/bin/chromium could not start; trying /usr/bin/firefox", stderr.getvalue())
+        self.assertIn("No usable sandbox!", stderr.getvalue())
+
+    def test_errors_after_startup_are_not_retried_elsewhere(self) -> None:
+        opened = []
+
+        @contextlib.contextmanager
+        def fake_open(kind, program, **options):
+            opened.append(program)
+            yield program
+
+        with mock.patch("scientific_slides.browser.open_page", fake_open):
+            with self.assertRaises(BrowserError):
+                with open_first_page([("chromium", "a"), ("firefox", "b")]):
+                    raise BrowserError("Timed out waiting for the presentation")
+        self.assertEqual(opened, ["a"])
+
+    def test_when_nothing_starts_every_reason_is_reported(self) -> None:
+        @contextlib.contextmanager
+        def fake_open(kind, program, **options):
+            raise BrowserStartError(f"{program} crashed")
+            yield  # pragma: no cover
+
+        with mock.patch("scientific_slides.browser.open_page", fake_open), contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(BrowserStartError) as error:
+                with open_first_page([("chromium", "a"), ("firefox", "b")]):
+                    pass
+        self.assertIn("No installed browser could be started", str(error.exception))
+        self.assertIn("a crashed", str(error.exception))
+        self.assertIn("b crashed", str(error.exception))
 
 
 class FakeServer:

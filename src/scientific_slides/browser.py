@@ -28,6 +28,7 @@ import shutil
 import socket
 import struct
 import subprocess
+import sys
 import tempfile
 import time
 from pathlib import Path
@@ -51,6 +52,10 @@ class BrowserError(RuntimeError):
     """The browser could not be started, or refused or failed a command."""
 
 
+class BrowserStartError(BrowserError):
+    """The browser never became ready for automation; another one may be tried."""
+
+
 def browser_kind(program: str) -> str:
     """Classify a browser by program name: Firefox speaks BiDi, the rest CDP."""
     return "firefox" if "firefox" in Path(program).name.lower() else "chromium"
@@ -71,6 +76,32 @@ def find_browser(preferred: str | None = None, *, purpose: str = "This") -> tupl
         f"{purpose} needs Chrome, Chromium, Edge, or Firefox on this computer; "
         "install one or name it with --browser"
     )
+
+
+def browser_candidates(preferred: str | None = None, *, purpose: str = "This") -> list[tuple[str, str]]:
+    """Every distinct installed browser worth trying, in order of preference.
+
+    A named browser is the only candidate. Otherwise the Chromium family comes
+    first and Firefox last, and names that resolve to the same program (such
+    as ``chromium`` and ``chromium-browser``) count once, so a browser that
+    cannot start is not retried under another name.
+    """
+    if preferred:
+        return [find_browser(preferred, purpose=purpose)]
+    candidates: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    for name in (*CHROMIUM_BROWSERS, *FIREFOX_BROWSERS):
+        program = find_executable((name,))
+        if not program:
+            continue
+        identity = os.path.normcase(os.path.realpath(program))
+        if identity in seen:
+            continue
+        seen.add(identity)
+        candidates.append((browser_kind(program), program))
+    if not candidates:
+        find_browser(purpose=purpose)  # raises the usual "needs a browser" error
+    return candidates
 
 
 # --- WebSocket --------------------------------------------------------------
@@ -394,13 +425,36 @@ def read_endpoint(kind: str, profile: Path, log: Path | None = None) -> tuple[st
     return host, port, ("/session" if kind == "firefox" else path or "/")
 
 
-def _log_tail(log: Path) -> str:
+SANDBOX_HINT = (
+    "Chromium could not start its sandbox. On Ubuntu 23.10 and later AppArmor "
+    "blocks it for Chromium builds installed without an AppArmor profile; use a "
+    "packaged Google Chrome, Edge, or Firefox, named with --browser if needed."
+)
+
+
+STACK_FRAME = re.compile(r"#\d+\s+0x[0-9a-f]+", re.IGNORECASE)
+
+
+def log_excerpt(log: Path, *, lines: int = 6) -> str:
+    """The lines of a browser's console that explain why it stopped.
+
+    A crashing Chromium ends its output with a stack trace, so the last line
+    alone ("[end of stack trace]") says nothing. Report every FATAL line, then
+    the last few lines, and recognise the common sandbox failure.
+    """
     try:
-        lines = log.read_text(encoding="utf-8", errors="replace").splitlines()
+        console = log.read_text(encoding="utf-8", errors="replace").splitlines()
     except OSError:
         return ""
-    reported = [line.strip() for line in lines if line.strip()]
-    return reported[-1][:300] if reported else ""
+    reported = [line.strip()[:300] for line in console if line.strip()]
+    fatal = [line for line in reported if "FATAL" in line][:3]
+    # Stack frames ("#12 0x55d4... (/opt/chrome+0x...)") are noise to a reader.
+    readable = [line for line in reported if not STACK_FRAME.match(line)]
+    chosen = fatal + [line for line in readable[-lines:] if line not in fatal]
+    excerpt = "\n  ".join(chosen)
+    if any("sandbox" in line.lower() for line in reported):
+        excerpt += f"\n  {SANDBOX_HINT}"
+    return excerpt
 
 
 def _stop(process: subprocess.Popen[bytes]) -> None:
@@ -441,10 +495,16 @@ def open_page(
                 if endpoint is not None:
                     break
                 if process.poll() is not None:
-                    detail = _log_tail(log)
-                    raise BrowserError("The browser stopped before it was ready" + (f": {detail}" if detail else ""))
+                    detail = log_excerpt(log)
+                    raise BrowserStartError(
+                        f"The browser stopped before it was ready (exit {process.returncode})"
+                        + (f":\n  {detail}" if detail else "")
+                    )
                 if time.monotonic() > deadline:
-                    raise BrowserError("Timed out waiting for the browser to start")
+                    detail = log_excerpt(log)
+                    raise BrowserStartError(
+                        "Timed out waiting for the browser to start" + (f":\n  {detail}" if detail else "")
+                    )
                 time.sleep(POLL_INTERVAL_SECONDS)
             connection = WebSocket(*endpoint)
             page = (FirefoxPage if kind == "firefox" else ChromiumPage)(connection, width, height)
@@ -465,6 +525,37 @@ def open_page(
             if not workspace.exists():
                 break
             time.sleep(0.1)
+
+
+@contextlib.contextmanager
+def open_first_page(
+    candidates: list[tuple[str, str]], *, width: int = 1280, height: int = 720,
+    startup_timeout: float = STARTUP_TIMEOUT_SECONDS,
+) -> Iterator[tuple[ChromiumPage | FirefoxPage, str]]:
+    """Yield a page of the first candidate browser that starts, and its program.
+
+    Only a failure to start moves on to the next candidate, with a note on
+    stderr; once a browser is running, its errors are the caller's.
+    """
+    failures: list[str] = []
+    for index, (kind, program) in enumerate(candidates):
+        stack = contextlib.ExitStack()
+        try:
+            page = stack.enter_context(
+                open_page(kind, program, width=width, height=height, startup_timeout=startup_timeout)
+            )
+        except BrowserStartError as error:
+            failures.append(f"{program}: {error}")
+            if index + 1 < len(candidates):
+                print(f"quarkfoil: {program} could not start; trying {candidates[index + 1][1]}\n  {error}",
+                      file=sys.stderr, flush=True)
+            continue
+        with stack:
+            yield page, program
+        return
+    if len(failures) == 1:
+        raise BrowserStartError(failures[0])
+    raise BrowserStartError("No installed browser could be started:\n" + "\n".join(failures))
 
 
 def wait_for(page: ChromiumPage | FirefoxPage, expression: str, timeout: float) -> Any:
@@ -491,6 +582,10 @@ def wait_for(page: ChromiumPage | FirefoxPage, expression: str, timeout: float) 
 
 __all__ = [
     "BrowserError",
+    "BrowserStartError",
+    "browser_candidates",
+    "log_excerpt",
+    "open_first_page",
     "ChromiumPage",
     "FIREFOX_BROWSERS",
     "FirefoxPage",
