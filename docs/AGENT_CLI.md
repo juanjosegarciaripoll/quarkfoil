@@ -297,7 +297,8 @@ slide: 13
 Literal Markdown and $\sum_i n_i$.
 ```
 
-Delete and move documents contain YAML only:
+Delete, move, trash, and restore documents contain YAML only. Trash and
+restore take the same header as delete:
 
 ```yaml
 ---
@@ -512,7 +513,18 @@ Supported operations are:
 - `insert`: insert one slide from `source` after `after`; zero inserts at the
   beginning.
 - `delete`: delete `slide`. The final slide cannot be deleted.
-- `move`: move `slide` after `after`; zero moves it to the beginning.
+- `move`: move `slide` after `after`; zero moves it to the beginning. A trashed
+  slide cannot be moved (restore it first), and `after` cannot name a trashed
+  slide, which would place the moved slide inside the Trash section; `insert`
+  follows the same rule.
+- `trash`: mark `slide` `.trashed` and move it into the
+  `# Trash {#quarkfoil-trash .section .trash}` section at the end of the deck,
+  creating the section if needed. The result is the text the editor's Trash
+  command writes, and every trashed slide found elsewhere is gathered into the
+  section too. The last active slide cannot be trashed, and no transaction may
+  leave the presentation without an active slide.
+- `restore`: remove `.trashed` from `slide` and move it after the last active
+  slide; the Trash section disappears with its last slide.
 - `substitute`: replace literal `expect` text within one `slide`. The text must
   occur exactly once by default; set `count` to another positive exact count.
   A mismatch exits with status 4 and changes nothing. `replacement` may be

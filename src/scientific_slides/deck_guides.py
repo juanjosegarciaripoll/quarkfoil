@@ -100,7 +100,13 @@ Edit operations:
   delete      Delete the addressed slide. Never delete without user intent;
               Quarkfoil rejects deletion of the final slide.
   move        Move the addressed slide after another slide; `after: 0` means
-              the beginning.
+              the beginning. Trashed slides and positions inside the Trash
+              section are refused.
+  trash       Move the addressed slide into the Trash section at the end of
+              the deck and mark it `.trashed`, as the editor does. It leaves
+              Present mode and exports but stays recoverable. Prefer trash to
+              delete; the last active slide cannot be trashed.
+  restore     Return a trashed slide after the last active slide.
   substitute  Replace an exact literal fragment. `expect` must occur exactly
               `count` times (one by default).
   metadata    Replace front matter from a guarded YAML mapping. Generate this
@@ -140,7 +146,8 @@ Content.
 :::
 ```
 
-Delete or move an inspected slide using its fingerprint:
+Delete, move, trash, or restore an inspected slide using its fingerprint
+(trash and restore take the same header as delete, with their own operation):
 
 ```yaml
 ---
@@ -217,7 +224,10 @@ Quantum Simulation School
 Every slide starts with a Markdown heading carrying a `.layout-*` class.
 Consecutive heading lines belong to the visible title region. A section is an
 editor-only item such as `# Methods {#methods .section}`. A trashed slide has
-the `.trashed` class and is omitted from Present mode and exports.
+the `.trashed` class, sits in the `# Trash {#quarkfoil-trash .section .trash}`
+section at the end, and is omitted from Present mode and exports. Trash and
+restore slides with the trash and restore operations, not by editing the class
+or the informational `trashed:` header of an edit document.
 
 Grid cells are fenced directives. Their valid names depend on the layout:
 

@@ -1195,3 +1195,143 @@ class DeckRenderTests(unittest.TestCase):
             result, output, errors = self.invoke(["--output", str(self.output)])
         self.assertEqual((result, output), (2, ""))
         self.assertEqual(json.loads(errors)["error"], "revision_changed")
+
+
+TRASH_SOURCE = """---
+title: Trash
+---
+
+## First {.layout-1}
+
+One.
+
+---
+
+## Second {.layout-1 theme="scientific-dark"}
+
+Two.
+
+---
+
+## Third {.layout-1}
+
+Three.
+"""
+
+
+class DeckTrashTests(unittest.TestCase):
+    """trash and restore write what the editor's trashSlide and restoreSlide write."""
+
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        self.deck = self.root / "deck.md"
+        self.deck.write_bytes(TRASH_SOURCE.encode("utf-8"))
+
+    def invoke(self, arguments: list[str]) -> tuple[int, str, str]:
+        output, errors = StringIO(), StringIO()
+        with redirect_stdout(output), redirect_stderr(errors):
+            result = main(arguments)
+        return result, output.getvalue(), errors.getvalue()
+
+    def apply(self, *operations: dict) -> tuple[int, dict, dict]:
+        transaction = self.root / "transaction.json"
+        transaction.write_bytes(json.dumps({
+            "revision": revision(self.deck.read_bytes()), "operations": list(operations),
+        }).encode("utf-8"))
+        result, output, errors = self.invoke(["deck", "apply", str(self.deck), str(transaction)])
+        return result, json.loads(output) if output else {}, json.loads(errors) if errors else {}
+
+    def test_trash_moves_the_slide_into_a_new_trash_section_as_the_editor_does(self) -> None:
+        result, receipt, _ = self.apply({"operation": "trash", "slide": 2})
+        self.assertEqual(result, 0)
+        self.assertEqual(self.deck.read_text(encoding="utf-8"), (
+            "---\ntitle: Trash\n---\n\n## First {.layout-1}\n\nOne.\n\n---\n\n"
+            "## Third {.layout-1}\n\nThree.\n\n---\n\n# Trash {#quarkfoil-trash .section .trash}\n\n---\n\n"
+            "## Second {.layout-1 .trashed theme=\"scientific-dark\"}\n\nTwo.\n"
+        ))
+        operation = receipt["operation_results"][0]
+        self.assertEqual((operation["type"], operation["from_slide"], operation["result_slide"]), ("trash", 2, 3))
+        deck = parse_deck(self.deck.read_text(encoding="utf-8"))
+        self.assertEqual([(slide.title, slide.trashed) for slide in deck.slides],
+                         [("First", False), ("Third", False), ("Second", True)])
+        self.assertTrue(deck.sections[-1].is_trash)
+
+    def test_more_trash_joins_the_section_and_restoring_the_last_one_removes_it(self) -> None:
+        self.assertEqual(self.apply({"operation": "trash", "slide": 1})[0], 0)
+        self.assertEqual(self.apply({"operation": "trash", "slide": 1})[0], 0)  # "Second" is now slide 1
+        deck = parse_deck(self.deck.read_text(encoding="utf-8"))
+        self.assertEqual([(slide.title, slide.trashed) for slide in deck.slides],
+                         [("Third", False), ("First", True), ("Second", True)])
+        self.assertEqual(sum(section.is_trash for section in deck.sections), 1)
+
+        result, receipt, _ = self.apply({"operation": "restore", "slide": 2})
+        self.assertEqual((result, receipt["operation_results"][0]["result_slide"]), (0, 2))
+        self.assertEqual(self.apply({"operation": "restore", "slide": 3})[0], 0)
+        text = self.deck.read_text(encoding="utf-8")
+        self.assertNotIn("quarkfoil-trash", text)
+        self.assertNotIn(".trashed", text)
+        self.assertEqual([slide.title for slide in parse_deck(text).slides], ["Third", "First", "Second"])
+
+    def test_edit_documents_trash_and_restore_with_the_slide_fingerprint(self) -> None:
+        current = revision(self.deck.read_bytes())
+        slide = parse_deck(TRASH_SOURCE).slides[2]
+        document = self.root / "trash.md"
+        document.write_text(
+            f"---\nquarkfoil_edit: 1\noperation: trash\ndeck_revision: {current}\nslide: 3\n"
+            f"slide_revision: {revision(slide.raw.encode('utf-8'))}\n---\n",
+            encoding="utf-8",
+        )
+        result, _, errors = self.invoke(["deck", "apply", str(self.deck), "--edit", str(document)])
+        self.assertEqual((result, errors), (0, ""))
+        self.assertTrue(parse_deck(self.deck.read_text(encoding="utf-8")).slides[2].trashed)
+
+    def test_the_last_active_slide_cannot_be_trashed_by_any_operation(self) -> None:
+        self.assertEqual(self.apply({"operation": "trash", "slide": 1}, {"operation": "trash", "slide": 1})[0], 0)
+        before = self.deck.read_bytes()
+        result, _, error = self.apply({"operation": "trash", "slide": 1})
+        self.assertEqual(result, 2)
+        self.assertIn("at least one active slide", error["message"])
+        result, _, error = self.apply({"operation": "substitute", "slide": 1, "expect": "{.layout-1}",
+                                       "replacement": "{.layout-1 .trashed}"})
+        self.assertEqual(result, 2)
+        self.assertIn("no active slide", error["message"])
+        self.assertEqual(self.deck.read_bytes(), before)
+
+    def test_trashing_twice_or_restoring_an_active_slide_is_refused(self) -> None:
+        self.assertEqual(self.apply({"operation": "trash", "slide": 1})[0], 0)
+        self.assertIn("already in the trash", self.apply({"operation": "trash", "slide": 3})[2]["message"])
+        self.assertIn("not in the trash", self.apply({"operation": "restore", "slide": 1})[2]["message"])
+
+    def test_slides_cannot_be_placed_inside_the_trash_or_moved_out_of_it(self) -> None:
+        self.assertEqual(self.apply({"operation": "trash", "slide": 1})[0], 0)  # Second, Third | First
+        result, _, error = self.apply({"operation": "insert", "after": 3, "source": "## New {.layout-1}\n\nNew."})
+        self.assertEqual(result, 2)
+        self.assertIn("use after: 2", error["message"])
+        self.assertIn("in the trash", self.apply({"operation": "move", "slide": 1, "after": 3})[2]["message"])
+        self.assertIn("restore it before moving", self.apply({"operation": "move", "slide": 3, "after": 0})[2]["message"])
+        result, _, _ = self.apply({"operation": "insert", "after": 2, "source": "## New {.layout-1}\n\nNew."})
+        self.assertEqual(result, 0)
+        deck = parse_deck(self.deck.read_text(encoding="utf-8"))
+        self.assertEqual([(slide.title, slide.trashed) for slide in deck.slides],
+                         [("Second", False), ("Third", False), ("New", False), ("First", True)])
+
+    def test_an_edited_trashed_header_is_refused_rather_than_ignored(self) -> None:
+        destination = self.root / "edits"
+        self.assertEqual(self.invoke(["deck", "inspect", str(self.deck), "--slides", "2", "--format", "edit",
+                                      "--output", str(destination)])[0], 0)
+        document = destination / "slide-0002.md"
+        document.write_text(document.read_text(encoding="utf-8").replace("trashed: false", "trashed: true"),
+                            encoding="utf-8")
+        result, _, errors = self.invoke(["deck", "apply", str(self.deck), "--edit", str(document)])
+        self.assertEqual(result, 2)
+        self.assertIn("operation: trash", errors)
+        self.assertEqual(self.deck.read_bytes(), TRASH_SOURCE.encode("utf-8"))
+
+    def test_the_protocol_announces_trash_and_restore(self) -> None:
+        result, output, _ = self.invoke(["deck", "protocol"])
+        payload = json.loads(output)
+        self.assertIn("trash", payload["capabilities"])
+        self.assertIn("trash", payload["transaction"]["operations"])
+        self.assertIn("restore", payload["edit_documents"]["operations"])

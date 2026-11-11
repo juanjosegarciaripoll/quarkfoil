@@ -70,6 +70,11 @@ The distribution and command-line tool are named `quarkfoil`.
   not require reselecting the object.
 - Slide-local object IDs need only be unique within their slide.
 - A deck must contain at least one slide. Deleting the final slide is rejected.
+- Trashing moves a slide into the `# Trash {#quarkfoil-trash .section .trash}`
+  section at the end and marks it `.trashed`; restoring returns it after the
+  last active slide. The editor (`trashSlide`, `restoreSlide` in `parser.js`)
+  and `quarkfoil deck apply` (`trash`, `restore`) must write identical text,
+  and neither may leave a deck without an active slide.
 - Opening a missing or whitespace-only `.md`/`.markdown` path initializes a
   small valid front-page presentation. The parent directory must already
   exist. Never replace a nonempty file, including a malformed one.

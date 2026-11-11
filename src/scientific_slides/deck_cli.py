@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import sys
 import tempfile
@@ -26,7 +27,7 @@ UNRELIABLE_BOUNDARY_CODES = frozenset(("unreliable_slide_boundaries", "untermina
 PROTOCOL_VERSION = 1
 CAPABILITIES = ("replace", "insert", "delete", "move", "notes_policy", "dry_run", "quiet", "compact",
                 "inspect_projection", "slide_fingerprints", "apply_results", "source_file", "substitute",
-                "metadata", "edit_documents", "yaml_results", "markdown_projection", "render")
+                "metadata", "edit_documents", "yaml_results", "markdown_projection", "render", "trash")
 
 PROTOCOL = {
     "name": "quarkfoil-deck",
@@ -51,7 +52,12 @@ PROTOCOL = {
             "insert": {"required": ["after", "exactly one of source or source_file"],
                        "optional": {"source_revision": "sha256:..."}, "after_zero": "beginning"},
             "delete": {"required": ["slide"]},
-            "move": {"required": ["slide", "after"], "after_zero": "beginning"},
+            "move": {"required": ["slide", "after"], "after_zero": "beginning",
+                     "rejects": "trashed slides and destinations inside the Trash section"},
+            "trash": {"required": ["slide"], "optional": {"slide_revision": "sha256:..."},
+                      "effect": "adds .trashed and moves the slide into the Trash section at the end, as the editor does"},
+            "restore": {"required": ["slide"], "optional": {"slide_revision": "sha256:..."},
+                        "effect": "removes .trashed and moves the slide after the last active slide"},
             "substitute": {"required": ["slide", "expect", "replacement"], "optional": {"count": 1}},
             "metadata": {"required": ["source"], "source": "complete YAML front-matter mapping"},
         },
@@ -66,6 +72,8 @@ PROTOCOL = {
                        "slide": "resulting insertion position", "body": "exactly one Markdown slide"},
             "delete": {"header": ["deck_revision", "slide", "slide_revision"]},
             "move": {"header": ["deck_revision", "slide", "slide_revision", "after"]},
+            "trash": {"header": ["deck_revision", "slide", "slide_revision"]},
+            "restore": {"header": ["deck_revision", "slide", "slide_revision"]},
             "substitute": {"header": ["deck_revision", "slide", "slide_revision", "expect", "replacement"],
                            "optional": {"count": 1}},
             "metadata": {"header": ["deck_revision"], "body": "complete YAML front-matter mapping"},
@@ -462,6 +470,89 @@ def _check_fields(operation: dict[str, Any], required: set[str], optional: set[s
         raise DeckCommandError(f"unknown operation field '{sorted(unknown)[0]}'")
 
 
+# Trash, as the editor keeps it (trashSlide/restoreSlide in parser.js): trashed
+# slides carry `.trashed` and sit, in order, under this section marker at the
+# end of the deck. Every trash or restore regathers them there, so a trashed
+# slide found anywhere else is moved into the section too.
+TRASH_MARKER = "# Trash {#quarkfoil-trash .section .trash}"
+
+
+def _serialize_attributes(attrs: Any) -> str:
+    """serializeAttributes in parser.js: #id, then .classes, then key="value" in order."""
+    tokens = [f"#{attrs.id}"] if attrs.id else []
+    tokens += [f".{name}" for name in attrs.classes]
+    tokens += [f"{key}={json.dumps(str(value), ensure_ascii=False)}" for key, value in attrs.values.items()]
+    return " ".join(tokens)
+
+
+def _slide_with_class(slide: Any, class_name: str, enabled: bool) -> str:
+    """slideSourceWithClass in parser.js: rewrite the heading with or without one class."""
+    if slide.heading_range is None:
+        raise DeckCommandError(f"slide {slide.index + 1} has no heading to mark")
+    classes = [name for name in slide.heading_attrs.classes if name != class_name]
+    if enabled:
+        classes.append(class_name)
+    attrs = type(slide.heading_attrs)(classes=classes, id=slide.heading_attrs.id, values=dict(slide.heading_attrs.values))
+    match = re.match(r"^\s*(#{1,6})", slide.raw)
+    heading = f"{match.group(1) if match else '##'} {slide.title} {{{_serialize_attributes(attrs)}}}"
+    start = slide.heading_range.start - slide.range.start
+    end = slide.heading_range.end - slide.range.start
+    return slide.raw[:start] + heading + slide.raw[end:]
+
+
+def _trash_parts(deck: Deck, discarded: int | None) -> tuple[list[tuple[str, int | None]], list[tuple[str, int]]]:
+    """trashParts in parser.js, with each slide's old index kept for renumbering."""
+    active: list[tuple[str, int | None]] = []
+    trashed: list[tuple[str, int]] = []
+    for item in deck.items:
+        if item.kind == "section" and item.is_trash:
+            continue
+        if item.kind == "slide" and item.index == discarded:
+            continue
+        if item.kind == "slide" and item.trashed:
+            trashed.append((item.raw, item.index))
+        else:
+            active.append((item.raw, item.index if item.kind == "slide" else None))
+    return active, trashed
+
+
+def _trash_or_restore(deck: Deck, number: int, trash: bool) -> tuple[str, list[int]]:
+    """The editor's trash (or restore) of slide *number*: new source and old indices in new order."""
+    slide = deck.slides[number - 1]
+    if trash:
+        if slide.trashed:
+            raise DeckCommandError(f"slide {number} is already in the trash")
+        if sum(1 for item in deck.slides if not item.trashed) == 1:
+            raise DeckCommandError("a presentation must contain at least one active slide")
+    elif not slide.trashed:
+        raise DeckCommandError(f"slide {number} is not in the trash")
+    active, trashed = _trash_parts(deck, slide.index)
+    if trash:
+        trashed.append((_slide_with_class(slide, "trashed", True), slide.index))
+    else:
+        active.append((_slide_with_class(slide, "trashed", False), slide.index))
+    items = [raw for raw, _ in active]
+    if trashed:
+        items += [TRASH_MARKER] + [raw for raw, _ in trashed]
+    # composeItems in parser.js.
+    front_matter = deck.source[:deck.front_matter_range.end].rstrip()
+    body = "\n\n---\n\n".join(item.strip() for item in items)
+    text = f"{front_matter}{chr(10) * 2 if front_matter else ''}{body}\n"
+    order = [index for _, index in active if index is not None] + [index for _, index in trashed]
+    return text, order
+
+
+def _check_active_destination(deck: Deck, after: int, verb: str) -> None:
+    """Slides placed after a trashed slide would land inside the Trash section."""
+    if after and deck.slides[after - 1].trashed:
+        active = [slide.index + 1 for slide in deck.slides if not slide.trashed]
+        last = max(active) if active else 0
+        raise DeckCommandError(
+            f"cannot {verb} after slide {after}: it is in the trash; "
+            f"use after: {last} to place a slide after the last active slide"
+        )
+
+
 def _apply_operation(source: str, operation: Any) -> str:
     if not isinstance(operation, dict):
         raise DeckCommandError("each operation must be a JSON object")
@@ -499,6 +590,7 @@ def _apply_operation(source: str, operation: Any) -> str:
         after = _integer(operation, "after", minimum=0)
         if after > len(deck.slides):
             raise DeckCommandError(f"cannot insert after slide {after}; presentation has {len(deck.slides)} slides")
+        _check_active_destination(deck, after, "insert")
         return _insert_slide(source, deck, after, _slide_source(operation.get("source")))
     elif name == "delete":
         _check_fields(operation, {"slide"}, {"slide_revision"})
@@ -516,6 +608,9 @@ def _apply_operation(source: str, operation: Any) -> str:
         if number == after:
             raise DeckCommandError("a slide cannot be moved after itself")
         _slide_position(deck, number)
+        if deck.slides[number - 1].trashed:
+            raise DeckCommandError(f"slide {number} is in the trash; restore it before moving it")
+        _check_active_destination(deck, after, "move")
         if after == number - 1:
             return source
         moved = deck.slides[number - 1].raw
@@ -523,6 +618,11 @@ def _apply_operation(source: str, operation: Any) -> str:
         reduced_deck = parse_deck(reduced)
         adjusted_after = after - 1 if number < after else after
         return _insert_slide(reduced, reduced_deck, adjusted_after, moved)
+    elif name in ("trash", "restore"):
+        _check_fields(operation, {"slide"}, {"slide_revision"})
+        number = _integer(operation, "slide")
+        _slide_position(deck, number)
+        return _trash_or_restore(deck, number, name == "trash")[0]
     elif name == "substitute":
         _check_fields(operation, {"slide", "expect", "replacement"}, {"count", "slide_revision"})
         number = _integer(operation, "slide")
@@ -584,6 +684,13 @@ def _apply_transaction_details(source: str, operations: Any) -> tuple[str, list[
                 tokens.insert(after - 1 if number < after else after, token)
                 touched.add(token)
             result.update({"from_slide": number, "after": after, "no_op": no_op, "_token": token})
+        elif name in ("trash", "restore"):
+            number = operation["slide"]
+            token = tokens[number - 1]
+            order = _trash_or_restore(parse_deck(source), number, name == "trash")[1]
+            tokens = [tokens[index] for index in order]
+            touched.add(token)
+            result.update({"from_slide": number, "_token": token})
         elif name == "metadata":
             result.update({"metadata_changed": updated != source, "result_slide": None})
         results.append(result)
@@ -593,6 +700,8 @@ def _apply_transaction_details(source: str, operations: Any) -> tuple[str, list[
     errors = [item.message for item in deck.diagnostics if item.level == "error"]
     if errors:
         raise DeckCommandError(f"transaction produced an invalid presentation: {errors[0]}")
+    if deck.slides and all(slide.trashed for slide in deck.slides):
+        raise DeckCommandError("transaction leaves no active slide; a presentation must contain at least one")
     positions = {token: index + 1 for index, token in enumerate(tokens)}
     for result in results:
         token = result.pop("_token", None)
@@ -646,6 +755,8 @@ _EDIT_OPERATION_FIELDS = {
     "insert": {"slide"},
     "delete": {"slide", "slide_revision"},
     "move": {"slide", "slide_revision", "after"},
+    "trash": {"slide", "slide_revision"},
+    "restore": {"slide", "slide_revision"},
     "substitute": {"slide", "slide_revision", "expect", "replacement", "count"},
     "metadata": set(),
 }
@@ -698,6 +809,13 @@ def _parse_edit_document(text: str, label: str) -> tuple[str, dict[str, Any]]:
             operation["source"] = _slide_source(body)
             if name == "replace" and header["notes"] not in ("preserve", "replace", "remove"):
                 raise DeckCommandError("edit field 'notes' must be preserve, replace, or remove")
+            if name == "replace" and "trashed" in header:
+                marked = parse_deck(operation["source"]).slides[0].trashed
+                if header["trashed"] is not marked:
+                    raise DeckCommandError(
+                        "edit field 'trashed' is information and does not change the slide; "
+                        "use an edit document with operation: trash or operation: restore"
+                    )
         elif name == "metadata":
             operation["source"] = _metadata_source(body)
         elif body.strip():
