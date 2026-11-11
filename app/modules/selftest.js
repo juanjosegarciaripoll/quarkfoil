@@ -613,6 +613,17 @@ try {
       && (fixture.diagnosticPrefixes || []).every(prefix => summary.diagnostics.some(message => message.startsWith(prefix))),
       `JavaScript parser matches shared fixture: ${fixture.name}`);
   }
+  // The deck CLI's trash and restore are checked against the same file in
+  // tests/test_deck_cli.py, so the editor and the CLI write identical text.
+  const editFixturesResponse = await fetch("/edit-fixtures.json");
+  assert(editFixturesResponse.ok, "shared edit fixture corpus loads");
+  for (const fixture of await editFixturesResponse.json()) {
+    const operation = fixture.operation === "trash" ? trashSlide : restoreSlide;
+    let written = null;
+    try { written = operation(parseDeck(fixture.source), fixture.slide - 1); } catch { written = null; }
+    assert(fixture.error ? written === null : written === fixture.expected,
+      `JavaScript ${fixture.operation} matches shared fixture: ${fixture.name}`);
+  }
   assert(pdfPrintView("?print-pdf&print-dialog"), "PDF print query is recognized");
   assert(!pdfPrintView("?print-dialog"), "ordinary pages are not mistaken for the PDF print view");
   const printUrl = new URL(pdfPrintUrl({ href: "http://127.0.0.1:8000/?deck=example%2Fdeck.md#slide-2" }));

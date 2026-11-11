@@ -1329,6 +1329,20 @@ class DeckTrashTests(unittest.TestCase):
         self.assertIn("operation: trash", errors)
         self.assertEqual(self.deck.read_bytes(), TRASH_SOURCE.encode("utf-8"))
 
+    def test_trash_and_restore_match_the_editors_shared_fixtures(self) -> None:
+        # app/edit-fixtures.json holds the editor's own trashSlide/restoreSlide
+        # results; selftest.js checks parser.js against the same file.
+        fixtures = json.loads((Path(__file__).resolve().parents[1] / "app" / "edit-fixtures.json").read_text(encoding="utf-8"))
+        self.assertTrue(fixtures)
+        for fixture in fixtures:
+            with self.subTest(fixture["name"]):
+                operation = [{"operation": fixture["operation"], "slide": fixture["slide"]}]
+                if fixture.get("error"):
+                    with self.assertRaises(deck_cli.DeckCommandError):
+                        apply_transaction(fixture["source"], operation)
+                else:
+                    self.assertEqual(apply_transaction(fixture["source"], operation), fixture["expected"])
+
     def test_the_protocol_announces_trash_and_restore(self) -> None:
         result, output, _ = self.invoke(["deck", "protocol"])
         payload = json.loads(output)

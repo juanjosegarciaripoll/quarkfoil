@@ -1,0 +1,65 @@
+[
+  {
+    "name": "trash the first slide into a new Trash section",
+    "operation": "trash",
+    "slide": 1,
+    "source": "---\ntitle: T\n---\n\n## First {.layout-1}\n\nOne\n\n---\n\n## Second {.layout-1-1 columns=\"40 60\"}\n\n::: left\nL\n:::\n\n::: right\nR\n:::\n\n---\n\n## Third {#third .layout-free}\n\nThree\n",
+    "expected": "---\ntitle: T\n---\n\n## Second {.layout-1-1 columns=\"40 60\"}\n\n::: left\nL\n:::\n\n::: right\nR\n:::\n\n---\n\n## Third {#third .layout-free}\n\nThree\n\n---\n\n# Trash {#quarkfoil-trash .section .trash}\n\n---\n\n## First {.layout-1 .trashed}\n\nOne\n"
+  },
+  {
+    "name": "trash the last slide, keeping its id and other classes",
+    "operation": "trash",
+    "slide": 3,
+    "source": "---\ntitle: T\n---\n\n## First {.layout-1}\n\nOne\n\n---\n\n## Second {.layout-1-1 columns=\"40 60\"}\n\n::: left\nL\n:::\n\n::: right\nR\n:::\n\n---\n\n## Third {#third .layout-free}\n\nThree\n",
+    "expected": "---\ntitle: T\n---\n\n## First {.layout-1}\n\nOne\n\n---\n\n## Second {.layout-1-1 columns=\"40 60\"}\n\n::: left\nL\n:::\n\n::: right\nR\n:::\n\n---\n\n# Trash {#quarkfoil-trash .section .trash}\n\n---\n\n## Third {#third .layout-free .trashed}\n\nThree\n"
+  },
+  {
+    "name": "trash beside an existing Trash section and ordinary section",
+    "operation": "trash",
+    "slide": 1,
+    "source": "---\ntitle: T\n---\n\n# Methods {#methods .section}\n\n---\n\n## A *emph* title {.layout-1 theme=\"scientific-dark\"}\n\nOne\n\n::: notes\nNote with \"quotes\"\n:::\n\n---\n\n## Second {.layout-1}\n\nTwo\n\n---\n\n# Trash {#quarkfoil-trash .section .trash}\n\n---\n\n## Old {.layout-1 .trashed}\n\nOld\n",
+    "expected": "---\ntitle: T\n---\n\n# Methods {#methods .section}\n\n---\n\n## Second {.layout-1}\n\nTwo\n\n---\n\n# Trash {#quarkfoil-trash .section .trash}\n\n---\n\n## Old {.layout-1 .trashed}\n\nOld\n\n---\n\n## A *emph* title {.layout-1 .trashed theme=\"scientific-dark\"}\n\nOne\n\n::: notes\nNote with \"quotes\"\n:::\n"
+  },
+  {
+    "name": "restore the only trashed slide, removing the Trash section",
+    "operation": "restore",
+    "slide": 3,
+    "source": "---\ntitle: T\n---\n\n# Methods {#methods .section}\n\n---\n\n## A *emph* title {.layout-1 theme=\"scientific-dark\"}\n\nOne\n\n::: notes\nNote with \"quotes\"\n:::\n\n---\n\n## Second {.layout-1}\n\nTwo\n\n---\n\n# Trash {#quarkfoil-trash .section .trash}\n\n---\n\n## Old {.layout-1 .trashed}\n\nOld\n",
+    "expected": "---\ntitle: T\n---\n\n# Methods {#methods .section}\n\n---\n\n## A *emph* title {.layout-1 theme=\"scientific-dark\"}\n\nOne\n\n::: notes\nNote with \"quotes\"\n:::\n\n---\n\n## Second {.layout-1}\n\nTwo\n\n---\n\n## Old {.layout-1}\n\nOld\n"
+  },
+  {
+    "name": "trash gathers a stray trashed slide into the section",
+    "operation": "trash",
+    "slide": 3,
+    "source": "## Kept {.layout-1}\n\nK\n\n---\n\n## Stray {.layout-1 .trashed}\n\nS\n\n---\n\n## Last {.layout-0 data-x=\"ψ → ∞\"}\n\nL\n",
+    "expected": "## Kept {.layout-1}\n\nK\n\n---\n\n# Trash {#quarkfoil-trash .section .trash}\n\n---\n\n## Stray {.layout-1 .trashed}\n\nS\n\n---\n\n## Last {.layout-0 .trashed data-x=\"ψ → ∞\"}\n\nL\n"
+  },
+  {
+    "name": "restore a stray trashed slide",
+    "operation": "restore",
+    "slide": 2,
+    "source": "## Kept {.layout-1}\n\nK\n\n---\n\n## Stray {.layout-1 .trashed}\n\nS\n\n---\n\n## Last {.layout-0 data-x=\"ψ → ∞\"}\n\nL\n",
+    "expected": "## Kept {.layout-1}\n\nK\n\n---\n\n## Last {.layout-0 data-x=\"ψ → ∞\"}\n\nL\n\n---\n\n## Stray {.layout-1}\n\nS\n"
+  },
+  {
+    "name": "the last active slide cannot be trashed",
+    "operation": "trash",
+    "slide": 1,
+    "source": "## Only {.layout-1}\n\nO\n\n---\n\n# Trash {#quarkfoil-trash .section .trash}\n\n---\n\n## Gone {.layout-1 .trashed}\n\nG\n",
+    "error": true
+  },
+  {
+    "name": "an active slide cannot be restored",
+    "operation": "restore",
+    "slide": 1,
+    "source": "## Only {.layout-1}\n\nO\n\n---\n\n# Trash {#quarkfoil-trash .section .trash}\n\n---\n\n## Gone {.layout-1 .trashed}\n\nG\n",
+    "error": true
+  },
+  {
+    "name": "a trashed slide cannot be trashed again",
+    "operation": "trash",
+    "slide": 2,
+    "source": "## Only {.layout-1}\n\nO\n\n---\n\n# Trash {#quarkfoil-trash .section .trash}\n\n---\n\n## Gone {.layout-1 .trashed}\n\nG\n",
+    "error": true
+  }
+]

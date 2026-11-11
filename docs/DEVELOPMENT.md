@@ -31,6 +31,25 @@ Open the browser self-test while the example server is running:
 http://127.0.0.1:8765/selftest.html
 ```
 
+### Shared fixtures
+
+Some behaviour exists both in the browser (`app/modules/parser.js`) and in
+Python. Shared fixture files hold both to the same results:
+
+- `app/parser-fixtures.json`: the document model, checked by
+  `tests/test_parser.py` and the browser self-test.
+- `app/edit-fixtures.json`: trashing and restoring slides, checked by
+  `tests/test_deck_cli.py` and the browser self-test, so the editor and
+  `quarkfoil deck apply` write identical text.
+
+The editor is the reference for edits. After deliberately changing one, or to
+add a case (a name, operation, slide, and source deck), regenerate the expected
+results from `parser.js` in a headless browser:
+
+```console
+uv run python tools/edit_fixtures.py
+```
+
 ## Documentation
 
 The files under `docs/` are both the repository documentation and the source

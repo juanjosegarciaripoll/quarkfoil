@@ -52,6 +52,7 @@ example/                   Maintained sample presentation and figures
 tests/                     Python tests and the Edge browser CI harness
 docs/                      User, format, security, export, and developer docs
 tools/fetch_vendor.py      Pinned browser-dependency fetcher
+tools/edit_fixtures.py     Refresh shared edit fixtures from parser.js
 .github/workflows/ci.yml   Tests and ephemeral distribution-build verification
 .github/workflows/docs.yml Documentation build, live example, and Pages deploy
 ```
@@ -74,7 +75,10 @@ The distribution and command-line tool are named `quarkfoil`.
   section at the end and marks it `.trashed`; restoring returns it after the
   last active slide. The editor (`trashSlide`, `restoreSlide` in `parser.js`)
   and `quarkfoil deck apply` (`trash`, `restore`) must write identical text,
-  and neither may leave a deck without an active slide.
+  and neither may leave a deck without an active slide. `app/edit-fixtures.json`
+  pins both: `tests/test_deck_cli.py` checks the CLI and `selftest.js` checks
+  `parser.js` against it. Its expected text comes from the editor; after a
+  deliberate change, refresh it with `uv run python tools/edit_fixtures.py`.
 - Opening a missing or whitespace-only `.md`/`.markdown` path initializes a
   small valid front-page presentation. The parent directory must already
   exist. Never replace a nonempty file, including a malformed one.
