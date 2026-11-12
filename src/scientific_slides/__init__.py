@@ -258,24 +258,41 @@ def _publish(arguments: list[str]) -> int:
     return 0
 
 
+COMMANDS = {
+    "export": (_export, "Export a presentation as a static website"),
+    "pack": (_pack, "Copy a presentation and its assets into an editable project folder"),
+    "print": (_print, "Render a presentation to PDF with a headless browser"),
+    "publish": (_publish, "Publish presentations into a shared collection of talks"),
+    "download": (_download, "Recover a published talk as a project, ZIP archive, or PDF"),
+    "deck": (None, "Create, inspect, edit, or render a deck for an LLM agent"),
+}
+
+
+def _commands_help() -> str:
+    width = max(len(name) for name in COMMANDS)
+    lines = [f"  {name:<{width}}  {summary}" for name, (_, summary) in COMMANDS.items()]
+    return "\n".join(
+        [
+            "commands:",
+            *lines,
+            "",
+            "Run 'quarkfoil COMMAND --help' for the options of each command.",
+        ]
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     arguments = list(sys.argv[1:] if argv is None else argv)
-    if arguments[:1] == ["export"]:
-        return _export(arguments[1:])
-    if arguments[:1] == ["pack"]:
-        return _pack(arguments[1:])
-    if arguments[:1] == ["download"]:
-        return _download(arguments[1:])
-    if arguments[:1] == ["publish"]:
-        return _publish(arguments[1:])
-    if arguments[:1] == ["print"]:
-        return _print(arguments[1:])
-    if arguments[:1] == ["deck"]:
+    command = arguments[0] if arguments else None
+    if command == "deck":
         from .deck_cli import main as deck
 
         return deck(arguments[1:])
+    if command in COMMANDS:
+        handler, _ = COMMANDS[command]
+        return handler(arguments[1:])
     from .server import main as serve
 
-    return serve(arguments)
+    return serve(arguments, epilog=_commands_help())
 
 __all__ = ["main"]

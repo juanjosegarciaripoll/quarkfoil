@@ -1387,13 +1387,26 @@ def main(arguments: list[str]) -> int:
         and "--format" in arguments
     )
     try:
-        commands = ("guide", "protocol", "create", "inspect", "apply", "render")
+        commands = {
+            "guide": "Print version-matched guidance for presentation agents (start here)",
+            "protocol": "Print the machine-readable deck protocol as JSON",
+            "create": "Create a starter presentation without launching the editor",
+            "inspect": "Read deck content, slides, and the current revision",
+            "apply": "Atomically apply a revision-guarded slide transaction",
+            "render": "Render slides to PNG images with a headless browser",
+        }
         if not arguments or arguments[0] not in commands:
+            width = max(len(name) for name in commands)
             parser = DeckArgumentParser(
                 prog="quarkfoil deck",
                 description="Create, inspect, atomically edit, or render a presentation for an LLM agent",
+                epilog="\n".join(
+                    ["commands:", *(f"  {name:<{width}}  {summary}" for name, summary in commands.items()), "",
+                     "Run 'quarkfoil deck COMMAND --help' for the options of each command."]
+                ),
+                formatter_class=argparse.RawDescriptionHelpFormatter,
             )
-            parser.add_argument("command", choices=commands)
+            parser.add_argument("command", metavar="COMMAND", choices=tuple(commands))
             parser.parse_args(arguments)
         if arguments[0] == "guide":
             return _guide(arguments[1:])

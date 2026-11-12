@@ -247,6 +247,26 @@ class DeckCliTests(unittest.TestCase):
         self.assertIn("render", payload["capabilities"])
         self.assertIn("forbidden", payload["deck_file_access"]["direct_file_tools"])
 
+    def test_top_level_help_lists_every_command(self) -> None:
+        from scientific_slides import COMMANDS
+
+        output = StringIO()
+        with redirect_stdout(output), self.assertRaises(SystemExit) as stopped:
+            main(["--help"])
+        self.assertEqual(stopped.exception.code, 0)
+        self.assertEqual(set(COMMANDS), {"export", "pack", "print", "publish", "download", "deck"})
+        for command in COMMANDS:
+            self.assertRegex(output.getvalue(), rf"(?m)^  {command} +\S")
+        self.assertIn("quarkfoil COMMAND --help", output.getvalue())
+
+    def test_deck_help_describes_every_command(self) -> None:
+        output = StringIO()
+        with redirect_stdout(output), self.assertRaises(SystemExit) as stopped:
+            main(["deck", "--help"])
+        self.assertEqual(stopped.exception.code, 0)
+        for command in ("guide", "protocol", "create", "inspect", "apply", "render"):
+            self.assertRegex(output.getvalue(), rf"(?m)^  {command} +\S")
+
     def test_apply_help_describes_quiet_result(self) -> None:
         output = StringIO()
         with redirect_stdout(output), self.assertRaises(SystemExit) as stopped:

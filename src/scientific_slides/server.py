@@ -1013,11 +1013,14 @@ def fetch_doi_bibtex(value: str) -> str:
     return _normalize_doi_bibtex(text) + "\n"
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv: list[str] | None = None, *, epilog: str | None = None) -> int:
     arguments = list(sys.argv[1:] if argv is None else argv)
     parser = argparse.ArgumentParser(
-        description="Open a scientific Markdown presentation in Quarkfoil",
-        epilog="Agent deck operations: quarkfoil deck --help",
+        prog="quarkfoil",
+        usage="%(prog)s [options] DECK_FILE\n       %(prog)s COMMAND [options] ...",
+        description="Open a scientific Markdown presentation in the Quarkfoil editor",
+        epilog=epilog,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("deck", metavar="DECK_FILE", type=Path, help="Markdown presentation to open")
     parser.add_argument("--host", default="127.0.0.1", help="Address to bind (default: 127.0.0.1)")
