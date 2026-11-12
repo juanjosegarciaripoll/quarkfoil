@@ -78,25 +78,36 @@ def assert_text_undo(driver: webdriver.Remote, editor, original: str, browser: s
         raise RuntimeError(f"Ctrl+Z in the {context} textarea did not use native text undo")
 
 
-def apply_markdown_format(driver: webdriver.Remote, editor, browser: str, shortcut: str, key: str) -> None:
+def apply_markdown_format(
+    driver: webdriver.Remote, editor, browser: str, shortcut: str, key: str, start: int, end: int
+) -> str:
+    """Select editor[start:end], apply bold (b) or italic (i), and return a diagnostic."""
     if browser == "safari":
         # SafariDriver does not reliably synthesize Command-modified key events. The
         # browser self-test covers shortcut routing; exercise the exported operation
         # here on the real application textarea so this integration test is stable.
+        # Select in the same script that formats: anything that assigns the
+        # textarea's value between two WebDriver calls collapses the selection.
         result = driver.execute_async_script(
-            "const textarea=arguments[0], marker=arguments[1], done=arguments[arguments.length - 1];"
-            "const start=textarea.selectionStart, end=textarea.selectionEnd;"
+            "const [textarea, marker, start, end] = arguments, done = arguments[arguments.length - 1];"
             "import('./modules/editor.js').then(module => {"
             "textarea.focus(); textarea.setSelectionRange(start, end);"
-            "module.applyMarkdownStyle(textarea, marker); done(null); },"
-            "error => done(String(error)));",
+            "const before = {start: textarea.selectionStart, end: textarea.selectionEnd,"
+            "selected: textarea.value.slice(textarea.selectionStart, textarea.selectionEnd)};"
+            "module.applyMarkdownStyle(textarea, marker);"
+            "done({before, after: textarea.value.slice(Math.max(0, start - 4), end + 8)}); },"
+            "error => done({error: String(error)}));",
             editor,
             "**" if key == "b" else "*",
+            start,
+            end,
         )
-        if result is not None:
-            raise RuntimeError(f"Safari could not invoke Markdown formatting: {result}")
-        return
+        if result.get("error"):
+            raise RuntimeError(f"Safari could not invoke Markdown formatting: {result['error']}")
+        return f"selection before formatting {result['before']!r}, text after {result['after']!r}"
+    driver.execute_script("arguments[0].focus(); arguments[0].setSelectionRange(arguments[1], arguments[2]);", editor, start, end)
     editor.send_keys(shortcut, key)
+    return ""
 
 
 def main() -> int:
@@ -272,14 +283,14 @@ def main() -> int:
         driver.find_element(By.CSS_SELECTOR, '[data-mode="source"]').click()
         source_editor = driver.find_element(By.ID, "source-editor")
         original_source = source_editor.get_attribute("value")
-        driver.execute_script("const start=arguments[0].value.indexOf('Browser'); arguments[0].focus(); arguments[0].setSelectionRange(start, start + 7);", source_editor)
-        apply_markdown_format(driver, source_editor, browser, shortcut, "b")
+        word = original_source.index("Browser")
+        detail = apply_markdown_format(driver, source_editor, browser, shortcut, "b", word, word + 7)
         if "**Browser**" not in source_editor.get_attribute("value"):
-            raise RuntimeError("Markdown bold did not apply in the Source editor")
-        driver.execute_script("const start=arguments[0].value.indexOf('Browser'); arguments[0].setSelectionRange(start, start + 7);", source_editor)
-        apply_markdown_format(driver, source_editor, browser, shortcut, "b")
+            raise RuntimeError(f"Markdown bold did not apply in the Source editor; {detail}")
+        word = source_editor.get_attribute("value").index("Browser")
+        detail = apply_markdown_format(driver, source_editor, browser, shortcut, "b", word, word + 7)
         if source_editor.get_attribute("value") != original_source:
-            raise RuntimeError("Repeating Markdown bold did not toggle it off")
+            raise RuntimeError(f"Repeating Markdown bold did not toggle it off; {detail}")
         assert_text_undo(driver, source_editor, original_source, browser, "Source", shortcut)
         driver.find_element(By.CSS_SELECTOR, '[data-mode="design"]').click()
         driver.execute_script(
@@ -311,14 +322,12 @@ def main() -> int:
         if driver.switch_to.active_element != content_editor:
             raise RuntimeError("Opening the content dialog did not focus its textarea")
         original_content = content_editor.get_attribute("value")
-        driver.execute_script("arguments[0].setSelectionRange(0, 8);", content_editor)
-        apply_markdown_format(driver, content_editor, browser, shortcut, "i")
+        detail = apply_markdown_format(driver, content_editor, browser, shortcut, "i", 0, 8)
         if not content_editor.get_attribute("value").startswith("*Editable*"):
-            raise RuntimeError("Markdown italic did not apply in the content editor")
-        driver.execute_script("arguments[0].setSelectionRange(1, 9);", content_editor)
-        apply_markdown_format(driver, content_editor, browser, shortcut, "i")
+            raise RuntimeError(f"Markdown italic did not apply in the content editor; {detail}")
+        detail = apply_markdown_format(driver, content_editor, browser, shortcut, "i", 1, 9)
         if content_editor.get_attribute("value") != original_content:
-            raise RuntimeError("Repeating Markdown italic did not toggle it off")
+            raise RuntimeError(f"Repeating Markdown italic did not toggle it off; {detail}")
         assert_text_undo(driver, content_editor, original_content, browser, "content", shortcut)
         content_editor.send_keys(Keys.ESCAPE)
         position = driver.find_element(By.ID, "prop-x")
