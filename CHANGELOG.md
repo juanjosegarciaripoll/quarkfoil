@@ -37,10 +37,11 @@ All notable changes to Quarkfoil are documented here. The project follows
   reconstruction, and canonical examples. The publishing guide documents
   required metadata, local and rsync-over-SSH targets, dry runs, and the
   external mapping from a remote directory to its public URL. The reconstruction
-  guide resolves effective pixel sizes, documents
-  image-only cells and overlay line breaks, distinguishes the two gridless
-  layouts, derives overlay geometry, and makes rendered-page inspection part
-  of whole-deck authoring. `--all`
+  guide resolves effective pixel sizes, requires a native-object decision before
+  exporting assets, documents circle-versus-ellipse mapping, image-only cells,
+  and overlay line breaks, distinguishes the two gridless layouts, derives
+  overlay geometry, and adds an image-necessity audit to rendered-page review.
+  `--all`
   prints the complete reference when context size is not a concern. Add
   `quarkfoil deck create DECK` to initialize a missing or whitespace-only
   presentation without starting the browser server; optional title, author,

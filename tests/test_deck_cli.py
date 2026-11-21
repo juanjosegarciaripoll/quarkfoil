@@ -142,6 +142,14 @@ class DeckCliTests(unittest.TestCase):
         self.assertIn("0.72 -> 23.0 px", reproduction)
         self.assertIn("overlay Markdown prose", reproduction)
         self.assertIn("1.00 -> 21.8 px", reproduction)
+        self.assertIn("REPRODUCTION: OBJECTS BEFORE ASSETS", reproduction)
+        self.assertIn('equal rendered width and height to `shape="circle"`', reproduction)
+        self.assertIn('unequal dimensions to `shape="ellipse"`', reproduction)
+        self.assertIn("export it once and reuse that project-relative asset", reproduction)
+        self.assertLess(
+            reproduction.index("REPRODUCTION: OBJECTS BEFORE ASSETS"),
+            reproduction.index("REPRODUCTION: IMAGE CELLS ARE IMAGE-ONLY"),
+        )
         self.assertIn("IMAGE CELLS ARE IMAGE-ONLY", reproduction)
         self.assertIn("OVERLAY LINE BREAKS", reproduction)
         self.assertIn("REPRODUCTION: CITATION BOXES", reproduction)
@@ -150,6 +158,7 @@ class DeckCliTests(unittest.TestCase):
         self.assertIn("references.bib", reproduction)
         self.assertIn('x="55" y="82" w="40" h="8"', reproduction)
         self.assertIn("quarkfoil deck render deck.md", reproduction)
+        self.assertIn("Which objects became\nimages, and what required each one to be an image?", reproduction)
 
         result, overlays, errors = self.invoke(["deck", "guide", "overlays"])
         self.assertEqual((result, errors), (0, ""))

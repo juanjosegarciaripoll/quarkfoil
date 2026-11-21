@@ -545,13 +545,25 @@ Use these rules when reconstructing PowerPoint, PDF, or image references:
 1. Choose layout from content shape: text + figure -> 1+1; text + two figures
    -> 1+2; two texts + figure -> 2+1; annotated canvas with normal title and
    footer -> 0; full-bleed or chrome-free divider -> Free.
-2. Set `font-size` explicitly on every text cell and text overlay.
-3. Keep an image alone in its grid cell.
-4. Keep each overlay paragraph on one source line.
-5. Use `type="citation"` boxes for positioned paper references or credits;
+2. Inspect each PowerPoint object before exporting it. Prefer a native
+   Quarkfoil overlay whenever its geometry and styling can represent the object.
+3. Set `font-size` explicitly on every text cell and text overlay.
+4. Keep an image alone in its grid cell.
+5. Keep each overlay paragraph on one source line.
+6. Use `type="citation"` boxes for positioned paper references or credits;
    do not recreate them as Markdown overlays.
-6. Place overlays after the grid content is stable.
-7. Render and inspect every page. `deck inspect` validates structure, not fit.
+7. Place overlays after the grid content is stable.
+8. Render and inspect every page. `deck inspect` validates structure, not fit.
+
+REPRODUCTION: OBJECTS BEFORE ASSETS
+
+Inspect each PowerPoint object before exporting it. When a Quarkfoil primitive
+can represent its geometry and styling, create a native overlay. Map a
+PowerPoint ellipse with equal rendered width and height to `shape="circle"`,
+and one with unequal dimensions to `shape="ellipse"`. Use native shapes,
+arrows, Markdown, equations, citations, images, and video objects whenever they
+preserve the source object faithfully. For custom geometry that needs an SVG,
+export it once and reuse that project-relative asset across placements.
 
 REPRODUCTION: RESOLVED TYPOGRAPHY AT 1280x720
 
@@ -704,6 +716,10 @@ names one.
 Inspect every image for clipped text, literal attribute strings, unreadable
 type, off-slide overlays, long equations, and accidental source line breaks.
 Report when visual verification was not possible.
+
+After visual comparison, perform an object audit: **Which objects became
+images, and what required each one to be an image?** A visual match does not
+justify rasterizing geometry that a native Quarkfoil overlay can represent.
 """
 
 

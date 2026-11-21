@@ -16,13 +16,28 @@ quarkfoil deck guide reproduction
    text plus two figures uses `1+2`; two text panels plus one figure uses
    `2+1`; a positioned canvas with a normal title and footer uses `0`; a
    full-bleed or chrome-free divider uses Free.
-2. Set `font-size` explicitly on every text region and text overlay.
-3. Keep every image alone in its grid region.
-4. Keep each overlay paragraph on one source line.
-5. Use `type="citation"` boxes for positioned paper references or credits;
+2. Inspect every PowerPoint object before exporting it, and prefer a native
+   Quarkfoil overlay whenever its geometry and styling can represent the object.
+3. Set `font-size` explicitly on every text region and text overlay.
+4. Keep every image alone in its grid region.
+5. Keep each overlay paragraph on one source line.
+6. Use `type="citation"` boxes for positioned paper references or credits;
    do not recreate them as Markdown overlays.
-6. Add overlays after the grid content is stable.
-7. Render and inspect every page. `deck inspect` validates structure, not fit.
+7. Add overlays after the grid content is stable.
+8. Render and inspect every page. `deck inspect` validates structure, not fit.
+
+## Inspect objects before exporting assets
+
+Inspect each PowerPoint object before exporting it. When a Quarkfoil primitive
+can represent its geometry and styling, create a native overlay. Map a
+PowerPoint ellipse with equal rendered width and height to `shape="circle"`,
+and one with unequal dimensions to `shape="ellipse"`. Use native shapes,
+arrows, Markdown, equations, citations, images, and video objects whenever they
+preserve the source object faithfully.
+
+Export custom geometry as SVG only when a native primitive cannot reproduce it
+faithfully. Export that SVG once and reuse the same project-relative asset
+across every placement rather than creating duplicate image files.
 
 ## Resolved typography
 
@@ -210,6 +225,10 @@ for:
 - overlays outside the slide or colliding with title/footer chrome;
 - unintended line breaks caused by wrapped overlay source; and
 - mismatches against the reference slide.
+
+After the visual comparison, ask: **Which objects became images, and what
+required each one to be an image?** A close visual match does not justify
+rasterizing geometry that a native Quarkfoil overlay can represent.
 
 Always report when visual verification was not possible. A clean `deck
 inspect` result is not a visual check.
