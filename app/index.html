@@ -67,6 +67,7 @@
   <div id="external-change-banner" class="external-change-banner" role="alert" hidden>
     <span id="external-change-message">Presentation changed on disk.</span>
     <button id="external-change-review" type="button">Review</button>
+    <button id="external-change-reload" type="button">Reload</button>
   </div>
 
   <main id="workspace" class="workspace mode-design">
@@ -148,6 +149,9 @@
         <button id="edit-content" type="button">Edit content</button>
       </form>
       <form id="image-properties" hidden>
+        <label>Image file
+          <input id="prop-image-source" type="text" readonly>
+        </label>
         <label>Image fit
           <select id="prop-fit">
             <option value="contain">Fit</option>

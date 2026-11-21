@@ -115,12 +115,19 @@ def main() -> int:
     shortcut = Keys.COMMAND if sys.platform == "darwin" else Keys.CONTROL
     temporary = tempfile.TemporaryDirectory()
     deck = Path(temporary.name) / "deck.md"
+    figures = Path(temporary.name) / "figures"
+    figures.mkdir()
+    (figures / "reference-image.svg").write_text(
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2 1"><rect width="2" height="1" fill="#146c7e"/></svg>',
+        encoding="utf-8",
+    )
     bibliography_pdf = Path(temporary.name).parent / f"{Path(temporary.name).name}-paper.pdf"
     bibliography_pdf.write_bytes(b"%PDF-browser-test")
     deck.write_text(
         "---\ntitle: Browser title test\n---\n\n"
         "## Browser test {.layout-1}\n\nInitial content.\n\n"
         "::: overlay {#markdown-test type=\"markdown\" x=\"55\" y=\"20\" w=\"30\" h=\"15\"}\nEditable overlay.\n:::\n\n"
+        "::: overlay {#image-test type=\"image\" x=\"5\" y=\"20\" w=\"20\" h=\"20\"}\n![](figures/reference-image.svg){fit=contain}\n:::\n\n"
         "::: overlay {#link-test type=\"citation\" key=\"test-link\" display=\"brief\" x=\"10\" y=\"70\" w=\"40\" h=\"8\"}\n:::\n\n"
         "---\n\n## Reload position {.layout-1}\n\nSecond slide.\n",
         encoding="utf-8",
@@ -293,6 +300,14 @@ def main() -> int:
             raise RuntimeError(f"Repeating Markdown bold did not toggle it off; {detail}")
         assert_text_undo(driver, source_editor, original_source, browser, "Source", shortcut)
         driver.find_element(By.CSS_SELECTOR, '[data-mode="design"]').click()
+        driver.execute_script(
+            "document.querySelector('[data-object-id=\"image-test\"]').dispatchEvent(new MouseEvent('click', {bubbles:true}));"
+        )
+        image_source = driver.find_element(By.ID, "prop-image-source")
+        if image_source.get_attribute("value") != "figures/reference-image.svg":
+            raise RuntimeError(f"Image properties do not show the source path: {image_source.get_attribute('value')!r}")
+        if image_source.get_attribute("title") != "figures/reference-image.svg":
+            raise RuntimeError("Image source path is not available as a tooltip")
         driver.execute_script(
             "document.querySelector('.overlay-markdown').dispatchEvent(new MouseEvent('click', {bubbles:true}));"
         )
@@ -483,6 +498,11 @@ def main() -> int:
         )
         if not driver.find_element(By.ID, "save-button").get_attribute("disabled"):
             raise RuntimeError("Editing after an external conflict re-enabled browser saving")
+        banner_actions = [button.text for button in banner.find_elements(By.TAG_NAME, "button")]
+        if banner_actions != ["Review", "Reload"]:
+            raise RuntimeError(f"External change warning does not offer Review and Reload: {banner_actions}")
+        if driver.find_element(By.ID, "external-change-reload").get_attribute("disabled"):
+            raise RuntimeError("Valid external Markdown cannot be reloaded directly")
         banner.find_element(By.ID, "external-change-review").click()
         WebDriverWait(driver, 5).until(
             lambda active_driver: active_driver.find_element(By.ID, "external-change-dialog").get_attribute("open") is not None
@@ -503,7 +523,8 @@ def main() -> int:
                 or external_dialog_layout["overflow"] > 1 or external_dialog_layout["tail"] > 20
                 or external_dialog_layout["dialogTail"] > 2):
             raise RuntimeError(f"External conflict actions do not fit their dialog: {external_dialog_layout}")
-        driver.find_element(By.ID, "external-use-disk").click()
+        driver.find_element(By.CSS_SELECTOR, "#external-change-dialog button[value='cancel']").click()
+        driver.find_element(By.ID, "external-change-reload").click()
         WebDriverWait(driver, 5).until(
             lambda active_driver: "External conflict" in active_driver.find_element(By.ID, "slide-list").text
             and not active_driver.find_element(By.ID, "external-change-banner").is_displayed()
@@ -517,6 +538,8 @@ def main() -> int:
         )
         if "External conflict" not in driver.find_element(By.ID, "slide-list").text:
             raise RuntimeError("Invalid external Markdown replaced the last valid presentation")
+        if not driver.find_element(By.ID, "external-change-reload").get_attribute("disabled"):
+            raise RuntimeError("Invalid external Markdown remained directly reloadable")
         driver.find_element(By.ID, "external-change-review").click()
         if not driver.find_element(By.ID, "external-use-disk").get_attribute("disabled"):
             raise RuntimeError("Invalid external Markdown remained directly loadable")

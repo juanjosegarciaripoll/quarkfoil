@@ -168,6 +168,7 @@ button.active { background: #146c7e; border-color: #56cfe1; }
 .properties label { display: grid; grid-template-columns: 72px 1fr; align-items: center; gap: 0.4rem; font-size: 0.78rem; }
 .properties label.check { display: flex; }
 .properties input, .properties select { min-width: 0; padding: 0.25rem; }
+#prop-image-source { color: #cbd3da; background: #252b31; cursor: text; }
 .color-with-alpha, .color-with-alpha-reset { display: grid; grid-template-columns: 34px auto minmax(2.6rem, 1fr); align-items: center; gap: 0.25rem; }
 .color-with-alpha-reset { grid-template-columns: 34px auto minmax(2.6rem, 1fr) 28px; }
 .color-with-alpha input[type="color"] { width: 34px; height: 28px; padding: 1px; }

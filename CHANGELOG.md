@@ -7,6 +7,9 @@ All notable changes to Quarkfoil are documented here. The project follows
 
 ### Added
 
+- Show the selected image's project-relative source path in the Properties
+  panel for both image-only grid regions and floating image overlays.
+
 - Add `quarkfoil download URL --output DIRECTORY` to reconstruct a published
   talk as an editable project without changing the website. It restores pooled
   and private assets to the paths written in the Markdown, remembers the
@@ -186,6 +189,8 @@ adds focused controls for slide styling, diagrams, export, and recovery.
 
 ### Changed
 
+- Offer **Review** and **Reload** directly in the external-change warning so a
+  valid disk revision can immediately replace the browser draft.
 - Copy only referenced files from `assets.figures` during static export while
   retaining complete directories explicitly listed under `assets.include`.
 - Merge non-overlapping slide edits made in the browser and on disk, and present

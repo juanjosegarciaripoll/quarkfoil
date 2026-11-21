@@ -118,6 +118,8 @@ are editable and validated against the same limits as their sliders.
 
 Image-only regions and image overlays support:
 
+- Source path: the Properties panel shows the current project-relative image
+  path, making repeated use of the same file easy to identify.
 - Fit: contain, crop/fill, stretch, fit width, fit height, or native size. Stretch
   reshapes raster images and SVG resources to the overlay's exact dimensions.
 - Horizontal and vertical crop focus.
@@ -246,11 +248,12 @@ has no unsaved work. Quarkfoil preserves the current slide by its stable ID when
 possible, so inserted or reordered slides do not unnecessarily move the view.
 
 If both revisions contain work, saving is blocked and a persistent **Changed on
-disk** warning appears. **Review** shows the browser draft, the current disk
-version, and an editable merged result. You can download the browser draft,
-discard it in favor of a valid disk version, or apply valid merged Markdown and
-then save it against the external revision. Closing the comparison does not
-dismiss the conflict or enable saving.
+disk** warning appears. **Reload** immediately discards the browser draft and
+loads a valid disk version. **Review** shows the browser draft, the current disk
+version, and an editable merged result. From there you can download the browser
+draft, discard it in favor of a valid disk version, or apply valid merged
+Markdown and then save it against the external revision. Closing the comparison
+does not dismiss the conflict or enable saving.
 
 When both revisions retain the same slides in the same order, Quarkfoil uses
 the last saved source as a common base and merges changes slide by slide.

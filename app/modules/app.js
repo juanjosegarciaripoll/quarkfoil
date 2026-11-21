@@ -202,6 +202,7 @@ function showExternalChange(source, hash, error = "") {
     ? `The presentation changed on disk but is invalid: ${error}`
     : "The presentation changed on disk while the browser had unsaved or active edits.";
   document.querySelector("#external-change-message").textContent = message;
+  document.querySelector("#external-change-reload").disabled = Boolean(error);
   document.querySelector("#external-change-banner").hidden = false;
   updateDirtyState();
   const dialog = document.querySelector("#external-change-dialog");
@@ -1273,7 +1274,8 @@ function useExternalDiskVersion() {
   if (!change || change.error) return;
   try {
     applyExternalDeck(change.source, change.hash, "Loaded disk version");
-    document.querySelector("#external-change-dialog").close();
+    const dialog = document.querySelector("#external-change-dialog");
+    if (dialog.open) dialog.close();
   } catch (error) {
     const status = document.querySelector("#external-merge-status");
     status.textContent = error.message;
@@ -1688,6 +1690,7 @@ function bindUi() {
   elements.save.addEventListener("click", saveDeck);
   elements.download.addEventListener("click", downloadSource);
   document.querySelector("#external-change-review").addEventListener("click", openExternalChangeDialog);
+  document.querySelector("#external-change-reload").addEventListener("click", useExternalDiskVersion);
   document.querySelector("#external-download-browser").addEventListener("click", downloadBrowserDraft);
   document.querySelector("#external-use-disk").addEventListener("click", useExternalDiskVersion);
   document.querySelector("#external-apply-merge").addEventListener("click", applyExternalMerge);

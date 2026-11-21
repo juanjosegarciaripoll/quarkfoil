@@ -726,13 +726,7 @@ export class DesignEditor {
     this.cellProperties.hidden = false;
     setRangeControl("prop-cell-font-size", cell?.fontSize || 0.72);
     if (cell?.type === "image" && cell.image) {
-      this.imageProperties.hidden = false;
-      document.querySelector("#prop-fit").value = cell.image.attrs.values.fit || "contain";
-      const focus = (cell.image.attrs.values.focus || "50 50").split(/[\s,]+/);
-      setRangeControl("prop-focus-x", focus[0] || 50);
-      setRangeControl("prop-focus-y", focus[1] || 50);
-      setRangeControl("prop-image-opacity", 100 * Number(cell.image.attrs.values.opacity ?? 1));
-      this.loadPlotProperties(cell.image.source);
+      this.fillImageProperties(cell.image);
     } else if (cell?.type === "video") {
       this.noSelection.textContent = "Video cell properties must currently be edited in Source mode.";
     }
@@ -794,13 +788,7 @@ export class DesignEditor {
     document.querySelector("#prop-locked").checked = object.locked;
     document.querySelector("#edit-content").hidden = ["image", "video", "citation", "arrow"].includes(object.type);
     if (object.type === "image" && object.image) {
-      this.imageProperties.hidden = false;
-      document.querySelector("#prop-fit").value = object.image.attrs.values.fit || "contain";
-      const focus = (object.image.attrs.values.focus || "50 50").split(/[\s,]+/);
-      setRangeControl("prop-focus-x", focus[0] || 50);
-      setRangeControl("prop-focus-y", focus[1] || 50);
-      setRangeControl("prop-image-opacity", 100 * Number(object.image.attrs.values.opacity ?? 1));
-      this.loadPlotProperties(object.image.source);
+      this.fillImageProperties(object.image);
     } else if (object.type === "video" && object.video) {
       this.fillVideoProperties(object.video);
     } else if (object.type === "arrow" && object.arrow) {
@@ -1187,6 +1175,19 @@ export class DesignEditor {
     const body = `![${object.image.alt}](${object.image.source}${title}){fit=${JSON.stringify(fit)} focus=${JSON.stringify(focus)}${opacityAttribute}}`;
     if (this.selected) this.commit(updateBlockContent(this.options.getDeck(), this.slideIndex(), object.id, body));
     else this.commit(setCellContent(this.options.getDeck(), this.slideIndex(), object.id, body));
+  }
+
+  fillImageProperties(image) {
+    this.imageProperties.hidden = false;
+    const source = document.querySelector("#prop-image-source");
+    source.value = image.source;
+    source.title = image.source;
+    document.querySelector("#prop-fit").value = image.attrs.values.fit || "contain";
+    const focus = (image.attrs.values.focus || "50 50").split(/[\s,]+/);
+    setRangeControl("prop-focus-x", focus[0] || 50);
+    setRangeControl("prop-focus-y", focus[1] || 50);
+    setRangeControl("prop-image-opacity", 100 * Number(image.attrs.values.opacity ?? 1));
+    this.loadPlotProperties(image.source);
   }
 
   fillVideoProperties(video) {
