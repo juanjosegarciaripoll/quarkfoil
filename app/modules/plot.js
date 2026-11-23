@@ -1,9 +1,10 @@
-const FUNCTIONS = Object.freeze({
-  abs: Math.abs, acos: Math.acos, asin: Math.asin, atan: Math.atan, atan2: Math.atan2,
-  ceil: Math.ceil, cos: Math.cos, exp: Math.exp, floor: Math.floor, log: Math.log,
-  log10: Math.log10, max: Math.max, min: Math.min, pow: Math.pow, round: Math.round,
-  sign: Math.sign, sin: Math.sin, sqrt: Math.sqrt, tan: Math.tan,
-});
+const mathNames = Object.getOwnPropertyNames(Math);
+const FUNCTIONS = Object.freeze(Object.fromEntries(
+  mathNames.filter(name => typeof Math[name] === "function").map(name => [name, Math[name]])
+));
+const CONSTANTS = Object.freeze(Object.fromEntries(
+  mathNames.filter(name => typeof Math[name] === "number").map(name => [name, Math[name]])
+));
 
 function tokenize(source) {
   const tokens = [];
@@ -38,8 +39,8 @@ export function compileExpression(source) {
     if (!peek("identifier")) throw new Error("Expected a number, x, t, or function");
     const name = take("identifier").value;
     if (["x", "t"].includes(name)) return x => x;
-    if (["PI", "E"].includes(name) && !peek("(")) { const value = Math[name]; return () => value; }
-    const fn = FUNCTIONS[name];
+    if (Object.hasOwn(CONSTANTS, name) && !peek("(")) { const value = CONSTANTS[name]; return () => value; }
+    const fn = Object.hasOwn(FUNCTIONS, name) ? FUNCTIONS[name] : null;
     if (!fn) throw new Error(`Unknown function or value '${name}'`);
     take("(");
     const args = [];

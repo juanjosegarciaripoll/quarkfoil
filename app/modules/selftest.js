@@ -760,6 +760,15 @@ try {
   const expression = compileExpression("Math.sin(x) + x ** 2");
   assert(Math.abs(expression(2) - (Math.sin(2) + 4)) < 1e-10, "plot expressions support JavaScript-style Math functions and operators");
   assert(Math.abs(compileExpression("cos(t)")(Math.PI) + 1) < 1e-10, "plot expressions accept t as a parametric variable");
+  assert(Math.abs(compileExpression("Math.cosh(x)")(2) - Math.cosh(2)) < 1e-10, "plot expressions include hyperbolic Math functions");
+  const mathFunctionNames = Object.getOwnPropertyNames(Math).filter(name => typeof Math[name] === "function");
+  assert(mathFunctionNames.every(name => {
+    try { return typeof compileExpression(`Math.${name}()`) === "function"; }
+    catch { return false; }
+  }), "plot expressions expose every Math function available in the browser");
+  const mathConstantNames = Object.getOwnPropertyNames(Math).filter(name => typeof Math[name] === "number");
+  assert(mathConstantNames.every(name => Object.is(compileExpression(`Math.${name}`)(0), Math[name])),
+    "plot expressions expose every numeric Math constant available in the browser");
   const barePlot = createPlotSvg("sin(x)", 0, 2 * Math.PI, 40, false);
   assert(barePlot.includes('<svg xmlns="http://www.w3.org/2000/svg"') && barePlot.includes('data-quarkfoil-plot="1"') && !barePlot.includes('class="axes"'), "axis-free plots serialize as identifiable standalone SVG without axes");
   assert(/<path d="M0\.00 /.test(barePlot) && barePlot.includes("800.00"), "axis-free plot curves use the full SVG width without padding");

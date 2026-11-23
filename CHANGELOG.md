@@ -7,6 +7,9 @@ All notable changes to Quarkfoil are documented here. The project follows
 
 ### Added
 
+- Expose every browser-supported `Math` function and numeric constant to plot
+  expressions, including hyperbolic functions such as `cosh`.
+
 - Show the selected image's project-relative source path in the Properties
   panel for both image-only grid regions and floating image overlays.
 

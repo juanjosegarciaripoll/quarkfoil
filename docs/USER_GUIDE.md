@@ -194,7 +194,12 @@ The plot dialog accepts one or two JavaScript-style expressions. Leave the
 second expression empty for an ordinary `Y = f(x)` graph. Fill both expression
 areas for a parametric `(X(t), Y(t))` curve. The start and end values define the
 domain of `x` or `t`, and the point count controls sampling. The dialog previews
-a cubic spline through the samples. Enable axes for a padded plot with horizontal and
+a cubic spline through the samples. Every function and numeric constant in the
+browser's `Math` namespace is available with or without the `Math.` prefix, for
+example `cosh(x)`, `Math.hypot(x, 1)`, `PI`, and `Math.SQRT2`. Expressions remain
+restricted to those functions, constants, arithmetic, and `x` or `t`; they do
+not execute arbitrary JavaScript. `random()` is available but intentionally
+produces a different sample each time the plot is evaluated. Enable axes for a padded plot with horizontal and
 vertical axes, or disable them to make the curve occupy the full SVG viewport
 without padding. Choose the SVG filename before creating the plot; Quarkfoil saves
 the generated file in the configured figures folder and inserts it as an ordinary
