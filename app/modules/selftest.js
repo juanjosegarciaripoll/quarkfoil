@@ -32,7 +32,7 @@ import {
   updateSlideNotes,
 } from "./parser.js";
 import { renderDeck, renderMarkdownPreview, syncVideoPlayback } from "./render.js";
-import { applyMarkdownStyle, arrowGeometry, bindRangeControl, boundarySlideShortcut, buildShapePalette, buildShapeSelect, canvasLinkTarget, canvasStartsMarquee, clipboardImageFile, deleteKey, DesignEditor, dialogDragPosition, handleMarkdownShortcut, initialImageGeometry, moveGeometryGroup, overlayPasteOffset, pageSlideIndex, projectAssetPage, rectanglesIntersect, refreshConvertedVideoAssets, renameClipboardImage, repeatedActivation, resolveImportDestination, storeOverlayClipboard, storedOverlayClipboard, videoConflictDestination, videoFile, videoPathAttributes } from "./editor.js";
+import { applyMarkdownStyle, arrowGeometry, bindRangeControl, boundarySlideShortcut, buildShapePalette, buildShapeSelect, canvasLinkTarget, canvasStartsMarquee, clipboardImageFile, deleteKey, DesignEditor, dialogDragPosition, handleMarkdownShortcut, initialImageGeometry, moveGeometryGroup, overlayPasteOffset, pageSlideIndex, projectAssetPage, rectanglesIntersect, refreshConvertedVideoAssets, renameClipboardImage, repeatedActivation, resizeOverlayGeometry, resolveImportDestination, storeOverlayClipboard, storedOverlayClipboard, videoConflictDestination, videoFile, videoPathAttributes } from "./editor.js";
 import { briefReference, formatBibliography, parseBibliography, prepareBibliography, renderCitation, renameBibliographyEntry, uniqueCitationKey } from "./bibliography.js";
 import { compileExpression, createPlotSvg } from "./plot.js";
 import { externalDeckAction, externalMergePlan, renderExternalMerge } from "./external.js";
@@ -658,6 +658,12 @@ try {
   "deck-boundary shortcuts require focus in the editing pane");
   const movedGroup = moveGeometryGroup([{ x: 5, y: 10, w: 20, h: 10 }, { x: 40, y: 30, w: 30, h: 20 }], -10, 60);
   assert(movedGroup[0].x === 0 && movedGroup[0].y === 60 && movedGroup[1].x === 35 && movedGroup[1].y === 80, "group movement preserves spacing and stays inside the slide");
+  const ordinaryResize = resizeOverlayGeometry({ x: 10, y: 20, w: 30, h: 40 }, "se", 128, 36, 0, 1280, 720);
+  assert(ordinaryResize.x === 10 && ordinaryResize.y === 20 && ordinaryResize.w === 40 && ordinaryResize.h === 45,
+    "unrotated corner resizing preserves ordinary slide-axis geometry");
+  const rotatedResize = resizeOverlayGeometry({ x: 20, y: 20, w: 20, h: 20 }, "se", 0, 128, 90, 1280, 720);
+  assert(rotatedResize.x === 15 && rotatedResize.y === 28.9 && rotatedResize.w === 30 && rotatedResize.h === 20,
+    "rotated corner resizing follows the overlay's local axes and keeps its opposite corner fixed");
   assert(rectanglesIntersect({ left: 0, top: 0, right: 20, bottom: 20 }, { left: 20, top: 10, right: 30, bottom: 30 }), "marquee selection includes objects touching its boundary");
   assert(!rectanglesIntersect({ left: 0, top: 0, right: 19, bottom: 20 }, { left: 20, top: 10, right: 30, bottom: 30 }), "marquee selection excludes separated objects");
 

@@ -144,6 +144,69 @@ export function moveGeometryGroup(geometries, dx, dy) {
   return geometries.map(item => ({ ...item, x: round(item.x + boundedX), y: round(item.y + boundedY) }));
 }
 
+export function resizeOverlayGeometry(geometry, corner, pointerDx, pointerDy, rotation, canvasWidth, canvasHeight) {
+  const scaleX = canvasWidth / 100;
+  const scaleY = canvasHeight / 100;
+  if (!(scaleX > 0) || !(scaleY > 0)) return { ...geometry };
+  const signX = corner.includes("e") ? 1 : -1;
+  const signY = corner.includes("s") ? 1 : -1;
+  const angle = (Number(rotation) || 0) * Math.PI / 180;
+  const cosine = Math.cos(angle);
+  const sine = Math.sin(angle);
+  const rotate = (x, y) => ({ x: cosine * x - sine * y, y: sine * x + cosine * y });
+  const unrotate = (x, y) => ({ x: cosine * x + sine * y, y: -sine * x + cosine * y });
+  const originalWidth = geometry.w * scaleX;
+  const originalHeight = geometry.h * scaleY;
+  const originalCenter = {
+    x: (geometry.x + geometry.w / 2) * scaleX,
+    y: (geometry.y + geometry.h / 2) * scaleY,
+  };
+  const anchorOffset = rotate(-signX * originalWidth / 2, -signY * originalHeight / 2);
+  const handleOffset = rotate(signX * originalWidth / 2, signY * originalHeight / 2);
+  const anchor = { x: originalCenter.x + anchorOffset.x, y: originalCenter.y + anchorOffset.y };
+  const handle = {
+    x: originalCenter.x + handleOffset.x + pointerDx,
+    y: originalCenter.y + handleOffset.y + pointerDy,
+  };
+  const localSpan = unrotate(handle.x - anchor.x, handle.y - anchor.y);
+  const targetWidth = Math.max(scaleX, signX * localSpan.x);
+  const targetHeight = Math.max(scaleY, signY * localSpan.y);
+  const fromDimensions = (width, height) => {
+    const centerOffset = rotate(signX * width / 2, signY * height / 2);
+    const center = { x: anchor.x + centerOffset.x, y: anchor.y + centerOffset.y };
+    return { x: center.x - width / 2, y: center.y - height / 2, width, height };
+  };
+  const inside = value => value.x >= 0 && value.y >= 0
+    && value.x + value.width <= canvasWidth && value.y + value.height <= canvasHeight;
+  let resized = fromDimensions(targetWidth, targetHeight);
+  if (!inside(resized) && inside(fromDimensions(originalWidth, originalHeight))) {
+    let lower = 0;
+    let upper = 1;
+    for (let iteration = 0; iteration < 30; iteration += 1) {
+      const amount = (lower + upper) / 2;
+      const candidate = fromDimensions(
+        originalWidth + amount * (targetWidth - originalWidth),
+        originalHeight + amount * (targetHeight - originalHeight),
+      );
+      if (inside(candidate)) lower = amount;
+      else upper = amount;
+    }
+    resized = fromDimensions(
+      originalWidth + lower * (targetWidth - originalWidth),
+      originalHeight + lower * (targetHeight - originalHeight),
+    );
+  }
+  const width = clamp(round(resized.width / scaleX), 1, 100);
+  const height = clamp(round(resized.height / scaleY), 1, 100);
+  return {
+    ...geometry,
+    x: clamp(round(resized.x / scaleX), 0, 100 - width),
+    y: clamp(round(resized.y / scaleY), 0, 100 - height),
+    w: width,
+    h: height,
+  };
+}
+
 export function dialogDragPosition(rect, dx, dy, viewportWidth, viewportHeight) {
   return {
     left: Math.round(clamp(rect.left + dx, 0, Math.max(0, viewportWidth - rect.width))),
@@ -1053,20 +1116,17 @@ export class DesignEditor {
         this.applyGeometryToElement(item.element, item.next);
       });
     } else {
-      const original = this.drag.items[0].original;
-      const next = { ...original };
-      const corner = this.drag.corner;
-      if (corner.includes("e")) next.w = clamp(round(original.w + dx), 1, 100 - original.x);
-      if (corner.includes("s")) next.h = clamp(round(original.h + dy), 1, 100 - original.y);
-      if (corner.includes("w")) {
-        next.x = clamp(round(original.x + dx), 0, original.x + original.w - 1);
-        next.w = round(original.w + original.x - next.x);
-      }
-      if (corner.includes("n")) {
-        next.y = clamp(round(original.y + dy), 0, original.y + original.h - 1);
-        next.h = round(original.h + original.y - next.y);
-      }
-      this.drag.items[0].next = next;
+      const item = this.drag.items[0];
+      const next = resizeOverlayGeometry(
+        item.original,
+        this.drag.corner,
+        event.clientX - this.drag.startX,
+        event.clientY - this.drag.startY,
+        item.object.rotation,
+        this.drag.rect.width,
+        this.drag.rect.height,
+      );
+      item.next = next;
       this.applyGeometryToElement(this.drag.element, next);
     }
     const primary = this.drag.items.find(item => item.element === this.selected)?.next;

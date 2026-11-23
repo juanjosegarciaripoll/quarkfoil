@@ -207,6 +207,8 @@ adds focused controls for slide styling, diagrams, export, and recovery.
 
 ### Fixed
 
+- Resize rotated overlays in their own local axes while keeping the opposite
+  rotated corner fixed, so image handles track pointer motion predictably.
 - Keep slide-import galleries tall when their search controls are hidden, and
   keep file-conflict actions visible within compact browser windows.
 - Keep the presentation player responsive while optional resources initialize.
