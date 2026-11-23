@@ -674,6 +674,30 @@ export function moveSlide(deck, slideIndex, direction) {
   return composeItems(deck, sources);
 }
 
+export function moveSlideTo(deck, slideIndex, targetIndex) {
+  const slide = deck.slides[slideIndex];
+  if (!slide) throw new Error("Unknown slide to move");
+  if (slide.trashed) return deck.source;
+  const activeSlides = deck.slides.filter(item => !item.trashed);
+  const currentIndex = activeSlides.findIndex(item => item.index === slideIndex);
+  if (!Number.isInteger(targetIndex) || targetIndex < 0 || targetIndex >= activeSlides.length) {
+    throw new Error(`Slide position must be between 1 and ${activeSlides.length}`);
+  }
+  if (targetIndex === currentIndex) return deck.source;
+  const position = slideItemPosition(deck, slideIndex);
+  const items = [...deck.items];
+  const sources = itemSources(deck);
+  const [item] = items.splice(position, 1);
+  const [source] = sources.splice(position, 1);
+  const remainingSlides = items.filter(candidate => candidate.kind === "slide" && !candidate.trashed);
+  const destination = targetIndex < remainingSlides.length
+    ? items.indexOf(remainingSlides[targetIndex])
+    : items.indexOf(remainingSlides.at(-1)) + 1;
+  items.splice(destination, 0, item);
+  sources.splice(destination, 0, source);
+  return composeItems(deck, sources);
+}
+
 export function duplicateSlide(deck, slideIndex) {
   const slide = deck.slides[slideIndex];
   if (!slide) throw new Error("Unknown slide to duplicate");

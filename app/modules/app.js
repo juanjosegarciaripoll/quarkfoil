@@ -342,7 +342,7 @@ function bindExternalDeckChecks() {
   setInterval(() => pollForExternalDeck(), 1200);
 }
 
-function parseAndRender(source, { preserveSlide = true } = {}) {
+function parseAndRender(source, { preserveSlide = true, slideIndex = null } = {}) {
   const previous = preserveSlide ? state.currentSlide : 0;
   const previousId = preserveSlide ? state.deck?.slides[state.currentSlide]?.id : null;
   source = canonicalSource(source);
@@ -356,7 +356,9 @@ function parseAndRender(source, { preserveSlide = true } = {}) {
   state.deck = deck;
   document.title = deck.metadata?.title ? String(deck.metadata.title) : "Quarkfoil";
   const matchingSlide = previousId ? deck.slides.findIndex(slide => slide.id === previousId) : -1;
-  state.currentSlide = matchingSlide >= 0 ? matchingSlide : Math.min(previous, Math.max(0, deck.slides.length - 1));
+  state.currentSlide = Number.isInteger(slideIndex)
+    ? Math.min(Math.max(0, slideIndex), Math.max(0, deck.slides.length - 1))
+    : matchingSlide >= 0 ? matchingSlide : Math.min(previous, Math.max(0, deck.slides.length - 1));
   if (!deck.sections.some(section => section.id === state.selectedSection)) state.selectedSection = null;
   state.collapsedSections = new Set([...state.collapsedSections].filter(id => deck.sections.some(section => section.id === id)));
   elements.source.value = source;
@@ -374,11 +376,11 @@ function parseAndRender(source, { preserveSlide = true } = {}) {
   return deck;
 }
 
-function commitSource(source, record = true) {
+function commitSource(source, record = true, renderOptions = {}) {
   if (source === state.source) return true;
   const previous = state.source;
   try {
-    parseAndRender(source);
+    parseAndRender(source, renderOptions);
     if (record) {
       state.undo.push(previous);
       if (state.undo.length > 100) state.undo.shift();

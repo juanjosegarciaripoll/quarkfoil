@@ -181,6 +181,8 @@ adds focused controls for slide styling, diagrams, export, and recovery.
   speaker notes, timing, and synchronization with the editor window.
 - Jump directly to the first or last slide with keyboard shortcuts, and keep the
   current slide encoded in the browser URL for reliable reloads and navigation.
+- Reorder a slide by editing its one-based Position property while keeping the
+  left slide list renumbered and synchronized with the moved slide.
 - Control footer visibility independently on each slide and adjust text size for
   structured slide panels from the Design properties.
 - Add left brace, right brace, and triangle diagram shapes, plus rotation for

@@ -52,6 +52,11 @@ Present hides the editor chrome and enables normal Reveal.js navigation. Press `
 
 The left sidebar selects slides. Its top controls add a blank slide with the current layout, duplicate the selected slide, or delete it. The bottom controls move the selected slide up or down.
 
+With no object selected, **Position** in the slide Properties is the active
+slide's one-based index. Enter another position to move the slide there and
+shift the intervening slides. The left sidebar is rebuilt, renumbered, and
+scrolled to keep the moved slide selected. Trashed slides cannot be reordered.
+
 Double-click a sidebar title to rename a slide. This is especially useful for Free slides, whose organizational title is hidden on the canvas.
 The title editor exposes Markdown headings while hiding the structural `{...}`
 attributes. Use `#`, `##`, and smaller heading levels on consecutive lines to

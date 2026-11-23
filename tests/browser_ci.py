@@ -125,7 +125,7 @@ def main() -> int:
     bibliography_pdf.write_bytes(b"%PDF-browser-test")
     deck.write_text(
         "---\ntitle: Browser title test\n---\n\n"
-        "## Browser test {.layout-1}\n\nInitial content.\n\n"
+        "## Browser test {#browser-test .layout-1}\n\nInitial content.\n\n"
         "::: overlay {#markdown-test type=\"markdown\" x=\"55\" y=\"20\" w=\"30\" h=\"15\"}\nEditable overlay.\n:::\n\n"
         "::: overlay {#image-test type=\"image\" x=\"5\" y=\"20\" w=\"20\" h=\"20\"}\n![](figures/reference-image.svg){fit=contain}\n:::\n\n"
         "::: overlay {#link-test type=\"citation\" key=\"test-link\" display=\"brief\" x=\"10\" y=\"70\" w=\"40\" h=\"8\"}\n:::\n\n"
@@ -182,6 +182,31 @@ def main() -> int:
         driver.get(base)
         WebDriverWait(driver, 30).until(
             lambda active_driver: active_driver.find_element(By.ID, "save-state").text == "Saved"
+        )
+        slide_position = WebDriverWait(driver, 5).until(
+            lambda active_driver: active_driver.find_element(By.ID, "prop-slide-position")
+            if active_driver.find_element(By.ID, "prop-slide-position").get_attribute("value") == "1" else False
+        )
+        if slide_position.get_attribute("max") != "2":
+            raise RuntimeError("Slide Position does not expose the active deck length")
+        driver.execute_script(
+            "arguments[0].value = '2'; arguments[0].dispatchEvent(new Event('change', {bubbles:true}));",
+            slide_position,
+        )
+        WebDriverWait(driver, 5).until(
+            lambda active_driver: active_driver.find_element(By.ID, "prop-slide-position").get_attribute("value") == "2"
+            and active_driver.find_element(By.CSS_SELECTOR, "#slide-list button.current").text.startswith("2. Browser test")
+            and active_driver.find_elements(By.CSS_SELECTOR, "#slide-list li:not(.section-entry) button")[0].text.startswith("1. Reload position")
+        )
+        slide_position = driver.find_element(By.ID, "prop-slide-position")
+        driver.execute_script(
+            "arguments[0].value = '1'; arguments[0].dispatchEvent(new Event('change', {bubbles:true}));",
+            slide_position,
+        )
+        WebDriverWait(driver, 5).until(
+            lambda active_driver: active_driver.find_element(By.ID, "prop-slide-position").get_attribute("value") == "1"
+            and active_driver.find_element(By.CSS_SELECTOR, "#slide-list button.current").text.startswith("1. Browser test")
+            and active_driver.find_elements(By.CSS_SELECTOR, "#slide-list li:not(.section-entry) button")[1].text.startswith("2. Reload position")
         )
         editor_window = driver.current_window_handle
         driver.find_element(By.ID, "presenter-button").click()

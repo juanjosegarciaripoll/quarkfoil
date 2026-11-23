@@ -4,6 +4,7 @@ import {
   duplicateOverlay,
   insertArrow,
   insertOverlay,
+  moveSlideTo,
   pasteOverlays,
   parseDeck,
   serializeOverlays,
@@ -451,6 +452,7 @@ export class DesignEditor {
     for (const id of ["prop-focus-x", "prop-focus-y", "prop-image-opacity", "prop-font-size", "prop-cell-font-size", "prop-rotation"]) bindRangeControl(id);
     document.querySelector("#layout-select").addEventListener("change", event => this.changeLayout(event.target.value));
     document.querySelector("#prop-slide-theme").addEventListener("change", event => this.applySlideProperties({ theme: event.target.value || null }));
+    document.querySelector("#prop-slide-position").addEventListener("change", () => this.applySlidePosition());
     document.querySelector("#prop-slide-footer").addEventListener("change", event => this.applySlideProperties({ footer: event.target.checked ? null : "none" }));
     for (const name of ["background", "foreground"]) {
       bindColorControl(`prop-slide-${name}`, () => this.applySlideProperties({ [name]: colorControlValue(`prop-slide-${name}`) }));
@@ -823,6 +825,12 @@ export class DesignEditor {
     const slide = this.slide();
     const section = this.section();
     if (!slide || !section) return;
+    const activeSlides = this.options.getDeck().slides.filter(item => !item.trashed);
+    const position = activeSlides.findIndex(item => item.index === this.slideIndex());
+    const positionInput = document.querySelector("#prop-slide-position");
+    positionInput.value = position < 0 ? "" : String(position + 1);
+    positionInput.max = String(activeSlides.length);
+    positionInput.disabled = position < 0;
     const style = getComputedStyle(section);
     document.querySelector("#prop-slide-theme").value = slide.headingAttrs.values.theme || "";
     document.querySelector("#prop-slide-footer").checked = slide.headingAttrs.values.footer !== "none";
@@ -836,6 +844,19 @@ export class DesignEditor {
 
   applySlideProperties(changes) {
     this.commit(updateSlideProperties(this.options.getDeck(), this.slideIndex(), changes));
+  }
+
+  applySlidePosition() {
+    const deck = this.options.getDeck();
+    const activeSlides = deck.slides.filter(item => !item.trashed);
+    const current = activeSlides.findIndex(item => item.index === this.slideIndex());
+    const input = document.querySelector("#prop-slide-position");
+    const requested = Number(input.value);
+    if (current < 0 || !Number.isInteger(requested) || requested < 1 || requested > activeSlides.length) {
+      input.value = current < 0 ? "" : String(current + 1);
+      return;
+    }
+    this.options.commitSource(moveSlideTo(deck, this.slideIndex(), requested - 1), true, { slideIndex: requested - 1 });
   }
 
   fillProperties(object, element) {

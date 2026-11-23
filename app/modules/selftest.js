@@ -13,6 +13,7 @@ import {
   insertSlide,
   moveSection,
   moveSlide,
+  moveSlideTo,
   permanentlyDeleteSlide,
   duplicateOverlay,
   normalizeDeck,
@@ -968,6 +969,13 @@ try {
   assert(imported.slides[1].raw.includes("Copied content"), "slide import copies its Markdown content");
   const moved = parseDeck(moveSlide(deck, 0, 1));
   assert(moved.slides[0].title === "Second" && moved.slides[1].title === "First", "selected slide moves within the deck");
+  const positionedDeck = parseDeck("## One {.layout-1}\n\n---\n\n## Two {.layout-1}\n\n---\n\n## Three {.layout-1}\n\n---\n\n## Four {.layout-1}\n");
+  const positioned = parseDeck(moveSlideTo(positionedDeck, 3, 1));
+  assert(positioned.slides.map(slide => slide.title).join(" ") === "One Four Two Three",
+    "moving a slide to an absolute position shifts the intervening slides down");
+  let invalidSlidePositionRejected = false;
+  try { moveSlideTo(positionedDeck, 0, 4); } catch (error) { invalidSlidePositionRejected = /between 1 and 4/.test(error.message); }
+  assert(invalidSlidePositionRejected, "absolute slide positions must name an active one-based position");
 
   let sectioned = parseDeck(insertSection(deck, 0, "Methods"));
   assert(sectioned.sections.length === 1 && sectioned.slides.length === 2, "section markers parse without becoming presentation slides");
@@ -984,6 +992,10 @@ try {
     && firstAcrossSection.slides.map(slide => slide.title).join(" ") === "First Second",
   "the first slide in a section moves above its section marker");
   const sectionBetweenSlides = parseDeck(insertSection(deck, 1, "Boundary"));
+  const positionedAcrossSection = parseDeck(moveSlideTo(sectionBetweenSlides, 1, 0));
+  assert(positionedAcrossSection.slides.map(slide => slide.title).join(" ") === "Second First"
+    && positionedAcrossSection.items.map(item => item.kind).join(" ") === "slide slide section",
+  "absolute slide positioning crosses section markers consistently with adjacent moves");
   const previousAcrossSection = parseDeck(moveSlide(sectionBetweenSlides, 0, 1));
   assert(previousAcrossSection.items.map(item => item.kind).join(" ") === "section slide slide"
     && previousAcrossSection.slides.map(slide => slide.title).join(" ") === "First Second",
